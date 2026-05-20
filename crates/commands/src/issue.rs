@@ -75,9 +75,9 @@ pub struct IssueInvoiceOutput {
     pub invoice: Invoice,
     /// Updated lines (tax_amount + line_total now populated).
     pub lines: Vec<InvoiceLine>,
-    /// Rendered HTML body. PDF bytes (via the stub engine) are computed
-    /// but discarded at v1 because the blob store (T-0009) isn't on
-    /// this worktree yet — a follow-up will persist `pdf_blob_ref`.
+    /// Rendered HTML body. PDF bytes are also persisted to
+    /// [`CoreCtx::blob_store`] (when configured) and the resulting
+    /// `blob://...` URI is recorded on `invoice.pdf_blob_ref`.
     pub html: String,
     /// PDF bytes (stub engine returns HTML verbatim at v1).
     pub pdf: Vec<u8>,
@@ -181,11 +181,17 @@ pub async fn issue_invoice(
         .map(std::path::Path::new);
     let html = render_html(template_path, &render_ctx).await?;
     let pdf = render_pdf(&html).await?;
-    // NOTE: blob storage (T-0009) is not merged on this worktree. When
-    // it lands, we'll persist `pdf` and set `invoice.pdf_blob_ref` to
-    // the returned URI. For now we emit the bytes in the command
-    // output so a caller can choose to write them locally.
-    let _ = &pdf;
+
+    // 7a. Persist PDF to the blob store when one is configured. The
+    //     returned `BlobRef` URI lands on `invoice.pdf_blob_ref` so
+    //     downstream channels (send via `link://`, archive, etc.) can
+    //     resolve back to the bytes. When no blob store is wired the
+    //     command still succeeds — the operator just gets the bytes
+    //     in the command output and `pdf_blob_ref` stays `None`.
+    if let Some(blob_store) = ctx.blob_store.as_ref() {
+        let blob_ref = blob_store.put(pdf.clone(), "application/pdf").await?;
+        invoice.pdf_blob_ref = Some(blob_ref.as_str().to_string());
+    }
 
     // 8. Persist mutation + audit row in a single sqlx transaction
     //    (design §3.5). InvoiceRepo::save_in_tx uses

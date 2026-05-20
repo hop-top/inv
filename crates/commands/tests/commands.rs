@@ -26,6 +26,7 @@ use inv_commands::{
     draft_invoice, issue_invoice, send_invoice, Actor, Channel, Clock, CoreCtx, CoreError,
     DraftInvoiceInput, DraftLineInput, IssueInvoiceInput, SendInvoiceInput,
 };
+use inv_store::blob::LocalBlobStore;
 use inv_store::pool::{connect, Pool};
 use inv_store::repo::history::InvoiceHistoryRepo;
 use inv_store::repo::CustomerRepo;
@@ -66,12 +67,34 @@ fn frozen_now() -> DateTime<Utc> {
     Utc.with_ymd_and_hms(2026, 5, 19, 12, 0, 0).unwrap()
 }
 
-async fn fresh_ctx() -> (CoreCtx, Pool) {
+async fn fresh_ctx() -> (CoreCtx, Pool, tempfile::TempDir) {
+    let (ctx, pool, blob_dir) = fresh_ctx_inner(true).await;
+    (ctx, pool, blob_dir.expect("blob dir present when blob store wired"))
+}
+
+/// Variant that returns a ctx with `blob_store = None`. Used by the
+/// test that asserts the no-blob-store path leaves `pdf_blob_ref` unset.
+async fn fresh_ctx_no_blob() -> (CoreCtx, Pool) {
+    let (ctx, pool, _) = fresh_ctx_inner(false).await;
+    (ctx, pool)
+}
+
+async fn fresh_ctx_inner(with_blob: bool) -> (CoreCtx, Pool, Option<tempfile::TempDir>) {
     let pool = connect("sqlite::memory:").await.expect("connect");
     run_migrations(&pool).await.expect("migrate");
     let (table, nexus) = TaxTable::load_from_str(FIXTURE_TOML).expect("tax fixture");
-    let ctx = CoreCtx::new(pool.clone(), table, nexus).with_clock(Arc::new(FrozenClock(frozen_now())));
-    (ctx, pool)
+    let mut ctx = CoreCtx::new(pool.clone(), table, nexus)
+        .with_clock(Arc::new(FrozenClock(frozen_now())));
+    let blob_dir = if with_blob {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let store = LocalBlobStore::new(dir.path(), b"test-signing-key".to_vec())
+            .expect("local blob store");
+        ctx = ctx.with_blob_store(Arc::new(store));
+        Some(dir)
+    } else {
+        None
+    };
+    (ctx, pool, blob_dir)
 }
 
 async fn seed_customer(pool: &Pool) -> CustomerId {
@@ -125,7 +148,7 @@ fn draft_input(
 
 #[tokio::test]
 async fn draft_happy_path_creates_draft_with_computed_totals() {
-    let (ctx, pool) = fresh_ctx().await;
+    let (ctx, pool, _blob_dir) = fresh_ctx().await;
     let cust = seed_customer(&pool).await;
 
     let out = draft_invoice(&ctx, draft_input(&cust, None))
@@ -161,7 +184,7 @@ async fn draft_happy_path_creates_draft_with_computed_totals() {
 
 #[tokio::test]
 async fn draft_idempotency_returns_existing_invoice() {
-    let (ctx, pool) = fresh_ctx().await;
+    let (ctx, pool, _blob_dir) = fresh_ctx().await;
     let cust = seed_customer(&pool).await;
 
     let first = draft_invoice(&ctx, draft_input(&cust, Some("key-1")))
@@ -186,7 +209,7 @@ async fn draft_idempotency_returns_existing_invoice() {
 
 #[tokio::test]
 async fn draft_validation_rejects_empty_lines() {
-    let (ctx, pool) = fresh_ctx().await;
+    let (ctx, pool, _blob_dir) = fresh_ctx().await;
     let cust = seed_customer(&pool).await;
     let mut input = draft_input(&cust, None);
     input.lines.clear();
@@ -200,7 +223,7 @@ async fn draft_validation_rejects_empty_lines() {
 
 #[tokio::test]
 async fn draft_validation_rejects_unsupported_currency() {
-    let (ctx, pool) = fresh_ctx().await;
+    let (ctx, pool, _blob_dir) = fresh_ctx().await;
     let cust = seed_customer(&pool).await;
     let mut input = draft_input(&cust, None);
     input.currency = Currency::new("EUR").unwrap();
@@ -214,7 +237,7 @@ async fn draft_validation_rejects_unsupported_currency() {
 
 #[tokio::test]
 async fn draft_validation_rejects_zero_quantity() {
-    let (ctx, pool) = fresh_ctx().await;
+    let (ctx, pool, _blob_dir) = fresh_ctx().await;
     let cust = seed_customer(&pool).await;
     let mut input = draft_input(&cust, None);
     input.lines[0].quantity = Decimal::ZERO;
@@ -232,7 +255,7 @@ async fn draft_validation_rejects_zero_quantity() {
 
 #[tokio::test]
 async fn issue_happy_path_freezes_tax_and_assigns_number() {
-    let (ctx, pool) = fresh_ctx().await;
+    let (ctx, pool, _blob_dir) = fresh_ctx().await;
     let cust = seed_customer(&pool).await;
     let drafted = draft_invoice(&ctx, draft_input(&cust, None))
         .await
@@ -266,6 +289,19 @@ async fn issue_happy_path_freezes_tax_and_assigns_number() {
     assert!(!out.html.is_empty());
     assert!(!out.pdf.is_empty());
 
+    // Blob persistence (T-0025): with a LocalBlobStore wired into the
+    // CoreCtx, issue must persist the rendered PDF and stamp the
+    // invoice with the resulting `blob://local/...` URI.
+    let blob_uri = out
+        .invoice
+        .pdf_blob_ref
+        .as_deref()
+        .expect("pdf_blob_ref set when blob_store is configured");
+    assert!(
+        blob_uri.starts_with("blob://local/"),
+        "expected blob://local/... uri, got {blob_uri}"
+    );
+
     // Mechanic-triplet + domain `.issued`.
     let topics: Vec<&str> = out
         .emitted_events
@@ -291,7 +327,7 @@ async fn issue_happy_path_freezes_tax_and_assigns_number() {
 
 #[tokio::test]
 async fn issue_on_already_issued_returns_fsm_error() {
-    let (ctx, pool) = fresh_ctx().await;
+    let (ctx, pool, _blob_dir) = fresh_ctx().await;
     let cust = seed_customer(&pool).await;
     let drafted = draft_invoice(&ctx, draft_input(&cust, None))
         .await
@@ -330,13 +366,49 @@ async fn issue_on_already_issued_returns_fsm_error() {
     }
 }
 
+#[tokio::test]
+async fn issue_without_blob_store_leaves_pdf_blob_ref_unset() {
+    // T-0025: when CoreCtx.blob_store is None the command must succeed,
+    // return the PDF bytes in the output, and leave `pdf_blob_ref`
+    // untouched (`None`). This documents the graceful-degradation path
+    // used by lightweight harnesses / adapters that don't wire a blob
+    // backend.
+    let (ctx, pool) = fresh_ctx_no_blob().await;
+    assert!(ctx.blob_store.is_none(), "precondition: no blob store");
+    let cust = seed_customer(&pool).await;
+    let drafted = draft_invoice(&ctx, draft_input(&cust, None))
+        .await
+        .unwrap();
+
+    let out = issue_invoice(
+        &ctx,
+        IssueInvoiceInput {
+            invoice_id: drafted.invoice.id.clone(),
+            idempotency_key: None,
+            actor: Actor::Cli {
+                name: "jad".into(),
+            },
+            channel: Channel::Cli,
+        },
+    )
+    .await
+    .expect("issue ok without blob store");
+
+    assert_eq!(out.invoice.state, InvoiceState::Issued);
+    assert!(!out.pdf.is_empty(), "bytes still returned to caller");
+    assert!(
+        out.invoice.pdf_blob_ref.is_none(),
+        "no blob store wired -> pdf_blob_ref must stay None"
+    );
+}
+
 // ---------------------------------------------------------------------
 // send_invoice
 // ---------------------------------------------------------------------
 
 #[tokio::test]
 async fn send_file_writes_bytes_and_transitions_to_sent() {
-    let (ctx, pool) = fresh_ctx().await;
+    let (ctx, pool, _blob_dir) = fresh_ctx().await;
     let cust = seed_customer(&pool).await;
     let drafted = draft_invoice(&ctx, draft_input(&cust, None))
         .await
@@ -409,7 +481,7 @@ async fn send_file_writes_bytes_and_transitions_to_sent() {
 
 #[tokio::test]
 async fn send_stdout_writes_to_injected_sink() {
-    let (ctx, pool) = fresh_ctx().await;
+    let (ctx, pool, _blob_dir) = fresh_ctx().await;
     let cust = seed_customer(&pool).await;
     let drafted = draft_invoice(&ctx, draft_input(&cust, None))
         .await
@@ -453,7 +525,7 @@ async fn send_stdout_writes_to_injected_sink() {
 
 #[tokio::test]
 async fn send_unsupported_scheme_returns_not_implemented() {
-    let (ctx, pool) = fresh_ctx().await;
+    let (ctx, pool, _blob_dir) = fresh_ctx().await;
     let cust = seed_customer(&pool).await;
     let drafted = draft_invoice(&ctx, draft_input(&cust, None))
         .await

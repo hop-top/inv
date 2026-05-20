@@ -11,6 +11,7 @@ use chrono::{DateTime, Utc};
 
 use inv_core::domain::invoice::HistoryChannel;
 use inv_core::tax::{NexusConfig, TaxTable};
+use inv_store::blob::BlobStore;
 use inv_store::pool::Pool;
 
 /// Trait so tests can inject a fixed clock.
@@ -115,8 +116,10 @@ impl From<Channel> for HistoryChannel {
 ///
 /// `bus_publisher` is `None` at v1 — events are returned in the command
 /// output for the test harness, and T-0014 will hook an actual
-/// publisher behind a trait. `blob_store` is similarly absent until
-/// T-0009 lands.
+/// publisher behind a trait. `blob_store` is `Option` to keep the
+/// dependency soft: when absent (e.g. lightweight test harnesses or
+/// adapters that don't need PDF persistence), commands that render
+/// content skip the persistence step and leave `pdf_blob_ref` unset.
 #[derive(Clone)]
 pub struct CoreCtx {
     /// Async sqlx pool the repos use.
@@ -127,22 +130,35 @@ pub struct CoreCtx {
     pub nexus: Arc<NexusConfig>,
     /// Injectable clock.
     pub clock: Arc<dyn Clock>,
+    /// Optional blob backend used to persist rendered PDFs (T-0009).
+    /// When `None`, commands skip blob persistence and leave the
+    /// invoice's `pdf_blob_ref` field unchanged.
+    pub blob_store: Option<Arc<dyn BlobStore>>,
 }
 
 impl CoreCtx {
-    /// Construct with the default [`SystemClock`].
+    /// Construct with the default [`SystemClock`] and no blob store.
     pub fn new(db: Pool, tax_table: TaxTable, nexus: NexusConfig) -> Self {
         Self {
             db,
             tax_table: Arc::new(tax_table),
             nexus: Arc::new(nexus),
             clock: Arc::new(SystemClock),
+            blob_store: None,
         }
     }
 
     /// Override the clock (used by tests to freeze time).
     pub fn with_clock(mut self, clock: Arc<dyn Clock>) -> Self {
         self.clock = clock;
+        self
+    }
+
+    /// Attach a blob store. Callers that want rendered PDFs to land in
+    /// persistent storage (and `Invoice.pdf_blob_ref` to be set) must
+    /// install one.
+    pub fn with_blob_store(mut self, blob_store: Arc<dyn BlobStore>) -> Self {
+        self.blob_store = Some(blob_store);
         self
     }
 }
@@ -153,6 +169,7 @@ impl std::fmt::Debug for CoreCtx {
             .field("db", &"<sqlx::AnyPool>")
             .field("tax_table_rows", &self.tax_table.len())
             .field("nexus_states", &self.nexus.states.len())
+            .field("blob_store", &self.blob_store.is_some())
             .finish()
     }
 }
