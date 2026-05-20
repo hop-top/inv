@@ -39,13 +39,21 @@
 
 #![deny(missing_docs)]
 
+pub mod credit;
 pub mod ctx;
 pub mod draft;
 pub mod error;
 pub mod events;
 pub mod issue;
+pub mod overdue;
+pub mod pay;
 pub mod send;
+pub mod void;
 
+pub use credit::{
+    create_credit_note, issue_credit_note, CreateCreditNoteInput, CreateCreditNoteOutput,
+    IssueCreditNoteInput, IssueCreditNoteOutput,
+};
 pub use ctx::{Actor, Channel, Clock, CoreCtx, SystemClock};
 pub use draft::{
     draft_invoice, DraftInvoiceInput, DraftInvoiceOutput, DraftLineInput,
@@ -53,6 +61,9 @@ pub use draft::{
 pub use error::CoreError;
 pub use events::EmittedEvent;
 pub use issue::{issue_invoice, IssueInvoiceInput, IssueInvoiceOutput};
+pub use overdue::{mark_overdue_ticker, OverdueTickerOutput};
+pub use pay::{mark_paid, MarkPaidInput, MarkPaidOutput};
 pub use send::{
     send_invoice, SendInvoiceInput, SendInvoiceOutput, SendSink,
 };
+pub use void::{void_invoice, VoidInvoiceInput, VoidInvoiceOutput};

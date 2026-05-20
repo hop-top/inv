@@ -23,12 +23,15 @@ use inv_core::state::TransitionError;
 use inv_core::tax::TaxTable;
 
 use inv_commands::{
-    draft_invoice, issue_invoice, send_invoice, Actor, Channel, Clock, CoreCtx, CoreError,
-    DraftInvoiceInput, DraftLineInput, IssueInvoiceInput, SendInvoiceInput,
+    create_credit_note, draft_invoice, issue_credit_note, issue_invoice, mark_overdue_ticker,
+    mark_paid, send_invoice, void_invoice, Actor, Channel, Clock, CoreCtx, CoreError,
+    CreateCreditNoteInput, DraftInvoiceInput, DraftLineInput, IssueCreditNoteInput,
+    IssueInvoiceInput, MarkPaidInput, SendInvoiceInput, VoidInvoiceInput,
 };
+use inv_core::domain::creditnote::CreditNoteState;
 use inv_store::pool::{connect, Pool};
 use inv_store::repo::history::InvoiceHistoryRepo;
-use inv_store::repo::CustomerRepo;
+use inv_store::repo::{CreditNoteRepo, CustomerRepo, InvoiceRepo};
 use inv_store::run_migrations;
 
 /// Frozen-clock impl for deterministic tests.
@@ -488,4 +491,394 @@ async fn send_unsupported_scheme_returns_not_implemented() {
     .await
     .unwrap_err();
     assert!(matches!(err, CoreError::NotImplemented(_)));
+}
+
+// ---------------------------------------------------------------------
+// mark_paid (T-0012)
+// ---------------------------------------------------------------------
+
+#[tokio::test]
+async fn mark_paid_full_settles_invoice() {
+    let (ctx, pool) = fresh_ctx().await;
+    let cust = seed_customer(&pool).await;
+    let drafted = draft_invoice(&ctx, draft_input(&cust, None))
+        .await
+        .unwrap();
+    let issued = issue_invoice(
+        &ctx,
+        IssueInvoiceInput {
+            invoice_id: drafted.invoice.id.clone(),
+            idempotency_key: None,
+            actor: Actor::Cli { name: "jad".into() },
+            channel: Channel::Cli,
+        },
+    )
+    .await
+    .unwrap();
+
+    let out = mark_paid(
+        &ctx,
+        MarkPaidInput {
+            invoice_id: issued.invoice.id.clone(),
+            amount: issued.invoice.total,
+            received_at: None,
+            idempotency_key: None,
+            bus_event_id: None,
+            actor: Actor::Cli { name: "jad".into() },
+            channel: Channel::Cli,
+        },
+    )
+    .await
+    .expect("mark_paid ok");
+
+    assert!(out.fully_paid);
+    assert_eq!(out.invoice.state, InvoiceState::Paid);
+    assert_eq!(out.invoice.amount_paid, issued.invoice.total);
+    assert!(out.invoice.paid_at.is_some());
+
+    let topics: Vec<&str> = out.emitted_events.iter().map(|e| e.topic.as_str()).collect();
+    assert!(topics.contains(&"inv.billing.invoice.paid"));
+
+    // history grew: draft + issue + paid
+    let hist = InvoiceHistoryRepo::new(&pool)
+        .list_for_invoice(&issued.invoice.id)
+        .await
+        .unwrap();
+    assert_eq!(hist.len(), 3);
+    assert_eq!(hist[2].to_state, InvoiceState::Paid);
+}
+
+#[tokio::test]
+async fn mark_paid_partial_then_remainder_reaches_paid() {
+    let (ctx, pool) = fresh_ctx().await;
+    let cust = seed_customer(&pool).await;
+    let drafted = draft_invoice(&ctx, draft_input(&cust, None)).await.unwrap();
+    let issued = issue_invoice(
+        &ctx,
+        IssueInvoiceInput {
+            invoice_id: drafted.invoice.id.clone(),
+            idempotency_key: None,
+            actor: Actor::Cli { name: "jad".into() },
+            channel: Channel::Cli,
+        },
+    )
+    .await
+    .unwrap();
+    let total = issued.invoice.total;
+    let half = (total / Decimal::from(2)).round_dp(2);
+
+    let p1 = mark_paid(
+        &ctx,
+        MarkPaidInput {
+            invoice_id: issued.invoice.id.clone(),
+            amount: half,
+            received_at: None,
+            idempotency_key: None,
+            bus_event_id: Some("evt-1".into()),
+            actor: Actor::Cli { name: "jad".into() },
+            channel: Channel::Bus,
+        },
+    )
+    .await
+    .unwrap();
+    assert!(!p1.fully_paid);
+    assert_eq!(p1.invoice.state, InvoiceState::PartiallyPaid);
+
+    let p2 = mark_paid(
+        &ctx,
+        MarkPaidInput {
+            invoice_id: issued.invoice.id.clone(),
+            amount: total - half,
+            received_at: None,
+            idempotency_key: None,
+            bus_event_id: Some("evt-2".into()),
+            actor: Actor::Cli { name: "jad".into() },
+            channel: Channel::Bus,
+        },
+    )
+    .await
+    .unwrap();
+    assert!(p2.fully_paid);
+    assert_eq!(p2.invoice.state, InvoiceState::Paid);
+    assert_eq!(p2.invoice.amount_paid, total);
+
+    // history: draft + issue + partial + paid
+    let hist = InvoiceHistoryRepo::new(&pool)
+        .list_for_invoice(&issued.invoice.id)
+        .await
+        .unwrap();
+    assert_eq!(hist.len(), 4);
+    assert_eq!(hist[2].to_state, InvoiceState::PartiallyPaid);
+    assert_eq!(hist[3].to_state, InvoiceState::Paid);
+    // bus_event_id provenance recorded.
+    assert_eq!(hist[2].bus_event_id.as_deref(), Some("evt-1"));
+    assert_eq!(hist[3].bus_event_id.as_deref(), Some("evt-2"));
+}
+
+#[tokio::test]
+async fn mark_paid_rejects_non_positive_amount() {
+    let (ctx, _pool) = fresh_ctx().await;
+    let err = mark_paid(
+        &ctx,
+        MarkPaidInput {
+            invoice_id: inv_core::domain::ids::InvoiceId::new(),
+            amount: Decimal::ZERO,
+            received_at: None,
+            idempotency_key: None,
+            bus_event_id: None,
+            actor: Actor::Cli { name: "jad".into() },
+            channel: Channel::Cli,
+        },
+    )
+    .await
+    .unwrap_err();
+    assert!(matches!(err, CoreError::Validation(_)));
+}
+
+// ---------------------------------------------------------------------
+// void_invoice (T-0012)
+// ---------------------------------------------------------------------
+
+#[tokio::test]
+async fn void_pre_payment_succeeds() {
+    let (ctx, pool) = fresh_ctx().await;
+    let cust = seed_customer(&pool).await;
+    let drafted = draft_invoice(&ctx, draft_input(&cust, None)).await.unwrap();
+    let issued = issue_invoice(
+        &ctx,
+        IssueInvoiceInput {
+            invoice_id: drafted.invoice.id.clone(),
+            idempotency_key: None,
+            actor: Actor::Cli { name: "jad".into() },
+            channel: Channel::Cli,
+        },
+    )
+    .await
+    .unwrap();
+
+    let out = void_invoice(
+        &ctx,
+        VoidInvoiceInput {
+            invoice_id: issued.invoice.id.clone(),
+            reason: Some("entered in error".into()),
+            idempotency_key: None,
+            actor: Actor::Cli { name: "jad".into() },
+            channel: Channel::Cli,
+        },
+    )
+    .await
+    .expect("void ok");
+
+    assert_eq!(out.invoice.state, InvoiceState::Voided);
+    assert!(out.invoice.voided_at.is_some());
+
+    let topics: Vec<&str> = out.emitted_events.iter().map(|e| e.topic.as_str()).collect();
+    assert!(topics.contains(&"inv.billing.invoice.voided"));
+}
+
+#[tokio::test]
+async fn void_after_payment_rejected_by_fsm() {
+    let (ctx, pool) = fresh_ctx().await;
+    let cust = seed_customer(&pool).await;
+    let drafted = draft_invoice(&ctx, draft_input(&cust, None)).await.unwrap();
+    let issued = issue_invoice(
+        &ctx,
+        IssueInvoiceInput {
+            invoice_id: drafted.invoice.id.clone(),
+            idempotency_key: None,
+            actor: Actor::Cli { name: "jad".into() },
+            channel: Channel::Cli,
+        },
+    )
+    .await
+    .unwrap();
+    mark_paid(
+        &ctx,
+        MarkPaidInput {
+            invoice_id: issued.invoice.id.clone(),
+            amount: issued.invoice.total,
+            received_at: None,
+            idempotency_key: None,
+            bus_event_id: None,
+            actor: Actor::Cli { name: "jad".into() },
+            channel: Channel::Cli,
+        },
+    )
+    .await
+    .unwrap();
+
+    let err = void_invoice(
+        &ctx,
+        VoidInvoiceInput {
+            invoice_id: issued.invoice.id.clone(),
+            reason: None,
+            idempotency_key: None,
+            actor: Actor::Cli { name: "jad".into() },
+            channel: Channel::Cli,
+        },
+    )
+    .await
+    .unwrap_err();
+    assert!(matches!(err, CoreError::FsmTransition(_)));
+}
+
+// ---------------------------------------------------------------------
+// credit notes (T-0012)
+// ---------------------------------------------------------------------
+
+#[tokio::test]
+async fn credit_note_draft_then_issue() {
+    let (ctx, pool) = fresh_ctx().await;
+    let cust = seed_customer(&pool).await;
+    let drafted = draft_invoice(&ctx, draft_input(&cust, None)).await.unwrap();
+    let issued = issue_invoice(
+        &ctx,
+        IssueInvoiceInput {
+            invoice_id: drafted.invoice.id.clone(),
+            idempotency_key: None,
+            actor: Actor::Cli { name: "jad".into() },
+            channel: Channel::Cli,
+        },
+    )
+    .await
+    .unwrap();
+
+    // 1. Draft credit note.
+    let cn_draft = create_credit_note(
+        &ctx,
+        CreateCreditNoteInput {
+            invoice_id: issued.invoice.id.clone(),
+            amount: Decimal::from_str("100.00").unwrap(),
+            reason: Some("duplicate billing".into()),
+            refund_ref: Some("refund-evt-1".into()),
+            idempotency_key: None,
+            actor: Actor::Cli { name: "jad".into() },
+            channel: Channel::Cli,
+        },
+    )
+    .await
+    .expect("draft cn ok");
+
+    assert_eq!(cn_draft.credit_note.state, CreditNoteState::Draft);
+    assert_eq!(cn_draft.credit_note.amount, Decimal::from_str("100.00").unwrap());
+    assert_eq!(cn_draft.credit_note.refund_ref.as_deref(), Some("refund-evt-1"));
+    let topics: Vec<&str> = cn_draft.emitted_events.iter().map(|e| e.topic.as_str()).collect();
+    assert!(topics.contains(&"inv.billing.creditnote.drafted"));
+
+    // 2. Issue credit note.
+    let cn_issued = issue_credit_note(
+        &ctx,
+        IssueCreditNoteInput {
+            credit_note_id: cn_draft.credit_note.id.clone(),
+            idempotency_key: None,
+            actor: Actor::Cli { name: "jad".into() },
+            channel: Channel::Cli,
+        },
+    )
+    .await
+    .expect("issue cn ok");
+
+    assert_eq!(cn_issued.credit_note.state, CreditNoteState::Issued);
+    assert!(cn_issued.credit_note.number.as_deref().unwrap_or("").starts_with("CN-2026-"));
+    assert!(cn_issued.credit_note.issued_at.is_some());
+
+    // Verify the cn is in the DB at the issued state.
+    let back = CreditNoteRepo::new(&pool)
+        .get(&cn_draft.credit_note.id)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(back.state, CreditNoteState::Issued);
+
+    let topics: Vec<&str> = cn_issued.emitted_events.iter().map(|e| e.topic.as_str()).collect();
+    assert!(topics.contains(&"inv.billing.creditnote.proposed"));
+    assert!(topics.contains(&"inv.billing.creditnote.transitioned"));
+    assert!(topics.contains(&"inv.billing.creditnote.entered"));
+    assert!(topics.contains(&"inv.billing.creditnote.issued"));
+}
+
+#[tokio::test]
+async fn credit_note_rejects_non_positive_amount() {
+    let (ctx, pool) = fresh_ctx().await;
+    let cust = seed_customer(&pool).await;
+    let drafted = draft_invoice(&ctx, draft_input(&cust, None)).await.unwrap();
+    let issued = issue_invoice(
+        &ctx,
+        IssueInvoiceInput {
+            invoice_id: drafted.invoice.id.clone(),
+            idempotency_key: None,
+            actor: Actor::Cli { name: "jad".into() },
+            channel: Channel::Cli,
+        },
+    )
+    .await
+    .unwrap();
+
+    let err = create_credit_note(
+        &ctx,
+        CreateCreditNoteInput {
+            invoice_id: issued.invoice.id.clone(),
+            amount: Decimal::ZERO,
+            reason: None,
+            refund_ref: None,
+            idempotency_key: None,
+            actor: Actor::Cli { name: "jad".into() },
+            channel: Channel::Cli,
+        },
+    )
+    .await
+    .unwrap_err();
+    assert!(matches!(err, CoreError::Validation(_)));
+}
+
+// ---------------------------------------------------------------------
+// mark_overdue_ticker (T-0012)
+// ---------------------------------------------------------------------
+
+#[tokio::test]
+async fn overdue_ticker_flags_past_due_invoices() {
+    let (ctx, pool) = fresh_ctx().await;
+    let cust = seed_customer(&pool).await;
+    let drafted = draft_invoice(&ctx, draft_input(&cust, None)).await.unwrap();
+    let issued = issue_invoice(
+        &ctx,
+        IssueInvoiceInput {
+            invoice_id: drafted.invoice.id.clone(),
+            idempotency_key: None,
+            actor: Actor::Cli { name: "jad".into() },
+            channel: Channel::Cli,
+        },
+    )
+    .await
+    .unwrap();
+
+    // Set due_at to a year ago via direct repo write — bypasses the
+    // command layer since due_at editing isn't exposed yet.
+    let mut inv = issued.invoice.clone();
+    inv.due_at = Some(Utc.with_ymd_and_hms(2025, 1, 1, 0, 0, 0).unwrap());
+    inv.updated_at = inv.due_at.unwrap();
+    InvoiceRepo::new(&pool).save(&inv).await.unwrap();
+
+    let out = mark_overdue_ticker(&ctx).await.expect("tick ok");
+    assert_eq!(out.overdue_invoices.len(), 1);
+    assert_eq!(out.overdue_invoices[0].id, issued.invoice.id);
+
+    let topics: Vec<&str> = out.emitted_events.iter().map(|e| e.topic.as_str()).collect();
+    assert_eq!(topics, vec!["inv.billing.invoice.overdue"]);
+
+    // State unchanged — overdue is a flag, not an FSM state.
+    let back = InvoiceRepo::new(&pool).get(&issued.invoice.id).await.unwrap().unwrap();
+    assert_eq!(back.state, InvoiceState::Issued);
+}
+
+#[tokio::test]
+async fn overdue_ticker_ignores_unset_due_at() {
+    let (ctx, pool) = fresh_ctx().await;
+    let cust = seed_customer(&pool).await;
+    let drafted = draft_invoice(&ctx, draft_input(&cust, None)).await.unwrap();
+    // Don't issue — Draft is not in the overdue-eligible set anyway.
+    let _ = drafted;
+    let out = mark_overdue_ticker(&ctx).await.unwrap();
+    assert!(out.overdue_invoices.is_empty());
+    assert!(out.emitted_events.is_empty());
 }

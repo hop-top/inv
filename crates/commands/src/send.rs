@@ -152,7 +152,6 @@ pub async fn send_invoice(
     let inv_repo = InvoiceRepo::new(&ctx.db);
     let line_repo = InvoiceLineRepo::new(&ctx.db);
     let cust_repo = CustomerRepo::new(&ctx.db);
-    let hist_repo = InvoiceHistoryRepo::new(&ctx.db);
 
     let mut invoice = inv_repo
         .get(&input.invoice_id)

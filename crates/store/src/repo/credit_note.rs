@@ -173,8 +173,20 @@ impl<'p> CreditNoteHistoryRepo<'p> {
         Self { pool }
     }
 
-    /// Append a row.
+    /// Append a row. Opens its own short transaction; for atomic
+    /// composition with a credit-note mutation, use [`Self::save_in_tx`].
     pub async fn save(&self, h: &CreditNoteStateHistory) -> Result<()> {
+        let mut tx = self.pool.begin().await?;
+        Self::save_in_tx(&mut tx, h).await?;
+        tx.commit().await?;
+        Ok(())
+    }
+
+    /// Append inside a caller-owned transaction.
+    pub async fn save_in_tx(
+        tx: &mut sqlx::Transaction<'_, sqlx::Any>,
+        h: &CreditNoteStateHistory,
+    ) -> Result<()> {
         let metadata = metadata_to_json(&h.metadata)?;
         sqlx::query(
             "INSERT INTO credit_note_state_history \
@@ -193,7 +205,7 @@ impl<'p> CreditNoteHistoryRepo<'p> {
         .bind(ts_to_string(&h.occurred_at))
         .bind(h.published_at.as_ref().map(ts_to_string))
         .bind(metadata)
-        .execute(self.pool)
+        .execute(&mut **tx)
         .await?;
         Ok(())
     }
