@@ -36,6 +36,12 @@ pub enum StoreError {
         /// The offending value as a string.
         value: String,
     },
+    /// Filesystem / IO failure surfacing through a blob backend.
+    #[error("io error: {0}")]
+    Io(#[from] std::io::Error),
+    /// Blob URI / signed-URL parse / verification failure.
+    #[error("blob error: {0}")]
+    Blob(String),
     /// Anything else (rare).
     #[error("{0}")]
     Other(String),
