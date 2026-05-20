@@ -182,6 +182,20 @@ async fn renders_dzd_zero_decimal_invoice() {
 }
 
 #[tokio::test]
+async fn renders_invoice_with_empty_metadata() {
+    // Operator may issue an invoice with no metadata at all. The
+    // domain type skips serializing an empty metadata bag entirely,
+    // so the template must guard `invoice.metadata.*` accesses. This
+    // snapshot pins the rendered form (notes + metadata sections
+    // both omitted).
+    let (mut inv, cust, lines) = fixture_full();
+    inv.metadata = BTreeMap::new();
+    let ctx = RenderContext::new(inv, cust, lines);
+    let html = render_html(None, &ctx).await.expect("render ok");
+    insta::assert_snapshot!("empty_metadata_bundled", html);
+}
+
+#[tokio::test]
 async fn renders_invoice_with_credit_note_metadata() {
     let (mut inv, cust, lines) = fixture_full();
     inv.metadata
