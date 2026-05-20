@@ -166,15 +166,7 @@ pub async fn issue_invoice(
     invoice.updated_at = now;
 
     // 7. Render HTML + (stub) PDF.
-    //
-    // The bundled template dereferences `invoice.metadata.notes`, which
-    // requires `invoice.metadata` to exist in the Tera context. The
-    // domain type's `metadata` field is `skip_serializing_if = empty`,
-    // so we synthesise a render-only clone with a sentinel entry when
-    // the operator's metadata bag is empty. The persisted row keeps
-    // the operator's actual (possibly empty) metadata.
-    let render_invoice = invoice_with_render_metadata(&invoice);
-    let render_ctx = RenderContext::new(render_invoice, customer.clone(), lines.clone());
+    let render_ctx = RenderContext::new(invoice.clone(), customer.clone(), lines.clone());
     let template_path = invoice
         .template_path
         .as_deref()
@@ -247,24 +239,6 @@ async fn count_invoices_issued_in_year(
     .map_err(inv_store::StoreError::from)?;
     let c: i64 = row.try_get("c").map_err(inv_store::StoreError::from)?;
     Ok(c.max(0) as u32)
-}
-
-/// Return a render-only clone of the invoice with a non-empty
-/// `metadata` map.
-///
-/// The bundled template references `invoice.metadata.notes` directly;
-/// when the operator's metadata bag is empty the
-/// `skip_serializing_if = empty` serde attribute drops the field from
-/// the Tera context entirely and Tera then fails the render with
-/// "Variable `invoice.metadata` not found". Injecting a sentinel keeps
-/// the contract intact without touching the domain type.
-fn invoice_with_render_metadata(invoice: &Invoice) -> Invoice {
-    let mut copy = invoice.clone();
-    if copy.metadata.is_empty() {
-        copy.metadata
-            .insert("_render_placeholder".to_string(), String::new());
-    }
-    copy
 }
 
 #[allow(clippy::too_many_arguments)]

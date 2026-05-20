@@ -1,8 +1,12 @@
+---
+source: crates/core/tests/render_html.rs
+expression: html
+---
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Invoice {{ invoice_label }}</title>
+<title>Invoice INV-2026-0001</title>
 <style>
   body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #1a1a1a; margin: 2rem; }
   header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #1a1a1a; padding-bottom: 1rem; margin-bottom: 1.5rem; }
@@ -35,34 +39,26 @@
 </head>
 <body>
   <header>
-    <h1>Invoice {{ invoice_label }}</h1>
+    <h1>Invoice INV-2026-0001</h1>
     <dl class="meta">
-      <div><dt>State</dt><dd><span class="state">{{ invoice.state }}</span></dd></div>
-      <div><dt>Currency</dt><dd>{{ invoice.currency }}</dd></div>
-      <div><dt>Jurisdiction</dt><dd>{{ invoice.seller_jurisdiction }}</dd></div>
-      {%- if invoice.issued_at %}
-      <div><dt>Issued</dt><dd>{{ invoice.issued_at | date(format="%Y-%m-%d") }}</dd></div>
-      {%- endif %}
-      {%- if invoice.due_at %}
-      <div><dt>Due</dt><dd>{{ invoice.due_at | date(format="%Y-%m-%d") }}</dd></div>
-      {%- endif %}
+      <div><dt>State</dt><dd><span class="state">issued</span></dd></div>
+      <div><dt>Currency</dt><dd>CAD</dd></div>
+      <div><dt>Jurisdiction</dt><dd>CA-QC</dd></div>
+      <div><dt>Issued</dt><dd>2026-05-01</dd></div>
+      <div><dt>Due</dt><dd>2026-05-31</dd></div>
     </dl>
   </header>
 
   <section class="parties">
     <div>
       <h2>From</h2>
-      <address>Seller ({{ invoice.seller_jurisdiction }})</address>
+      <address>Seller (CA-QC)</address>
     </div>
     <div>
       <h2>Bill to</h2>
       <address>
-        <strong>{{ customer.display_name }}</strong><br>
-        {%- if customer.address.line1 %}{{ customer.address.line1 }}<br>{%- endif %}
-        {%- if customer.address.line2 %}{{ customer.address.line2 }}<br>{%- endif %}
-        {%- if customer.address.city %}{{ customer.address.city }}{% if customer.address.region %}, {{ customer.address.region }}{% endif %}{% if customer.address.postal %} {{ customer.address.postal }}{% endif %}<br>{%- endif %}
-        {{ customer.address.country }}
-        {%- if customer.email %}<br>{{ customer.email }}{%- endif %}
+        <strong>Acme Corp</strong><br>123 Rue Saint-Denis<br>Suite 400<br>Montréal, QC H2X 1Y4<br>
+        CA<br>billing@acme.example
       </address>
     </div>
   </section>
@@ -78,50 +74,30 @@
       </tr>
     </thead>
     <tbody>
-      {%- if lines | length == 0 %}
-      <tr class="empty"><td colspan="5">No lines on this invoice.</td></tr>
-      {%- else %}
-      {%- for line in lines %}
       <tr>
-        <td>{{ line.description }}</td>
-        <td class="num">{{ line.quantity }}</td>
-        <td class="num">{{ line.unit_price }}</td>
-        <td>{{ line.tax_category }}</td>
-        <td class="num">{{ line.line_total }}</td>
+        <td>Consulting hours — May</td>
+        <td class="num">10</td>
+        <td class="num">125.00</td>
+        <td>standard</td>
+        <td class="num">1437.19</td>
       </tr>
-      {%- endfor %}
-      {%- endif %}
+      <tr>
+        <td>Workshop facilitation</td>
+        <td class="num">1</td>
+        <td class="num">500.00</td>
+        <td>standard</td>
+        <td class="num">574.88</td>
+      </tr>
     </tbody>
   </table>
 
   <section class="totals">
     <dl>
-      <dt>Subtotal</dt><dd>{{ invoice.subtotal }} <span class="currency">{{ invoice.currency }}</span></dd>
-      <dt>Tax</dt><dd>{{ invoice.tax_total }} <span class="currency">{{ invoice.currency }}</span></dd>
-      <dt class="grand">Total</dt><dd class="grand">{{ invoice.total }} <span class="currency">{{ invoice.currency }}</span></dd>
-      {%- if invoice.amount_paid %}
-      <dt>Paid</dt><dd>{{ invoice.amount_paid }} <span class="currency">{{ invoice.currency }}</span></dd>
-      {%- endif %}
+      <dt>Subtotal</dt><dd>1750.00 <span class="currency">CAD</span></dd>
+      <dt>Tax</dt><dd>262.07 <span class="currency">CAD</span></dd>
+      <dt class="grand">Total</dt><dd class="grand">2012.07 <span class="currency">CAD</span></dd>
+      <dt>Paid</dt><dd>0 <span class="currency">CAD</span></dd>
     </dl>
   </section>
-
-  {%- if invoice.metadata and invoice.metadata.notes %}
-  <section class="notes">
-    <h3>Notes</h3>
-    <p>{{ invoice.metadata.notes }}</p>
-  </section>
-  {%- endif %}
-
-  {%- if invoice.metadata and invoice.metadata | length > 0 %}
-  <section class="metadata">
-    <dl>
-    {%- for k, v in invoice.metadata %}
-    {%- if k != "notes" %}
-      <div><dt>{{ k }}</dt><dd>{{ v }}</dd></div>
-    {%- endif %}
-    {%- endfor %}
-    </dl>
-  </section>
-  {%- endif %}
 </body>
 </html>

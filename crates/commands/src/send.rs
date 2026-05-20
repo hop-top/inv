@@ -195,16 +195,8 @@ pub async fn send_invoice(
 
     let now = ctx.clock.now();
 
-    // Render (HTML always; PDF via stub engine). See issue.rs for why
-    // we synthesise a placeholder metadata entry for the render
-    // context only.
-    let mut render_invoice = invoice.clone();
-    if render_invoice.metadata.is_empty() {
-        render_invoice
-            .metadata
-            .insert("_render_placeholder".to_string(), String::new());
-    }
-    let render_ctx = RenderContext::new(render_invoice, customer, lines.clone());
+    // Render (HTML always; PDF via stub engine).
+    let render_ctx = RenderContext::new(invoice.clone(), customer, lines.clone());
     let template_path = invoice
         .template_path
         .as_deref()
