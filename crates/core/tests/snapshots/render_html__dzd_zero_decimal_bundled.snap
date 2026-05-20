@@ -1,0 +1,112 @@
+---
+source: crates/core/tests/render_html.rs
+expression: html
+---
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Invoice INV-2026-0001</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #1a1a1a; margin: 2rem; }
+  header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #1a1a1a; padding-bottom: 1rem; margin-bottom: 1.5rem; }
+  header h1 { margin: 0; font-size: 1.75rem; letter-spacing: -0.02em; }
+  .meta { text-align: right; font-size: 0.9rem; line-height: 1.5; }
+  .meta dt { display: inline-block; min-width: 6rem; color: #555; }
+  .meta dd { display: inline; margin: 0; font-weight: 500; }
+  .parties { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-bottom: 1.5rem; }
+  .parties h2 { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; color: #555; margin: 0 0 0.5rem; }
+  .parties address { font-style: normal; line-height: 1.5; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 1.5rem; font-size: 0.95rem; }
+  th, td { padding: 0.5rem 0.75rem; text-align: left; border-bottom: 1px solid #e0e0e0; }
+  th { background: #f5f5f5; font-weight: 600; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  tr.empty td { text-align: center; color: #888; font-style: italic; padding: 1.5rem; }
+  .totals { margin-left: auto; width: 18rem; font-size: 0.95rem; }
+  .totals dt, .totals dd { padding: 0.25rem 0; }
+  .totals dl { display: grid; grid-template-columns: 1fr auto; gap: 0.25rem 1rem; margin: 0; }
+  .totals dt { color: #555; }
+  .totals dd { margin: 0; font-variant-numeric: tabular-nums; text-align: right; }
+  .totals .grand { border-top: 2px solid #1a1a1a; padding-top: 0.5rem; font-weight: 700; font-size: 1.1rem; color: #1a1a1a; }
+  .notes { margin-top: 2rem; padding: 1rem; background: #fafafa; border-left: 3px solid #c0c0c0; font-size: 0.9rem; }
+  .notes h3 { margin: 0 0 0.5rem; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.1em; color: #555; }
+  .metadata { margin-top: 1rem; font-size: 0.8rem; color: #666; }
+  .metadata dt { display: inline-block; min-width: 7rem; color: #888; }
+  .metadata dd { display: inline; margin: 0; }
+  .currency { font-size: 0.85rem; color: #555; text-transform: uppercase; }
+  .state { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 3px; background: #eee; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; }
+</style>
+</head>
+<body>
+  <header>
+    <h1>Invoice INV-2026-0001</h1>
+    <dl class="meta">
+      <div><dt>State</dt><dd><span class="state">issued</span></dd></div>
+      <div><dt>Currency</dt><dd>DZD</dd></div>
+      <div><dt>Jurisdiction</dt><dd>DZ-16</dd></div>
+      <div><dt>Issued</dt><dd>2026-05-01</dd></div>
+      <div><dt>Due</dt><dd>2026-05-31</dd></div>
+    </dl>
+  </header>
+
+  <section class="parties">
+    <div>
+      <h2>From</h2>
+      <address>Seller (DZ-16)</address>
+    </div>
+    <div>
+      <h2>Bill to</h2>
+      <address>
+        <strong>Acme Corp</strong><br>Rue Didouche Mourad<br>Alger, 16 16000<br>
+        DZ<br>billing@acme.example
+      </address>
+    </div>
+  </section>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Description</th>
+        <th class="num">Qty</th>
+        <th class="num">Unit price</th>
+        <th>Tax</th>
+        <th class="num">Line total</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Consulting hours — May</td>
+        <td class="num">1</td>
+        <td class="num">6000</td>
+        <td>standard</td>
+        <td class="num">7140</td>
+      </tr>
+      <tr>
+        <td>Workshop facilitation</td>
+        <td class="num">1</td>
+        <td class="num">6000</td>
+        <td>standard</td>
+        <td class="num">7140</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <section class="totals">
+    <dl>
+      <dt>Subtotal</dt><dd>12000 <span class="currency">DZD</span></dd>
+      <dt>Tax</dt><dd>2280 <span class="currency">DZD</span></dd>
+      <dt class="grand">Total</dt><dd class="grand">14280 <span class="currency">DZD</span></dd>
+      <dt>Paid</dt><dd>0 <span class="currency">DZD</span></dd>
+    </dl>
+  </section>
+  <section class="notes">
+    <h3>Notes</h3>
+    <p>Net 30. Late fee 1.5% &#x2F; month.</p>
+  </section>
+  <section class="metadata">
+    <dl>
+      <div><dt>po_number</dt><dd>PO-2026-0042</dd></div>
+    </dl>
+  </section>
+</body>
+</html>
