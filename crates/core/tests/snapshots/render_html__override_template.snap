@@ -1,0 +1,5 @@
+---
+source: crates/core/tests/render_html.rs
+expression: html
+---
+<custom>INV-2026-0001 | CAD | lines=2</custom>

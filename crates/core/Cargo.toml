@@ -25,5 +25,26 @@ hop-top-kit = { workspace = true }
 hop-top-uri = { workspace = true }
 toml = { workspace = true }
 
+[dev-dependencies]
+insta = { workspace = true }
+tokio = { workspace = true }
+
+[features]
+# Default: HTML bytes as a PDF stub. Lets the render pipeline be wired
+# end-to-end (commands, blob store, channels) without committing to a
+# heavy PDF dep at v1. The "real" engines are stubbed/TODO behind their
+# own feature flags and ship at v1.1.
+default = ["pdf-stub"]
+# Stub: render_pdf returns the HTML bytes verbatim. Useful for tests +
+# dev; lets callers exercise the contract without a real engine.
+pdf-stub = []
+# Pure-Rust: typst-based engine. TODO at v1.1; the dep is currently
+# absent and the feature is here only for forward compat.
+pdf-typst = []
+# System binary: shells out to wkhtmltopdf. TODO at v1.1.
+pdf-wkhtmltopdf = []
+# Python sidecar: invokes weasyprint via a subprocess. TODO at v1.1.
+pdf-weasyprint = []
+
 [lints]
 workspace = true
