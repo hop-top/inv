@@ -1,0 +1,11 @@
+[package]
+name = "inv-bus"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "inv: bus event types, publisher/consumer adapters, outbox relay, inbox dedup"
+
+[lints]
+workspace = true

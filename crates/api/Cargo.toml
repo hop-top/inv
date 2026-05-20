@@ -1,0 +1,11 @@
+[package]
+name = "inv-api"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "inv: HTTP API channel adapter (axum)"
+
+[lints]
+workspace = true

@@ -1,0 +1,42 @@
+[workspace]
+resolver = "2"
+members = [
+    "bin/inv",
+    "crates/api",
+    "crates/bus",
+    "crates/cli",
+    "crates/core",
+    "crates/mcp",
+    "crates/store",
+    "crates/ws",
+]
+
+[workspace.package]
+version = "0.0.0"
+edition = "2021"
+license = "MIT"
+authors = ["Jad Bitar <me@jadb.io>"]
+repository = "https://github.com/hop-top/inv"
+homepage = "https://github.com/hop-top/inv"
+description = "Invoicing-as-a-service: composer + lifecycle, multi-channel core, event-bus interop with fin"
+
+[workspace.dependencies]
+# Wire-format + CLI deps used in T-0002 scaffold. Expanded in T-0003.
+clap = { version = "4", features = ["derive", "string"] }
+hop-top-kit = { path = "../kit/hops/main/sdk/experimental/rs", features = ["cli"] }
+serde_json = "1"
+
+# Workspace-internal crates (path deps).
+inv-api = { path = "crates/api" }
+inv-bus = { path = "crates/bus" }
+inv-cli = { path = "crates/cli" }
+inv-core = { path = "crates/core" }
+inv-mcp = { path = "crates/mcp" }
+inv-store = { path = "crates/store" }
+inv-ws = { path = "crates/ws" }
+
+[workspace.lints.rust]
+unsafe_code = "deny"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }

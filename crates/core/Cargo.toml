@@ -1,0 +1,11 @@
+[package]
+name = "inv-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "inv: domain types, FSM facade, tax engine, render pipeline, command layer"
+
+[lints]
+workspace = true

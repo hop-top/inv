@@ -1,6 +1,6 @@
-use clap::{ArgMatches, Args};
+use clap::ArgMatches;
 
-#[derive(Args)]
+#[derive(clap::Args)]
 pub struct Args {
     /// Who to greet.
     #[arg(default_value = "World")]

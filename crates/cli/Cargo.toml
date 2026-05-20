@@ -1,0 +1,16 @@
+[package]
+name = "inv-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "inv: CLI channel adapter (clap)"
+
+[dependencies]
+clap = { workspace = true }
+hop-top-kit = { workspace = true }
+serde_json = { workspace = true }
+
+[lints]
+workspace = true

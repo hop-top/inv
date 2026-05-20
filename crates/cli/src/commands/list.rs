@@ -6,12 +6,12 @@ use serde_json::json;
 ///
 /// Try:
 ///
-///   {{.Name}} list
-///   {{.Name}} list --format json
-///   {{.Name}} list --format yaml
-///   {{.Name}} list --cols name,status
-///   {{.Name}} list -o /tmp/out.json   # ext infers json
-///   {{.Name}} list --format-help
+///   inv list
+///   inv list --format json
+///   inv list --format yaml
+///   inv list --cols name,status
+///   inv list -o /tmp/out.json   # ext infers json
+///   inv list --format-help
 pub fn run(matches: &ArgMatches) -> Result<(), Box<dyn std::error::Error>> {
     let items = json!([
         {"name": "alpha", "count": 1, "status": "ok"},

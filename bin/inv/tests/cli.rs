@@ -3,7 +3,7 @@ use predicates::prelude::*;
 
 #[test]
 fn hello_default() {
-    Command::cargo_bin("{{.Name}}")
+    Command::cargo_bin("inv")
         .unwrap()
         .arg("hello")
         .assert()
@@ -13,7 +13,7 @@ fn hello_default() {
 
 #[test]
 fn hello_named() {
-    Command::cargo_bin("{{.Name}}")
+    Command::cargo_bin("inv")
         .unwrap()
         .args(["hello", "Alice"])
         .assert()
@@ -23,7 +23,7 @@ fn hello_named() {
 
 #[test]
 fn list_json_format() {
-    Command::cargo_bin("{{.Name}}")
+    Command::cargo_bin("inv")
         .unwrap()
         .args(["list", "--format", "json"])
         .assert()

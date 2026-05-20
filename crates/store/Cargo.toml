@@ -1,0 +1,11 @@
+[package]
+name = "inv-store"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "inv: sql storage (sqlx) + blob storage; migrations; repository structs"
+
+[lints]
+workspace = true
