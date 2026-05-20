@@ -1,0 +1,193 @@
+# inv default tax table.
+#
+# Per design spec §6.3: this file is a best-effort starting point sourced
+# from public revenue-authority pages, dated, and NOT legal advice.
+# Operators are responsible for keeping rates current and for opting US
+# states into nexus enforcement (`[nexus.<STATE>] enabled = true`).
+#
+# File shape (per design §6.2):
+#
+#   [[rate]]
+#   id              = "<kebab-id>"             # stable, used for audit
+#   jurisdiction    = "CA-QC" | "US-DE" | "DZ-16"
+#   applies_to_buyer = { country = "<ISO>", region = "<ISO subdivision suffix>" }
+#                                              # `country` and `region`
+#                                              # are both optional; a row
+#                                              # with no region applies
+#                                              # to any region inside the
+#                                              # given country.
+#   name            = "<human label>"
+#   category        = "standard" | "reduced" | "zero_rated" | "exempt"
+#   rate            = "<decimal fraction>"     # "0.05" = 5%
+#   effective_from  = "YYYY-MM-DD"
+#   effective_to    = "YYYY-MM-DD"             # optional, inclusive
+#
+#   [nexus.<STATE>]                            # US state, e.g. [nexus.CA]
+#   enabled         = false                    # operator must opt in
+#   revenue         = "<decimal>"              # USD threshold; null disables
+#   txn_count       = <int>                    # txn count threshold; null disables
+#
+# Multiple rows can match a single line (e.g. QC seller -> QC buyer
+# matches `ca-qc-gst` AND `ca-qc-qst`). The resolver sums them.
+
+# =============================================================================
+# Quebec (CA-QC) seller
+# =============================================================================
+# GST is a federal Canadian tax; applies to every CA buyer.
+[[rate]]
+id = "ca-qc-gst"
+jurisdiction = "CA-QC"
+applies_to_buyer = { country = "CA" }
+name = "GST"
+category = "standard"
+rate = "0.05"
+effective_from = "2008-01-01"
+
+# QST stacks on top of GST inside Quebec.
+[[rate]]
+id = "ca-qc-qst"
+jurisdiction = "CA-QC"
+applies_to_buyer = { country = "CA", region = "QC" }
+name = "QST"
+category = "standard"
+rate = "0.09975"
+effective_from = "2013-01-01"
+
+# Destination-province sales tax for QC seller shipping to other CA
+# provinces. HST is "harmonized" — federal GST + provincial component
+# rolled into one rate. Provinces with their own PST/RST stack a
+# provincial row on top of the federal GST row above.
+[[rate]]
+id = "ca-on-hst"
+jurisdiction = "CA-QC"
+applies_to_buyer = { country = "CA", region = "ON" }
+name = "HST (Ontario)"
+category = "standard"
+# Note: ON HST = 13%, which already includes the federal 5% GST. To
+# avoid double-counting we model ON's *provincial* slice (8%) and let
+# the GST row contribute the remaining 5%.
+rate = "0.08"
+effective_from = "2010-07-01"
+
+[[rate]]
+id = "ca-bc-pst"
+jurisdiction = "CA-QC"
+applies_to_buyer = { country = "CA", region = "BC" }
+name = "PST (British Columbia)"
+category = "standard"
+rate = "0.07"
+effective_from = "2013-04-01"
+
+[[rate]]
+id = "ca-ab-no-pst"
+jurisdiction = "CA-QC"
+applies_to_buyer = { country = "CA", region = "AB" }
+name = "Alberta (GST only, no PST)"
+category = "exempt"
+rate = "0.00"
+effective_from = "1991-01-01"
+
+# Canada zero-rates basic groceries federally. The row is recorded for
+# audit so an exported invoice clearly identifies why GST wasn't applied.
+[[rate]]
+id = "ca-qc-gst-zero-foods"
+jurisdiction = "CA-QC"
+applies_to_buyer = { country = "CA" }
+name = "GST zero-rated (basic groceries)"
+category = "zero_rated"
+rate = "0.00"
+effective_from = "1991-01-01"
+
+# =============================================================================
+# Algiers (DZ-16) seller
+# =============================================================================
+# TVA is national; same row applies regardless of buyer wilaya.
+[[rate]]
+id = "dz-tva-standard"
+jurisdiction = "DZ-16"
+applies_to_buyer = { country = "DZ" }
+name = "TVA"
+category = "standard"
+rate = "0.19"
+effective_from = "2017-01-01"
+
+# Reduced TVA (9%) on a published list of essential goods + cultural
+# items. Operators apply via line `tax_category = "reduced"`.
+[[rate]]
+id = "dz-tva-reduced"
+jurisdiction = "DZ-16"
+applies_to_buyer = { country = "DZ" }
+name = "TVA reduite"
+category = "reduced"
+rate = "0.09"
+effective_from = "2017-01-01"
+
+# Exports out of DZ are zero-rated for TVA purposes — but the resolver
+# already returns 0% for any export, so this row exists only to record
+# the rate id on the line for audit when the operator explicitly tags
+# an export line `zero_rated`.
+[[rate]]
+id = "dz-tva-export-zero"
+jurisdiction = "DZ-16"
+applies_to_buyer = { }
+name = "TVA zero-rated (exports)"
+category = "zero_rated"
+rate = "0.00"
+effective_from = "2017-01-01"
+
+# =============================================================================
+# Delaware (US-DE) seller
+# =============================================================================
+# Delaware itself has no general sales tax. Any US-DE -> US sale relies
+# on the destination-state economic-nexus regime: only rates whose
+# matching [nexus.<STATE>] block is `enabled = true` AND whose threshold
+# the seller has crossed actually apply.
+
+[[rate]]
+id = "us-ca-sales"
+jurisdiction = "US-DE"
+applies_to_buyer = { country = "US", region = "CA" }
+name = "California State Sales Tax"
+category = "standard"
+# Statewide base rate, NOT including district/county/city addenda.
+# Per design §2.2, locality tax is out of scope at v1.
+rate = "0.0725"
+effective_from = "2017-01-01"
+
+[[rate]]
+id = "us-ny-sales"
+jurisdiction = "US-DE"
+applies_to_buyer = { country = "US", region = "NY" }
+name = "New York State Sales Tax"
+category = "standard"
+rate = "0.04"
+effective_from = "2005-06-01"
+
+# =============================================================================
+# US economic-nexus thresholds (per design §6.1 step 2, US case)
+# =============================================================================
+# Default `enabled = false` everywhere — operators must explicitly opt
+# in to each state once they're confident they meet the legal nexus
+# requirements there.
+#
+# Thresholds are the dollar/transaction figures published by each state
+# (most cluster around Wayfair's $100K / 200 txn original; CA + NY went
+# higher).
+
+[nexus.CA]
+enabled = false
+revenue = "500000"
+# CA dropped its txn count requirement in 2019.
+
+[nexus.NY]
+enabled = false
+revenue = "500000"
+txn_count = 100
+
+[nexus.TX]
+enabled = false
+revenue = "500000"
+
+[nexus.WA]
+enabled = false
+revenue = "100000"
