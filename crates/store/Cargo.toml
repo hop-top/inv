@@ -7,5 +7,38 @@ authors.workspace = true
 repository.workspace = true
 description = "inv: sql storage (sqlx) + blob storage; migrations; repository structs"
 
+[dependencies]
+# Workspace primitives
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+chrono = { workspace = true }
+rust_decimal = { workspace = true }
+tracing = { workspace = true }
+
+# Local crate dependency (read-only consumer of inv-core domain types).
+inv-core = { workspace = true }
+
+# sqlx — driver features gated by this crate's storage features below.
+# `any` is always on so pool.rs can dispatch at runtime; sqlx::Any will
+# only resolve the drivers we enable here.
+sqlx = { workspace = true, features = ["any"] }
+
+[features]
+# Default to the lean dev experience: sqlite only.
+default = ["sqlite"]
+
+# Per-backend opt-ins. At least one MUST be enabled for the crate to be
+# useful. (At compile-time we only check that *any* of the three is
+# enabled — see src/lib.rs.)
+sqlite = ["sqlx/sqlite"]
+postgres = ["sqlx/postgres"]
+tidb = ["sqlx/mysql"]
+
+[dev-dependencies]
+tokio = { workspace = true }
+
 [lints]
 workspace = true

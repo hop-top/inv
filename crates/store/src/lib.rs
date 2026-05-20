@@ -1,4 +1,18 @@
 //! inv-store — persistence: sql connection management, migrations,
-//! repository structs, and blob storage for rendered PDFs.
+//! and repository structs.
 //!
-//! Populated by T-0008 and T-0009.
+//! Wires `sqlx` into the inv workspace. Backends are gated by Cargo
+//! features (`sqlite` default; `postgres`; `tidb`); at least one must
+//! be enabled.
+
+#[cfg(not(any(feature = "sqlite", feature = "postgres", feature = "tidb")))]
+compile_error!("inv-store requires at least one storage backend feature: `sqlite`, `postgres`, or `tidb`");
+
+pub mod error;
+pub mod migrate;
+pub mod pool;
+pub mod repo;
+
+pub use error::{Result, StoreError};
+pub use migrate::run_migrations;
+pub use pool::{connect, Pool};
