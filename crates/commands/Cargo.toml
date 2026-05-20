@@ -33,6 +33,8 @@ sqlx = { workspace = true, features = ["any"] }
 tokio = { workspace = true }
 # Enable the sqlite backend on inv-store for the integration test pool.
 inv-store = { workspace = true, features = ["sqlite"] }
+# Tempdir used as the LocalBlobStore root for the blob-wiring tests.
+tempfile = { workspace = true }
 
 [lints]
 workspace = true
