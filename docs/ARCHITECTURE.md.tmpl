@@ -1,0 +1,50 @@
+# Architecture: {{.Name}}
+
+> {{.Description}}
+
+## Overview
+
+High-level architecture of the system.
+
+## Directory Structure
+
+```
+.
+├── cmd/          # Entry points
+├── internal/     # Private application code
+├── pkg/          # Public library code
+├── docs/         # Documentation
+└── ...
+```
+
+## Key Components
+
+### CLI Layer
+
+Handles argument parsing, command routing, and user
+interaction.
+
+### Core Logic
+
+Business logic independent of I/O concerns.
+
+### Configuration
+
+Layered config: defaults, file, env vars, flags.
+
+## Data Flow
+
+Describe how data moves through the system.
+
+## Dependencies
+
+List key external dependencies and why they were chosen.
+
+## Design Decisions
+
+Document significant architectural decisions here or
+link to ADR files.
+
+## Future Considerations
+
+Note planned improvements or known limitations.

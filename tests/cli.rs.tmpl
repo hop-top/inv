@@ -1,0 +1,32 @@
+use assert_cmd::Command;
+use predicates::prelude::*;
+
+#[test]
+fn hello_default() {
+    Command::cargo_bin("{{.Name}}")
+        .unwrap()
+        .arg("hello")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Hello, World!"));
+}
+
+#[test]
+fn hello_named() {
+    Command::cargo_bin("{{.Name}}")
+        .unwrap()
+        .args(["hello", "Alice"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Hello, Alice!"));
+}
+
+#[test]
+fn list_json_format() {
+    Command::cargo_bin("{{.Name}}")
+        .unwrap()
+        .args(["list", "--format", "json"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"name\""));
+}

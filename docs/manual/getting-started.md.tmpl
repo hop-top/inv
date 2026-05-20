@@ -1,0 +1,45 @@
+# Getting Started with {{.Name}}
+
+## Quick Start
+
+1. Install {{.Name}} (see [install](install.md))
+
+2. Initialize a new project:
+   ```sh
+   {{.Name}} init
+   ```
+
+3. Run your first command:
+   ```sh
+   {{.Name}} help
+   ```
+
+## Basic Usage
+
+```sh
+# Show help
+{{.Name}} --help
+
+# Show version
+{{.Name}} --version
+
+# Run with verbose output
+{{.Name}} --verbose <command>
+```
+
+## Configuration
+
+{{.Name}} looks for configuration in:
+
+1. `./{{.Name}}.yaml` (project-local)
+2. `~/.config/{{.Name}}/config.yaml` (user)
+3. Environment variables prefixed with
+   `{{.Name}}_` (uppercase)
+
+See [configuration](configuration.md) for details.
+
+## Next Steps
+
+- [Configuration Reference](configuration.md)
+- [Commands Reference](commands.md)
+- [Troubleshooting](troubleshooting.md)

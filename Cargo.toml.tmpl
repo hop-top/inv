@@ -1,0 +1,20 @@
+[package]
+name = "{{.CrateName}}"
+version = "0.0.0"
+edition = "2021"
+license = "{{.License}}"
+description = "{{.Description}}"
+authors = ["{{.Author}} <{{.Email}}>"]
+
+[[bin]]
+name = "{{.Name}}"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "4", features = ["derive", "string"] }
+hop-top-kit = { version = "0.4.0-experimental.2", features = ["cli"] }
+serde_json = "1"
+
+[dev-dependencies]
+assert_cmd = "2"
+predicates = "3"

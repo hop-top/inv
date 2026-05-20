@@ -1,0 +1,21 @@
+# Per-file tier mapping for cli-rs template.
+# See spec §13: kit-init-design.md.
+#
+# Tier 1 = lint/build only
+# Tier 2 = + CI workflows
+# Tier 3 = + CLI wiring (main + commands)
+# Tier 4 = + full conformance (README, docs, changelogs)
+files:
+  ".gitignore": [1, 2, 3, 4]
+  "Cargo.toml": [1, 2, 3, 4]
+  "Makefile": [1, 2, 3, 4]
+  "rustfmt.toml": [1, 2, 3, 4]
+
+  "src/main.rs": [3, 4]
+  "src/commands/mod.rs": [3, 4]
+  "src/commands/hello.rs": [3, 4]
+  "src/commands/list.rs": [3, 4]
+  "tests/cli.rs": [3, 4]
+
+  "README.md": [4]
+  "CHANGELOG.md": [4]

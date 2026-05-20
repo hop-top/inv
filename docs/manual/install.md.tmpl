@@ -1,0 +1,45 @@
+# Installing {{.Name}}
+
+## From Source
+
+```sh
+git clone {{.Module}}
+cd {{.Name}}
+task build
+```
+
+## Go
+
+```sh
+go install {{.Module}}@latest
+```
+
+## npm
+
+```sh
+npm install -g {{.Name}}
+```
+
+## pip
+
+```sh
+pip install {{.Name}}
+```
+
+## Homebrew
+
+```sh
+brew install {{.Name}}
+```
+
+## Verify Installation
+
+```sh
+{{.Name}} --version
+```
+
+## System Requirements
+
+- Go 1.22+ (for Go builds)
+- Node.js 20+ (for TypeScript builds)
+- Python 3.11+ (for Python builds)

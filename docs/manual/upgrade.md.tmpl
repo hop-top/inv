@@ -1,0 +1,54 @@
+# Upgrading {{.Name}}
+
+## Check Current Version
+
+```sh
+{{.Name}} --version
+```
+
+## Upgrade Methods
+
+### Go
+
+```sh
+go install {{.Module}}@latest
+```
+
+### npm
+
+```sh
+npm update -g {{.Name}}
+```
+
+### pip
+
+```sh
+pip install --upgrade {{.Name}}
+```
+
+### Homebrew
+
+```sh
+brew upgrade {{.Name}}
+```
+
+## Breaking Changes
+
+Check the CHANGELOG for breaking changes between
+versions before upgrading.
+
+## Rollback
+
+If an upgrade causes issues, install the previous
+version explicitly:
+
+```sh
+# Go
+go install {{.Module}}@v<PREVIOUS_VERSION>
+
+# npm
+npm install -g {{.Name}}@<PREVIOUS_VERSION>
+
+# pip
+pip install {{.Name}}==<PREVIOUS_VERSION>
+```

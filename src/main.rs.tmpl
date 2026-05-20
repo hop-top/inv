@@ -1,0 +1,36 @@
+use clap::{Command, CommandFactory, Parser, Subcommand};
+use hop_top_kit::output::{register_output_flags, RegisterOutputFlagsOptions};
+
+mod commands;
+
+#[derive(Parser)]
+#[command(name = "{{.Name}}", version, about = "{{.Description}}")]
+struct Cli {
+    #[command(subcommand)]
+    cmd: SubCmd,
+}
+
+#[derive(Subcommand)]
+enum SubCmd {
+    /// Say hello to <name>.
+    Hello(commands::hello::Args),
+    /// Demo list command — exercises the output flag suite.
+    List,
+}
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Augment clap's auto-generated Command with the kit output flag
+    // suite, then re-parse the augmented Command. This is the
+    // clap-idiomatic mirror of cli-py's `register_output_flags(app)`
+    // and cli-php's `Flags::register($app)`.
+    let cli_cmd: Command = Cli::command();
+    let (cli_cmd, _ctx) =
+        register_output_flags(cli_cmd, RegisterOutputFlagsOptions::default());
+    let matches = cli_cmd.get_matches();
+
+    match matches.subcommand() {
+        Some(("hello", sub)) => commands::hello::run(sub),
+        Some(("list", sub)) => commands::list::run(sub),
+        _ => Ok(()),
+    }
+}

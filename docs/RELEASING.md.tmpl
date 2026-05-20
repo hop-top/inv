@@ -1,0 +1,48 @@
+# Releasing {{.Name}}
+
+## Pre-release Checklist
+
+- [ ] All tests pass on main
+- [ ] CHANGELOG updated with new version section
+- [ ] Version bumped in relevant manifests
+- [ ] Documentation reflects current behavior
+- [ ] Breaking changes documented (if any)
+
+## Release Process
+
+1. Ensure `main` is up to date:
+   ```sh
+   git checkout main && git pull
+   ```
+
+2. Create and push a version tag:
+   ```sh
+   git tag -a v<VERSION> -m "Release v<VERSION>"
+   git push origin v<VERSION>
+   ```
+
+3. CI will automatically:
+   - Run all tests
+   - Build release artifacts
+   - Publish to package registries
+
+4. Verify the release:
+   - Check CI pipeline completed successfully
+   - Confirm packages published correctly
+   - Test installation from registry
+
+## Hotfix Process
+
+1. Branch from the release tag:
+   ```sh
+   git checkout -b hotfix/v<VERSION> v<VERSION>
+   ```
+
+2. Apply fix, test, tag, push
+
+## Rollback
+
+If a release has critical issues:
+
+1. Yank/unpublish the broken version
+2. Tag and release a patch version with the fix

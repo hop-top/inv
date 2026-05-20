@@ -1,0 +1,57 @@
+# Troubleshooting {{.Name}}
+
+## Common Issues
+
+### Command not found
+
+Ensure {{.Name}} is installed and on your PATH:
+
+```sh
+which {{.Name}}
+```
+
+If missing, reinstall (see [install](install.md)).
+
+### Permission denied
+
+Check file permissions. On Unix systems:
+
+```sh
+chmod +x $(which {{.Name}})
+```
+
+### Config not loading
+
+Verify config file location and syntax:
+
+```sh
+{{.Name}} --verbose <command>
+```
+
+This prints which config files were loaded.
+
+### Unexpected output format
+
+Set the output format explicitly:
+
+```sh
+{{.Name}} --output json <command>
+```
+
+## Debug Mode
+
+Run with verbose output for detailed diagnostics:
+
+```sh
+{{.Name}} --verbose <command>
+```
+
+## Getting Help
+
+1. Check this troubleshooting guide
+2. Search existing issues on GitHub
+3. Open a new issue with:
+   - {{.Name}} version (`{{.Name}} --version`)
+   - OS and architecture
+   - Steps to reproduce
+   - Expected vs actual behavior
