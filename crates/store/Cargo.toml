@@ -17,6 +17,9 @@ anyhow = { workspace = true }
 chrono = { workspace = true }
 rust_decimal = { workspace = true }
 tracing = { workspace = true }
+sha2 = { workspace = true }
+async-trait = { workspace = true }
+mti = { workspace = true }
 
 # Local crate dependency (read-only consumer of inv-core domain types).
 inv-core = { workspace = true }
@@ -37,8 +40,14 @@ sqlite = ["sqlx/sqlite"]
 postgres = ["sqlx/postgres"]
 tidb = ["sqlx/mysql"]
 
+# Blob storage backends. `local` is always on; `s3` is a stub gate
+# that lets downstream crates compile-check the eventual S3 surface.
+# Real S3 implementation lands in v1.1.
+s3 = []
+
 [dev-dependencies]
 tokio = { workspace = true }
+tempfile = { workspace = true }
 
 [lints]
 workspace = true

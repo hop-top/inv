@@ -8,6 +8,7 @@
 #[cfg(not(any(feature = "sqlite", feature = "postgres", feature = "tidb")))]
 compile_error!("inv-store requires at least one storage backend feature: `sqlite`, `postgres`, or `tidb`");
 
+pub mod blob;
 pub mod error;
 pub mod migrate;
 pub mod pool;
