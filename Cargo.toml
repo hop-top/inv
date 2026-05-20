@@ -21,19 +21,83 @@ homepage = "https://github.com/hop-top/inv"
 description = "Invoicing-as-a-service: composer + lifecycle, multi-channel core, event-bus interop with fin"
 
 [workspace.dependencies]
-# Wire-format + CLI deps used in T-0002 scaffold. Expanded in T-0003.
-clap = { version = "4", features = ["derive", "string"] }
-hop-top-kit = { path = "../kit/hops/main/sdk/experimental/rs", features = ["cli"] }
-serde_json = "1"
 
-# Workspace-internal crates (path deps).
-inv-api = { path = "crates/api" }
-inv-bus = { path = "crates/bus" }
-inv-cli = { path = "crates/cli" }
-inv-core = { path = "crates/core" }
-inv-mcp = { path = "crates/mcp" }
+# --- Async runtime + serde -----------------------------------------------
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_yaml = "0.9"
+toml = "0.8"
+
+# --- Error types ---------------------------------------------------------
+thiserror = "2"
+anyhow = "1"
+
+# --- Time + decimal + IDs ------------------------------------------------
+chrono = { version = "0.4", features = ["serde"] }
+rust_decimal = { version = "1", features = ["serde-with-str", "db-postgres"] }
+mti = { version = "1.1", features = ["serde", "instrument"] }
+
+# --- Telemetry -----------------------------------------------------------
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+
+# --- FSM + templates ------------------------------------------------------
+statig = { version = "0.3", features = ["async"] }
+tera = "1"
+
+# --- SQL + blob -----------------------------------------------------------
+# sqlx enables driver features per consumer crate (storage-* features
+# on inv-store). Default sqlite; postgres + mysql (tidb) opt-in.
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "macros", "migrate", "chrono", "rust_decimal"] }
+
+# --- HTTP + WS + MCP -----------------------------------------------------
+axum = { version = "0.8", features = ["macros", "tokio", "ws", "tracing"] }
+tower = "0.5"
+tower-http = { version = "0.6", features = ["trace", "cors", "limit"] }
+rmcp = "1.7"
+
+# --- CLI -----------------------------------------------------------------
+clap = { version = "4", features = ["derive", "string"] }
+
+# --- hop-top primitives --------------------------------------------------
+# Pinned to local paths until both crates cut releases that include the
+# features we use. Swap to crates.io versions when available.
+hop-top-kit = { path = "../kit/hops/main/sdk/experimental/rs", features = ["cli"] }
+hop-top-uri = { path = "../uri-poly/rs" }
+
+# --- Workspace-internal crates (path deps) -------------------------------
+inv-api   = { path = "crates/api" }
+inv-bus   = { path = "crates/bus" }
+inv-cli   = { path = "crates/cli" }
+inv-core  = { path = "crates/core" }
+inv-mcp   = { path = "crates/mcp" }
 inv-store = { path = "crates/store" }
-inv-ws = { path = "crates/ws" }
+inv-ws    = { path = "crates/ws" }
+
+# --- Test helpers --------------------------------------------------------
+assert_cmd = "2"
+predicates = "3"
+insta = { version = "1", features = ["yaml", "json"] }
+
+# =========================================================================
+# Workspace-level Cargo features
+# =========================================================================
+# These are *advertised* here; specific crates wire them up. Default to
+# the lean sqlite + statig + (TBD) PDF engine combination.
+#
+# Storage backends:
+#   storage-sqlite     (default)  sqlx::sqlite
+#   storage-postgres              sqlx::postgres
+#   storage-tidb                  sqlx::mysql (tidb speaks MySQL wire)
+#
+# FSM adapter:
+#   fsm-statig         (default)
+#
+# PDF engine (T-0010 picks the default):
+#   pdf-typst                     pure Rust, recommended default
+#   pdf-wkhtmltopdf               system binary
+#   pdf-weasyprint                Python sidecar
 
 [workspace.lints.rust]
 unsafe_code = "deny"
