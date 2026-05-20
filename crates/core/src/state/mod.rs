@@ -21,6 +21,7 @@
 //! [`machine::StateMachine::propose`].
 
 pub mod adapter_statig;
+pub mod creditnote;
 pub mod events;
 pub mod machine;
 pub mod transitions;
