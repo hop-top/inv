@@ -43,14 +43,30 @@ impl<'p> InvoiceRepo<'p> {
         Self { pool }
     }
 
-    /// Upsert.
+    /// Upsert. Inserts a new row or updates an existing one in place
+    /// without triggering `ON DELETE CASCADE` on related history rows.
+    ///
+    /// Opens its own short transaction. For multi-step ops (e.g. FSM
+    /// transition + history-row insert) where the caller needs both
+    /// writes to commit atomically, use [`Self::save_in_tx`] instead.
     pub async fn save(&self, inv: &Invoice) -> Result<()> {
-        let metadata = metadata_to_json(&inv.metadata)?;
         let mut tx = self.pool.begin().await?;
-        sqlx::query("DELETE FROM invoices WHERE id = ?")
-            .bind(inv.id.to_string())
-            .execute(&mut *tx)
-            .await?;
+        Self::save_in_tx(&mut tx, inv).await?;
+        tx.commit().await?;
+        Ok(())
+    }
+
+    /// Upsert inside a caller-owned transaction.
+    ///
+    /// Use this when the invoice mutation must commit atomically with
+    /// other writes (history-row insert, line replacement, outbox
+    /// publish). See design §3.5 — every command runs FSM mutation +
+    /// `invoice_state_history` insert in one transaction.
+    pub async fn save_in_tx(
+        tx: &mut sqlx::Transaction<'_, sqlx::Any>,
+        inv: &Invoice,
+    ) -> Result<()> {
+        let metadata = metadata_to_json(&inv.metadata)?;
         sqlx::query(
             "INSERT INTO invoices \
              (id, number, customer_id, seller_jur, currency, state, \
@@ -58,7 +74,30 @@ impl<'p> InvoiceRepo<'p> {
               subtotal, tax_total, total, amount_paid, \
               schedule_id, template_path, pdf_blob_ref, idempotency_key, \
               nexus_review, metadata, created_at, updated_at) \
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) \
+             ON CONFLICT (id) DO UPDATE SET \
+              number = excluded.number, \
+              customer_id = excluded.customer_id, \
+              seller_jur = excluded.seller_jur, \
+              currency = excluded.currency, \
+              state = excluded.state, \
+              issued_at = excluded.issued_at, \
+              due_at = excluded.due_at, \
+              sent_at = excluded.sent_at, \
+              viewed_at = excluded.viewed_at, \
+              paid_at = excluded.paid_at, \
+              voided_at = excluded.voided_at, \
+              subtotal = excluded.subtotal, \
+              tax_total = excluded.tax_total, \
+              total = excluded.total, \
+              amount_paid = excluded.amount_paid, \
+              schedule_id = excluded.schedule_id, \
+              template_path = excluded.template_path, \
+              pdf_blob_ref = excluded.pdf_blob_ref, \
+              idempotency_key = excluded.idempotency_key, \
+              nexus_review = excluded.nexus_review, \
+              metadata = excluded.metadata, \
+              updated_at = excluded.updated_at",
         )
         .bind(inv.id.to_string())
         .bind(inv.number.clone())
@@ -84,9 +123,8 @@ impl<'p> InvoiceRepo<'p> {
         .bind(metadata)
         .bind(ts_to_string(&inv.created_at))
         .bind(ts_to_string(&inv.updated_at))
-        .execute(&mut *tx)
+        .execute(&mut **tx)
         .await?;
-        tx.commit().await?;
         Ok(())
     }
 
@@ -298,19 +336,35 @@ impl<'p> InvoiceLineRepo<'p> {
 
     /// Upsert a single line.
     pub async fn save(&self, line: &InvoiceLine) -> Result<()> {
+        let mut tx = self.pool.begin().await?;
+        Self::save_in_tx(&mut tx, line).await?;
+        tx.commit().await?;
+        Ok(())
+    }
+
+    /// Upsert inside a caller-owned transaction.
+    pub async fn save_in_tx(
+        tx: &mut sqlx::Transaction<'_, sqlx::Any>,
+        line: &InvoiceLine,
+    ) -> Result<()> {
         let tax_rate_ids = serde_json::to_string(&line.tax_rate_ids)?;
         let metadata = metadata_to_json(&line.metadata)?;
-
-        let mut tx = self.pool.begin().await?;
-        sqlx::query("DELETE FROM invoice_lines WHERE id = ?")
-            .bind(line.id.to_string())
-            .execute(&mut *tx)
-            .await?;
         sqlx::query(
             "INSERT INTO invoice_lines \
              (id, invoice_id, position, description, quantity, unit_price, \
               tax_rate_ids, tax_category, tax_amount, line_total, metadata) \
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) \
+             ON CONFLICT (id) DO UPDATE SET \
+              invoice_id = excluded.invoice_id, \
+              position = excluded.position, \
+              description = excluded.description, \
+              quantity = excluded.quantity, \
+              unit_price = excluded.unit_price, \
+              tax_rate_ids = excluded.tax_rate_ids, \
+              tax_category = excluded.tax_category, \
+              tax_amount = excluded.tax_amount, \
+              line_total = excluded.line_total, \
+              metadata = excluded.metadata",
         )
         .bind(line.id.to_string())
         .bind(line.invoice_id.to_string())
@@ -323,22 +377,37 @@ impl<'p> InvoiceLineRepo<'p> {
         .bind(decimal_to_string(&line.tax_amount))
         .bind(decimal_to_string(&line.line_total))
         .bind(metadata)
-        .execute(&mut *tx)
+        .execute(&mut **tx)
         .await?;
-        tx.commit().await?;
         Ok(())
     }
 
     /// Replace all lines for an invoice atomically.
+    ///
+    /// Unlike the other repo methods, this one intentionally
+    /// DELETEs-then-INSERTs because it semantically replaces the *set*
+    /// of lines (e.g. line removed by a draft edit). No CASCADEing
+    /// children hang off invoice_lines, so the DELETE is safe.
     pub async fn replace_for_invoice(
         &self,
         invoice_id: &InvoiceId,
         lines: &[InvoiceLine],
     ) -> Result<()> {
         let mut tx = self.pool.begin().await?;
+        Self::replace_for_invoice_in_tx(&mut tx, invoice_id, lines).await?;
+        tx.commit().await?;
+        Ok(())
+    }
+
+    /// Replace inside a caller-owned transaction.
+    pub async fn replace_for_invoice_in_tx(
+        tx: &mut sqlx::Transaction<'_, sqlx::Any>,
+        invoice_id: &InvoiceId,
+        lines: &[InvoiceLine],
+    ) -> Result<()> {
         sqlx::query("DELETE FROM invoice_lines WHERE invoice_id = ?")
             .bind(invoice_id.to_string())
-            .execute(&mut *tx)
+            .execute(&mut **tx)
             .await?;
         for line in lines {
             let tax_rate_ids = serde_json::to_string(&line.tax_rate_ids)?;
@@ -360,10 +429,9 @@ impl<'p> InvoiceLineRepo<'p> {
             .bind(decimal_to_string(&line.tax_amount))
             .bind(decimal_to_string(&line.line_total))
             .bind(metadata)
-            .execute(&mut *tx)
+            .execute(&mut **tx)
             .await?;
         }
-        tx.commit().await?;
         Ok(())
     }
 

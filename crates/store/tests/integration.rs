@@ -384,3 +384,83 @@ async fn bus_inbox_dedups_on_event_id() {
     let back2 = inbox.get(&rec.event_id).await.unwrap().unwrap();
     assert!(back2.processed_at.is_some());
 }
+
+// ---------------------------------------------------------------------
+// Regression: T-0024 — InvoiceRepo::save() must NOT trigger
+// ON DELETE CASCADE on invoice_state_history.
+// ---------------------------------------------------------------------
+
+#[tokio::test]
+async fn invoice_save_preserves_history_rows() {
+    let pool = fresh_pool().await;
+    CustomerRepo::new(&pool).save(&sample_customer()).await.unwrap();
+
+    let cust = sample_customer();
+    CustomerRepo::new(&pool).save(&cust).await.unwrap();
+    let inv = sample_invoice(&cust.id);
+    let inv_repo = InvoiceRepo::new(&pool);
+    let hist_repo = InvoiceHistoryRepo::new(&pool);
+
+    inv_repo.save(&inv).await.unwrap();
+
+    // Write a history row, then save the invoice again (simulating an
+    // FSM transition). With the old DELETE+INSERT pattern, the ON DELETE
+    // CASCADE on invoice_state_history would wipe the history row.
+    let h = InvoiceStateHistory {
+        id: HistoryId::new(),
+        invoice_id: inv.id.clone(),
+        from_state: None,
+        to_state: InvoiceState::Draft,
+        event: "draft".into(),
+        actor: Some("jad".into()),
+        channel: HistoryChannel::Cli,
+        bus_event_id: None,
+        reason: None,
+        occurred_at: Utc.with_ymd_and_hms(2026, 1, 2, 9, 0, 0).unwrap(),
+        published_at: None,
+        metadata: BTreeMap::new(),
+    };
+    hist_repo.save(&h).await.unwrap();
+
+    let mut inv_updated = inv.clone();
+    inv_updated.state = InvoiceState::Issued;
+    inv_updated.number = Some("INV-2026-0001".into());
+    inv_updated.issued_at =
+        Some(Utc.with_ymd_and_hms(2026, 1, 3, 10, 0, 0).unwrap());
+    inv_repo.save(&inv_updated).await.unwrap();
+
+    // The history row must still be there after the second save.
+    let rows = hist_repo.list_for_invoice(&inv.id).await.unwrap();
+    assert_eq!(rows.len(), 1, "history row was wiped by repeated InvoiceRepo::save() — CASCADE regression");
+    assert_eq!(rows[0], h);
+
+    // The invoice itself reflects the updated state.
+    let back = inv_repo.get(&inv.id).await.unwrap().unwrap();
+    assert_eq!(back.state, InvoiceState::Issued);
+    assert_eq!(back.number.as_deref(), Some("INV-2026-0001"));
+    assert!(back.issued_at.is_some());
+    // created_at is preserved across upserts.
+    assert_eq!(back.created_at, inv.created_at);
+}
+
+#[tokio::test]
+async fn customer_save_does_not_fk_violate_when_referenced() {
+    let pool = fresh_pool().await;
+    let repo = CustomerRepo::new(&pool);
+
+    let mut c = sample_customer();
+    repo.save(&c).await.unwrap();
+
+    // Insert a referencing invoice — with the old DELETE+INSERT pattern,
+    // a second save of the customer would have FK-violated.
+    let inv = sample_invoice(&c.id);
+    InvoiceRepo::new(&pool).save(&inv).await.unwrap();
+
+    // Now save the customer again. Must succeed.
+    c.display_name = "Acme Corp (renamed)".into();
+    c.updated_at = Utc.with_ymd_and_hms(2026, 1, 5, 0, 0, 0).unwrap();
+    repo.save(&c).await.expect("save must succeed when customer is FK-referenced");
+
+    let back = repo.get(&c.id).await.unwrap().unwrap();
+    assert_eq!(back.display_name, "Acme Corp (renamed)");
+}

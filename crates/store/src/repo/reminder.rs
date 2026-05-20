@@ -21,16 +21,28 @@ impl<'p> ReminderRepo<'p> {
         Self { pool }
     }
 
-    /// Upsert.
+    /// Upsert. Uses `INSERT ... ON CONFLICT DO UPDATE`.
     pub async fn save(&self, r: &Reminder) -> Result<()> {
         let mut tx = self.pool.begin().await?;
-        sqlx::query("DELETE FROM reminders WHERE id = ?")
-            .bind(r.id.to_string())
-            .execute(&mut *tx)
-            .await?;
+        Self::save_in_tx(&mut tx, r).await?;
+        tx.commit().await?;
+        Ok(())
+    }
+
+    /// Upsert inside a caller-owned transaction (see [`InvoiceRepo::save_in_tx`]).
+    pub async fn save_in_tx(
+        tx: &mut sqlx::Transaction<'_, sqlx::Any>,
+        r: &Reminder,
+    ) -> Result<()> {
         sqlx::query(
             "INSERT INTO reminders (id, invoice_id, scheduled_at, sent_at, channel, state) \
-             VALUES (?, ?, ?, ?, ?, ?)",
+             VALUES (?, ?, ?, ?, ?, ?) \
+             ON CONFLICT (id) DO UPDATE SET \
+              invoice_id = excluded.invoice_id, \
+              scheduled_at = excluded.scheduled_at, \
+              sent_at = excluded.sent_at, \
+              channel = excluded.channel, \
+              state = excluded.state",
         )
         .bind(r.id.to_string())
         .bind(r.invoice_id.to_string())
@@ -38,9 +50,8 @@ impl<'p> ReminderRepo<'p> {
         .bind(r.sent_at.as_ref().map(ts_to_string))
         .bind(channel_to_str(r.channel))
         .bind(state_to_str(r.state))
-        .execute(&mut *tx)
+        .execute(&mut **tx)
         .await?;
-        tx.commit().await?;
         Ok(())
     }
 

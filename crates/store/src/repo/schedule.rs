@@ -23,20 +23,39 @@ impl<'p> ScheduleRepo<'p> {
         Self { pool }
     }
 
-    /// Upsert.
+    /// Upsert. Uses `INSERT ... ON CONFLICT DO UPDATE`.
     pub async fn save(&self, s: &Schedule) -> Result<()> {
+        let mut tx = self.pool.begin().await?;
+        Self::save_in_tx(&mut tx, s).await?;
+        tx.commit().await?;
+        Ok(())
+    }
+
+    /// Upsert inside a caller-owned transaction (see [`InvoiceRepo::save_in_tx`]).
+    pub async fn save_in_tx(
+        tx: &mut sqlx::Transaction<'_, sqlx::Any>,
+        s: &Schedule,
+    ) -> Result<()> {
         let metadata = metadata_to_json(&s.metadata)?;
         let template_lines = serde_json::to_string(&s.template_lines)?;
-        let mut tx = self.pool.begin().await?;
-        sqlx::query("DELETE FROM schedules WHERE id = ?")
-            .bind(s.id.to_string())
-            .execute(&mut *tx)
-            .await?;
         sqlx::query(
             "INSERT INTO schedules \
              (id, customer_id, template_lines, currency, cadence, start_date, end_date, \
               auto_issue, next_run, last_run, state, metadata, created_at, updated_at) \
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) \
+             ON CONFLICT (id) DO UPDATE SET \
+              customer_id = excluded.customer_id, \
+              template_lines = excluded.template_lines, \
+              currency = excluded.currency, \
+              cadence = excluded.cadence, \
+              start_date = excluded.start_date, \
+              end_date = excluded.end_date, \
+              auto_issue = excluded.auto_issue, \
+              next_run = excluded.next_run, \
+              last_run = excluded.last_run, \
+              state = excluded.state, \
+              metadata = excluded.metadata, \
+              updated_at = excluded.updated_at",
         )
         .bind(s.id.to_string())
         .bind(s.customer_id.to_string())
@@ -52,9 +71,8 @@ impl<'p> ScheduleRepo<'p> {
         .bind(metadata)
         .bind(ts_to_string(&s.created_at))
         .bind(ts_to_string(&s.updated_at))
-        .execute(&mut *tx)
+        .execute(&mut **tx)
         .await?;
-        tx.commit().await?;
         Ok(())
     }
 

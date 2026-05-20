@@ -26,18 +26,36 @@ impl<'p> CreditNoteRepo<'p> {
         Self { pool }
     }
 
-    /// Upsert.
+    /// Upsert. Uses `INSERT ... ON CONFLICT DO UPDATE` so existing
+    /// rows are updated in place, preserving CASCADEing children
+    /// like `credit_note_state_history`.
     pub async fn save(&self, n: &CreditNote) -> Result<()> {
-        let metadata = metadata_to_json(&n.metadata)?;
         let mut tx = self.pool.begin().await?;
-        sqlx::query("DELETE FROM credit_notes WHERE id = ?")
-            .bind(n.id.to_string())
-            .execute(&mut *tx)
-            .await?;
+        Self::save_in_tx(&mut tx, n).await?;
+        tx.commit().await?;
+        Ok(())
+    }
+
+    /// Upsert inside a caller-owned transaction (see [`InvoiceRepo::save_in_tx`]).
+    pub async fn save_in_tx(
+        tx: &mut sqlx::Transaction<'_, sqlx::Any>,
+        n: &CreditNote,
+    ) -> Result<()> {
+        let metadata = metadata_to_json(&n.metadata)?;
         sqlx::query(
             "INSERT INTO credit_notes \
              (id, number, invoice_id, state, amount, currency, reason, refund_ref, issued_at, created_at, metadata) \
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) \
+             ON CONFLICT (id) DO UPDATE SET \
+              number = excluded.number, \
+              invoice_id = excluded.invoice_id, \
+              state = excluded.state, \
+              amount = excluded.amount, \
+              currency = excluded.currency, \
+              reason = excluded.reason, \
+              refund_ref = excluded.refund_ref, \
+              issued_at = excluded.issued_at, \
+              metadata = excluded.metadata",
         )
         .bind(n.id.to_string())
         .bind(n.number.clone())
@@ -50,9 +68,8 @@ impl<'p> CreditNoteRepo<'p> {
         .bind(n.issued_at.as_ref().map(ts_to_string))
         .bind(ts_to_string(&n.created_at))
         .bind(metadata)
-        .execute(&mut *tx)
+        .execute(&mut **tx)
         .await?;
-        tx.commit().await?;
         Ok(())
     }
 

@@ -23,8 +23,21 @@ impl<'p> InvoiceHistoryRepo<'p> {
         Self { pool }
     }
 
-    /// Append a row.
+    /// Append a row. Opens its own short transaction; for atomic
+    /// composition with an invoice mutation, use [`Self::save_in_tx`].
     pub async fn save(&self, h: &InvoiceStateHistory) -> Result<()> {
+        let mut tx = self.pool.begin().await?;
+        Self::save_in_tx(&mut tx, h).await?;
+        tx.commit().await?;
+        Ok(())
+    }
+
+    /// Append a row inside a caller-owned transaction (see
+    /// [`crate::repo::invoice::InvoiceRepo::save_in_tx`]).
+    pub async fn save_in_tx(
+        tx: &mut sqlx::Transaction<'_, sqlx::Any>,
+        h: &InvoiceStateHistory,
+    ) -> Result<()> {
         let metadata = metadata_to_json(&h.metadata)?;
         sqlx::query(
             "INSERT INTO invoice_state_history \
@@ -44,7 +57,7 @@ impl<'p> InvoiceHistoryRepo<'p> {
         .bind(ts_to_string(&h.occurred_at))
         .bind(h.published_at.as_ref().map(ts_to_string))
         .bind(metadata)
-        .execute(self.pool)
+        .execute(&mut **tx)
         .await?;
         Ok(())
     }

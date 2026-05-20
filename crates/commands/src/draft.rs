@@ -221,19 +221,16 @@ pub async fn draft_invoice(
         metadata: BTreeMap::new(),
     };
 
-    // sqlx::Any doesn't let us share one transaction across the existing
-    // repo helpers (they each begin their own). To keep this PR small
-    // and avoid touching the repos, we sequence the writes and rely on
-    // the fact that any failure leaves a half-written draft that the
-    // operator can either delete or retry against. The follow-up
-    // (T-0012/T-0014) will widen the repo surface to accept an
-    // `&mut Transaction` so the full design-§3.5 atomicity lands.
-    let inv_repo = InvoiceRepo::new(&ctx.db);
-    let line_repo = InvoiceLineRepo::new(&ctx.db);
-    let hist_repo = InvoiceHistoryRepo::new(&ctx.db);
-    inv_repo.save(&invoice).await?;
-    line_repo.replace_for_invoice(&invoice_id, &lines).await?;
-    hist_repo.save(&history).await?;
+    // Single sqlx transaction encompassing invoice + lines + history
+    // row (design §3.5). Each repo exposes a `save_in_tx` variant that
+    // accepts a borrowed `&mut Transaction`. See T-0024.
+    {
+        let mut tx = ctx.db.begin().await.map_err(inv_store::StoreError::from)?;
+        InvoiceRepo::save_in_tx(&mut tx, &invoice).await?;
+        InvoiceLineRepo::replace_for_invoice_in_tx(&mut tx, &invoice_id, &lines).await?;
+        InvoiceHistoryRepo::save_in_tx(&mut tx, &history).await?;
+        tx.commit().await.map_err(inv_store::StoreError::from)?;
+    }
 
     // 5. Construct the emitted-events list.
     let drafted_event = EmittedEvent::new(

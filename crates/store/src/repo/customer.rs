@@ -22,22 +22,35 @@ impl<'p> CustomerRepo<'p> {
         Self { pool }
     }
 
-    /// Upsert.
+    /// Upsert. Uses `INSERT ... ON CONFLICT DO UPDATE` so existing
+    /// rows are updated in place. (The prior DELETE+INSERT would have
+    /// hit a FK RESTRICT violation if any invoices or schedules
+    /// referenced this customer.)
     pub async fn save(&self, c: &Customer) -> Result<()> {
+        let mut tx = self.pool.begin().await?;
+        Self::save_in_tx(&mut tx, c).await?;
+        tx.commit().await?;
+        Ok(())
+    }
+
+    /// Upsert inside a caller-owned transaction (see [`InvoiceRepo::save_in_tx`]).
+    pub async fn save_in_tx(
+        tx: &mut sqlx::Transaction<'_, sqlx::Any>,
+        c: &Customer,
+    ) -> Result<()> {
         let address_json = serde_json::to_string(&c.address)?;
         let metadata = metadata_to_json(&c.metadata)?;
-
-        // UPSERT via DELETE+INSERT — portable across sqlite/postgres/mysql
-        // without driver-specific ON CONFLICT clauses.
-        let mut tx = self.pool.begin().await?;
-        sqlx::query("DELETE FROM customers WHERE id = ?")
-            .bind(c.id.to_string())
-            .execute(&mut *tx)
-            .await?;
         sqlx::query(
             "INSERT INTO customers \
              (id, display_name, email, address_json, jurisdiction, metadata, created_at, updated_at) \
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?) \
+             ON CONFLICT (id) DO UPDATE SET \
+              display_name = excluded.display_name, \
+              email = excluded.email, \
+              address_json = excluded.address_json, \
+              jurisdiction = excluded.jurisdiction, \
+              metadata = excluded.metadata, \
+              updated_at = excluded.updated_at",
         )
         .bind(c.id.to_string())
         .bind(&c.display_name)
@@ -47,9 +60,8 @@ impl<'p> CustomerRepo<'p> {
         .bind(metadata)
         .bind(ts_to_string(&c.created_at))
         .bind(ts_to_string(&c.updated_at))
-        .execute(&mut *tx)
+        .execute(&mut **tx)
         .await?;
-        tx.commit().await?;
         Ok(())
     }
 

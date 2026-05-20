@@ -245,16 +245,13 @@ pub async fn send_invoice(
         _ => unreachable!("scheme guard above"),
     };
 
-    // State mutation + audit row.
-    //
-    // As in `issue`, we bypass `InvoiceRepo::save` (DELETE+INSERT
-    // would CASCADE-wipe history rows) in favour of a focused UPDATE
-    // touching only the columns this transition mutates.
+    // State mutation + audit row in a single sqlx transaction
+    // (design §3.5). InvoiceRepo::save_in_tx is an upsert and does
+    // not CASCADE-wipe history rows (T-0024).
     invoice.state = to_state;
     invoice.sent_at = Some(now);
     invoice.updated_at = now;
 
-    update_invoice_for_send(ctx, &invoice).await?;
     let history = InvoiceStateHistory {
         id: HistoryId::new(),
         invoice_id: invoice.id.clone(),
@@ -273,7 +270,12 @@ pub async fn send_invoice(
             m
         },
     };
-    hist_repo.save(&history).await?;
+    {
+        let mut tx = ctx.db.begin().await.map_err(inv_store::StoreError::from)?;
+        InvoiceRepo::save_in_tx(&mut tx, &invoice).await?;
+        InvoiceHistoryRepo::save_in_tx(&mut tx, &history).await?;
+        tx.commit().await.map_err(inv_store::StoreError::from)?;
+    }
 
     // Bus events.
     let emitted =
@@ -287,35 +289,6 @@ pub async fn send_invoice(
         emitted_events: emitted,
         delivered_to,
     })
-}
-
-/// Focused UPDATE for the columns send transitions mutate. See
-/// `issue.rs::update_invoice_for_issue` for why we avoid the repo's
-/// DELETE+INSERT path here.
-async fn update_invoice_for_send(
-    ctx: &CoreCtx,
-    invoice: &Invoice,
-) -> Result<(), CoreError> {
-    let state_str = match invoice.state {
-        InvoiceState::Draft => "draft",
-        InvoiceState::Issued => "issued",
-        InvoiceState::Sent => "sent",
-        InvoiceState::Viewed => "viewed",
-        InvoiceState::PartiallyPaid => "partially_paid",
-        InvoiceState::Paid => "paid",
-        InvoiceState::Voided => "voided",
-    };
-    sqlx::query(
-        "UPDATE invoices SET state = ?, sent_at = ?, updated_at = ? WHERE id = ?",
-    )
-    .bind(state_str)
-    .bind(invoice.sent_at.as_ref().map(|t| t.to_rfc3339()))
-    .bind(invoice.updated_at.to_rfc3339())
-    .bind(invoice.id.to_string())
-    .execute(&ctx.db)
-    .await
-    .map_err(inv_store::StoreError::from)?;
-    Ok(())
 }
 
 fn scheme_of(uri: &str) -> String {

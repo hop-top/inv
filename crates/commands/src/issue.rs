@@ -96,7 +96,6 @@ pub async fn issue_invoice(
     let inv_repo = InvoiceRepo::new(&ctx.db);
     let line_repo = InvoiceLineRepo::new(&ctx.db);
     let cust_repo = CustomerRepo::new(&ctx.db);
-    let hist_repo = InvoiceHistoryRepo::new(&ctx.db);
 
     // 1. Load draft.
     let mut invoice = inv_repo
@@ -188,20 +187,11 @@ pub async fn issue_invoice(
     // output so a caller can choose to write them locally.
     let _ = &pdf;
 
-    // 8. Persist mutation + audit row (design §3.5 — single transaction
-    //    in intent; see the draft.rs note).
-    //
-    // We deliberately bypass `InvoiceRepo::save` here: that helper does
-    // DELETE-then-INSERT, and `invoice_state_history` has
-    // `ON DELETE CASCADE` against `invoices.id`, so re-saving the
-    // invoice would wipe the prior `drafted` history row. Until the
-    // repo grows an UPDATE path or a transaction-aware overload (the
-    // follow-up to T-0008), this command issues a focused UPDATE that
-    // only touches the columns the issue transition changes.
-    update_invoice_for_issue(ctx, &invoice).await?;
-    line_repo
-        .replace_for_invoice(&invoice.id, &lines)
-        .await?;
+    // 8. Persist mutation + audit row in a single sqlx transaction
+    //    (design §3.5). InvoiceRepo::save_in_tx uses
+    //    `INSERT ... ON CONFLICT DO UPDATE`, so the invoice row is
+    //    updated in place — no CASCADE wipe of invoice_state_history.
+    //    See T-0024.
     let history = InvoiceStateHistory {
         id: HistoryId::new(),
         invoice_id: invoice.id.clone(),
@@ -216,7 +206,13 @@ pub async fn issue_invoice(
         published_at: None,
         metadata: BTreeMap::new(),
     };
-    hist_repo.save(&history).await?;
+    {
+        let mut tx = ctx.db.begin().await.map_err(inv_store::StoreError::from)?;
+        InvoiceRepo::save_in_tx(&mut tx, &invoice).await?;
+        InvoiceLineRepo::replace_for_invoice_in_tx(&mut tx, &invoice.id, &lines).await?;
+        InvoiceHistoryRepo::save_in_tx(&mut tx, &history).await?;
+        tx.commit().await.map_err(inv_store::StoreError::from)?;
+    }
 
     // 9. Build emitted events: mechanic-triplet + domain `.issued`.
     let emitted = build_issued_events(&invoice, from_state, to_state, &event, &input.actor, history.channel, now);
@@ -228,42 +224,6 @@ pub async fn issue_invoice(
         pdf,
         emitted_events: emitted,
     })
-}
-
-/// Focused UPDATE for the columns issue transitions mutate. See the
-/// call-site for why we avoid `InvoiceRepo::save` here.
-async fn update_invoice_for_issue(
-    ctx: &CoreCtx,
-    invoice: &Invoice,
-) -> Result<(), CoreError> {
-    let state_str = match invoice.state {
-        InvoiceState::Draft => "draft",
-        InvoiceState::Issued => "issued",
-        InvoiceState::Sent => "sent",
-        InvoiceState::Viewed => "viewed",
-        InvoiceState::PartiallyPaid => "partially_paid",
-        InvoiceState::Paid => "paid",
-        InvoiceState::Voided => "voided",
-    };
-    sqlx::query(
-        "UPDATE invoices SET \
-            number = ?, state = ?, issued_at = ?, subtotal = ?, tax_total = ?, total = ?, \
-            nexus_review = ?, updated_at = ? \
-         WHERE id = ?",
-    )
-    .bind(invoice.number.clone())
-    .bind(state_str)
-    .bind(invoice.issued_at.as_ref().map(|t| t.to_rfc3339()))
-    .bind(invoice.subtotal.to_string())
-    .bind(invoice.tax_total.to_string())
-    .bind(invoice.total.to_string())
-    .bind(i64::from(invoice.nexus_review))
-    .bind(invoice.updated_at.to_rfc3339())
-    .bind(invoice.id.to_string())
-    .execute(&ctx.db)
-    .await
-    .map_err(inv_store::StoreError::from)?;
-    Ok(())
 }
 
 /// Count invoices that have an `issued_at` falling within the given
