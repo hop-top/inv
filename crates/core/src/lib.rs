@@ -2,3 +2,4 @@
 //! and the one-command-core layer that every channel adapter calls into.
 
 pub mod domain;
+pub mod state;
