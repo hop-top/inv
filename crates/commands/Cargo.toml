@@ -1,0 +1,38 @@
+[package]
+name = "inv-commands"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "inv: one-command-core layer that every channel adapter (CLI/API/WS/MCP/bus) calls into"
+
+[dependencies]
+# Workspace primitives
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+chrono = { workspace = true }
+rust_decimal = { workspace = true }
+tracing = { workspace = true }
+
+# inv crates: commands sit on top of core (domain + state + render + tax)
+# and store (repository structs). This is the seam that breaks the would-be
+# inv-core ↔ inv-store cycle (inv-store already depends on inv-core for
+# domain types), so commands live in their own crate.
+inv-core = { workspace = true }
+inv-store = { workspace = true }
+
+# sqlx is consumed indirectly through inv-store::Pool; the only direct
+# need from this crate is to express "an open transaction" on the same
+# AnyPool. Keep the dep narrow.
+sqlx = { workspace = true, features = ["any"] }
+
+[dev-dependencies]
+tokio = { workspace = true }
+# Enable the sqlite backend on inv-store for the integration test pool.
+inv-store = { workspace = true, features = ["sqlite"] }
+
+[lints]
+workspace = true

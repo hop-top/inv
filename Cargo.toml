@@ -5,6 +5,7 @@ members = [
     "crates/api",
     "crates/bus",
     "crates/cli",
+    "crates/commands",
     "crates/core",
     "crates/mcp",
     "crates/store",
@@ -67,13 +68,14 @@ hop-top-kit = { path = "../kit/hops/main/sdk/experimental/rs", features = ["cli"
 hop-top-uri = { path = "../uri-poly/rs" }
 
 # --- Workspace-internal crates (path deps) -------------------------------
-inv-api   = { path = "crates/api" }
-inv-bus   = { path = "crates/bus" }
-inv-cli   = { path = "crates/cli" }
-inv-core  = { path = "crates/core" }
-inv-mcp   = { path = "crates/mcp" }
-inv-store = { path = "crates/store" }
-inv-ws    = { path = "crates/ws" }
+inv-api      = { path = "crates/api" }
+inv-bus      = { path = "crates/bus" }
+inv-cli      = { path = "crates/cli" }
+inv-commands = { path = "crates/commands" }
+inv-core     = { path = "crates/core" }
+inv-mcp      = { path = "crates/mcp" }
+inv-store    = { path = "crates/store" }
+inv-ws       = { path = "crates/ws" }
 
 # --- Test helpers --------------------------------------------------------
 assert_cmd = "2"
