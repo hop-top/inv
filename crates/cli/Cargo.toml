@@ -8,9 +8,25 @@ repository.workspace = true
 description = "inv: CLI channel adapter (clap)"
 
 [dependencies]
+anyhow = { workspace = true }
 clap = { workspace = true }
+chrono = { workspace = true }
 hop-top-kit = { workspace = true }
+rust_decimal = { workspace = true }
+serde = { workspace = true }
 serde_json = { workspace = true }
+tokio = { workspace = true }
+toml = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+inv-bus = { workspace = true }
+inv-commands = { workspace = true }
+inv-core = { workspace = true }
+inv-store = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
 
 [lints]
 workspace = true
