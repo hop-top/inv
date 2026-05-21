@@ -43,8 +43,16 @@ make lint     # cargo fmt --check + clippy
 
 ## Design
 
-- [Design spec](https://github.com/jadb/ideacrafterslabs-docs/blob/main/superpowers/specs/2026-05-20-inv-design.md) — scope, architecture, FSM, tax engine, data model
-- [Implementation plan](.tlc/tracks/inv-v1/plan.md) — 23 tasks across 6 phases
+[`docs/`](docs/) is organised by reader intent — pick the doc that matches
+what you want to do.
+
+I want to...
+
+- **Install + run my first invoice** → [docs/user/tutorial-getting-started.md](docs/user/tutorial-getting-started.md)
+- **Look up a CLI flag, API route, MCP tool, or bus topic** → [docs/reference/](docs/reference/)
+- **Understand the FSM, tax algorithm, or signed-link format** → [docs/contracts/](docs/contracts/)
+- **Read the full design** → [docs/architecture/design-spec.md](docs/architecture/design-spec.md)
+- **See the implementation plan** → [`.tlc/tracks/inv-v1/plan.md`](.tlc/tracks/inv-v1/plan.md) — 23 tasks across 6 phases
 
 ## License
 
