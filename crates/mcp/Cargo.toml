@@ -7,5 +7,40 @@ authors.workspace = true
 repository.workspace = true
 description = "inv: MCP server channel adapter"
 
+[dependencies]
+# rmcp 1.7 defaults to ["base64", "macros", "server"]; we add
+# `transport-io` for stdio + `schemars` (re-export) for #[schemars(JsonSchema)]
+# on tool-input structs.
+rmcp = { workspace = true, features = ["transport-io", "schemars"] }
+
+# Workspace primitives
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+chrono = { workspace = true }
+rust_decimal = { workspace = true }
+async-trait = { workspace = true }
+
+# schemars is brought in via rmcp's `schemars` feature (v1.x). Pinning a
+# direct `schemars = "1"` workspace dep is unnecessary at v1 — see report
+# for rationale.
+schemars = { version = "1", features = ["chrono04"] }
+
+# inv internal crates
+inv-core = { workspace = true }
+inv-store = { workspace = true }
+inv-commands = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }
+# Enable `client` for the in-process integration test client + `sqlite`
+# storage backend for the in-memory CoreCtx fixture.
+rmcp = { workspace = true, features = ["client", "transport-io", "schemars"] }
+inv-store = { workspace = true, features = ["sqlite"] }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+
 [lints]
 workspace = true
