@@ -1163,6 +1163,21 @@ version = "0.0.0"
 [[package]]
 name = "inv-bus"
 version = "0.0.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "inv-commands",
+ "inv-core",
+ "inv-store",
+ "rust_decimal",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "tempfile",
+ "thiserror 2.0.18",
+ "tokio",
+ "tracing",
+]
 
 [[package]]
 name = "inv-cli"
