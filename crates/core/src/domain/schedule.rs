@@ -60,6 +60,58 @@ impl Cadence {
         }
         Ok(dom)
     }
+
+    /// Compute the next materialisation date strictly after `from`.
+    ///
+    /// - `Monthly { dom }`: the next month whose `dom`-th day is > `from`.
+    /// - `Quarterly { dom }`: same as `Monthly` but in 3-month increments.
+    /// - `Yearly { month, day }`: next occurrence of `(month, day)` after `from`.
+    pub fn advance(&self, from: chrono::NaiveDate) -> chrono::NaiveDate {
+        use chrono::{Datelike, NaiveDate};
+        match *self {
+            Cadence::Monthly { dom } => {
+                // Try this month first; if dom <= from.day, jump to next month.
+                let (mut year, mut month) = (from.year(), from.month());
+                if (from.day() as u8) >= dom {
+                    if month == 12 {
+                        month = 1;
+                        year += 1;
+                    } else {
+                        month += 1;
+                    }
+                }
+                NaiveDate::from_ymd_opt(year, month, dom.into())
+                    .expect("dom 1..=28 is always valid")
+            }
+            Cadence::Quarterly { dom } => {
+                // Three-month step. Same logic as monthly, but bump by 3 months
+                // (preserving the dom).
+                let (mut year, mut month) = (from.year(), from.month());
+                if (from.day() as u8) >= dom {
+                    month += 3;
+                    while month > 12 {
+                        month -= 12;
+                        year += 1;
+                    }
+                } else {
+                    // dom hasn't happened yet this month; that's the next run.
+                }
+                NaiveDate::from_ymd_opt(year, month, dom.into())
+                    .expect("dom 1..=28 is always valid")
+            }
+            Cadence::Yearly { month, day } => {
+                let (year, _, _) = (from.year(), month, day);
+                let candidate = NaiveDate::from_ymd_opt(year, month.into(), day.into())
+                    .expect("month 1..=12, day 1..=28");
+                if candidate > from {
+                    candidate
+                } else {
+                    NaiveDate::from_ymd_opt(year + 1, month.into(), day.into())
+                        .expect("month 1..=12, day 1..=28")
+                }
+            }
+        }
+    }
 }
 
 impl fmt::Display for Cadence {
@@ -239,5 +291,64 @@ mod tests {
     fn schedule_state_serde() {
         assert_eq!(serde_json::to_string(&ScheduleState::Active).unwrap(), r#""active""#);
         assert_eq!(serde_json::to_string(&ScheduleState::Paused).unwrap(), r#""paused""#);
+    }
+
+    #[test]
+    fn cadence_advance_monthly() {
+        use chrono::NaiveDate;
+        let c = Cadence::Monthly { dom: 15 };
+        // dom hasn't happened this month yet → next run is this month's dom.
+        assert_eq!(
+            c.advance(NaiveDate::from_ymd_opt(2026, 5, 10).unwrap()),
+            NaiveDate::from_ymd_opt(2026, 5, 15).unwrap()
+        );
+        // dom already passed → next month.
+        assert_eq!(
+            c.advance(NaiveDate::from_ymd_opt(2026, 5, 15).unwrap()),
+            NaiveDate::from_ymd_opt(2026, 6, 15).unwrap()
+        );
+        // Year boundary.
+        assert_eq!(
+            c.advance(NaiveDate::from_ymd_opt(2026, 12, 20).unwrap()),
+            NaiveDate::from_ymd_opt(2027, 1, 15).unwrap()
+        );
+    }
+
+    #[test]
+    fn cadence_advance_quarterly() {
+        use chrono::NaiveDate;
+        let c = Cadence::Quarterly { dom: 1 };
+        // dom of this month hasn't happened → run this month.
+        assert_eq!(
+            c.advance(NaiveDate::from_ymd_opt(2026, 5, 1).unwrap()),
+            // 5/1 IS the dom; >= means jump to +3 months.
+            NaiveDate::from_ymd_opt(2026, 8, 1).unwrap()
+        );
+        assert_eq!(
+            c.advance(NaiveDate::from_ymd_opt(2026, 11, 5).unwrap()),
+            // +3 months from Nov = Feb next year.
+            NaiveDate::from_ymd_opt(2027, 2, 1).unwrap()
+        );
+    }
+
+    #[test]
+    fn cadence_advance_yearly() {
+        use chrono::NaiveDate;
+        let c = Cadence::Yearly { month: 1, day: 1 };
+        assert_eq!(
+            c.advance(NaiveDate::from_ymd_opt(2026, 5, 19).unwrap()),
+            NaiveDate::from_ymd_opt(2027, 1, 1).unwrap()
+        );
+        // Edge: same date → next year.
+        assert_eq!(
+            c.advance(NaiveDate::from_ymd_opt(2026, 1, 1).unwrap()),
+            NaiveDate::from_ymd_opt(2027, 1, 1).unwrap()
+        );
+        // Before: same year.
+        let c2 = Cadence::Yearly { month: 12, day: 25 };
+        assert_eq!(
+            c2.advance(NaiveDate::from_ymd_opt(2026, 5, 19).unwrap()),
+            NaiveDate::from_ymd_opt(2026, 12, 25).unwrap()
+        );
     }
 }

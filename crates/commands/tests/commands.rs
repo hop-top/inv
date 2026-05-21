@@ -24,10 +24,15 @@ use inv_core::tax::TaxTable;
 
 use inv_commands::{
     create_credit_note, draft_invoice, issue_credit_note, issue_invoice, mark_overdue_ticker,
-    mark_paid, send_invoice, void_invoice, Actor, Channel, Clock, CoreCtx, CoreError,
-    CreateCreditNoteInput, DraftInvoiceInput, DraftLineInput, IssueCreditNoteInput,
-    IssueInvoiceInput, MarkPaidInput, SendInvoiceInput, VoidInvoiceInput,
+    mark_paid, reminder_cancel, reminder_schedule, reminders_tick, schedule_cancel,
+    schedule_create, schedule_pause, schedules_tick, send_invoice, void_invoice, Actor, Channel,
+    Clock, CoreCtx, CoreError, CreateCreditNoteInput, DraftInvoiceInput, DraftLineInput,
+    IssueCreditNoteInput, IssueInvoiceInput, MarkPaidInput, ReminderCancelInput,
+    ReminderScheduleInput, ScheduleCreateInput, ScheduleLineInput, ScheduleStateChangeInput,
+    SendInvoiceInput, VoidInvoiceInput,
 };
+use inv_core::domain::reminder::{ReminderChannel, ReminderState};
+use inv_core::domain::schedule::{Cadence, ScheduleState};
 use inv_core::domain::creditnote::CreditNoteState;
 use inv_store::blob::LocalBlobStore;
 use inv_store::pool::{connect, Pool};
@@ -953,4 +958,249 @@ async fn overdue_ticker_ignores_unset_due_at() {
     let out = mark_overdue_ticker(&ctx).await.unwrap();
     assert!(out.overdue_invoices.is_empty());
     assert!(out.emitted_events.is_empty());
+}
+
+// ---------------------------------------------------------------------
+// schedules (T-0013)
+// ---------------------------------------------------------------------
+
+fn schedule_input(cust: &CustomerId, auto_issue: bool) -> ScheduleCreateInput {
+    ScheduleCreateInput {
+        customer_id: cust.clone(),
+        template_lines: vec![ScheduleLineInput {
+            description: "Monthly retainer".into(),
+            quantity: Decimal::from_str("1").unwrap(),
+            unit_price: Decimal::from_str("500.00").unwrap(),
+            tax_category: TaxCategory::Standard,
+        }],
+        currency: Currency::CAD,
+        cadence: Cadence::Monthly { dom: 1 },
+        start_date: chrono::NaiveDate::from_ymd_opt(2026, 6, 1).unwrap(),
+        end_date: None,
+        auto_issue,
+        actor: Actor::Cli { name: "jad".into() },
+        channel: Channel::Cli,
+    }
+}
+
+#[tokio::test]
+async fn schedule_create_happy_path() {
+    let (ctx, pool, _blob_dir) = fresh_ctx().await;
+    let cust = seed_customer(&pool).await;
+
+    let out = schedule_create(&ctx, schedule_input(&cust, false))
+        .await
+        .expect("create ok");
+
+    assert_eq!(out.schedule.state, ScheduleState::Active);
+    assert!(!out.schedule.auto_issue);
+    assert_eq!(out.schedule.next_run, out.schedule.start_date);
+    assert_eq!(out.schedule.template_lines.len(), 1);
+    assert_eq!(out.emitted_events[0].topic, "inv.billing.schedule.created");
+}
+
+#[tokio::test]
+async fn schedule_validation_rejects_empty_lines() {
+    let (ctx, pool, _blob_dir) = fresh_ctx().await;
+    let cust = seed_customer(&pool).await;
+    let mut input = schedule_input(&cust, false);
+    input.template_lines.clear();
+    let err = schedule_create(&ctx, input).await.unwrap_err();
+    assert!(matches!(err, CoreError::Validation(_)));
+}
+
+#[tokio::test]
+async fn schedule_validation_rejects_end_before_start() {
+    let (ctx, pool, _blob_dir) = fresh_ctx().await;
+    let cust = seed_customer(&pool).await;
+    let mut input = schedule_input(&cust, false);
+    input.end_date = Some(chrono::NaiveDate::from_ymd_opt(2026, 5, 1).unwrap());
+    let err = schedule_create(&ctx, input).await.unwrap_err();
+    assert!(matches!(err, CoreError::Validation(_)));
+}
+
+#[tokio::test]
+async fn schedule_pause_then_cancel() {
+    let (ctx, pool, _blob_dir) = fresh_ctx().await;
+    let cust = seed_customer(&pool).await;
+    let created = schedule_create(&ctx, schedule_input(&cust, false)).await.unwrap();
+
+    let paused = schedule_pause(
+        &ctx,
+        ScheduleStateChangeInput {
+            schedule_id: created.schedule.id.clone(),
+            actor: Actor::Cli { name: "jad".into() },
+            channel: Channel::Cli,
+        },
+    )
+    .await
+    .unwrap();
+    assert_eq!(paused.schedule.state, ScheduleState::Paused);
+
+    let cancelled = schedule_cancel(
+        &ctx,
+        ScheduleStateChangeInput {
+            schedule_id: created.schedule.id.clone(),
+            actor: Actor::Cli { name: "jad".into() },
+            channel: Channel::Cli,
+        },
+    )
+    .await
+    .unwrap();
+    assert_eq!(cancelled.schedule.state, ScheduleState::Cancelled);
+
+    // After cancellation, pausing must reject (terminal).
+    let err = schedule_pause(
+        &ctx,
+        ScheduleStateChangeInput {
+            schedule_id: created.schedule.id.clone(),
+            actor: Actor::Cli { name: "jad".into() },
+            channel: Channel::Cli,
+        },
+    )
+    .await
+    .unwrap_err();
+    assert!(matches!(err, CoreError::Validation(_)));
+}
+
+#[tokio::test]
+async fn schedules_tick_materialises_drafts_for_due_schedules() {
+    // Use a clock past the schedule's start_date so it is due.
+    let (mut ctx, pool, _blob_dir) = fresh_ctx().await;
+    let cust = seed_customer(&pool).await;
+
+    // start_date = 2026-06-01; default frozen_now is 2026-05-19, so the
+    // schedule isn't due yet. Bump the clock past start_date.
+    ctx = ctx.with_clock(Arc::new(FrozenClock(
+        Utc.with_ymd_and_hms(2026, 6, 5, 0, 0, 0).unwrap(),
+    )));
+
+    let _created = schedule_create(&ctx, schedule_input(&cust, false))
+        .await
+        .unwrap();
+
+    let out = schedules_tick(&ctx).await.expect("tick ok");
+    assert_eq!(out.ran_schedule_ids.len(), 1);
+    assert_eq!(out.drafts.len(), 1);
+    assert_eq!(out.drafts[0].invoice.state, InvoiceState::Draft);
+
+    // A second tick on the same day must NOT re-materialise.
+    let out2 = schedules_tick(&ctx).await.unwrap();
+    assert!(out2.ran_schedule_ids.is_empty(), "no double-materialisation");
+}
+
+#[tokio::test]
+async fn schedules_tick_auto_issue_promotes_to_issued() {
+    let (mut ctx, pool, _blob_dir) = fresh_ctx().await;
+    let cust = seed_customer(&pool).await;
+    ctx = ctx.with_clock(Arc::new(FrozenClock(
+        Utc.with_ymd_and_hms(2026, 6, 5, 0, 0, 0).unwrap(),
+    )));
+
+    let _ = schedule_create(&ctx, schedule_input(&cust, true)).await.unwrap();
+    let out = schedules_tick(&ctx).await.unwrap();
+    assert_eq!(out.ran_schedule_ids.len(), 1);
+
+    // The materialised invoice should now be Issued.
+    let inv = InvoiceRepo::new(&pool)
+        .get(&out.drafts[0].invoice.id)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(inv.state, InvoiceState::Issued);
+    assert!(inv.number.is_some());
+}
+
+// ---------------------------------------------------------------------
+// reminders (T-0013)
+// ---------------------------------------------------------------------
+
+#[tokio::test]
+async fn reminder_schedule_then_cancel() {
+    let (ctx, pool, _blob_dir) = fresh_ctx().await;
+    let cust = seed_customer(&pool).await;
+    let drafted = draft_invoice(&ctx, draft_input(&cust, None)).await.unwrap();
+
+    let scheduled_at = ctx.clock.now() + chrono::Duration::days(7);
+    let out = reminder_schedule(
+        &ctx,
+        ReminderScheduleInput {
+            invoice_id: drafted.invoice.id.clone(),
+            scheduled_at,
+            channel_scheme: ReminderChannel::Webhook,
+            actor: Actor::Cli { name: "jad".into() },
+            channel: Channel::Cli,
+        },
+    )
+    .await
+    .expect("schedule ok");
+
+    assert_eq!(out.reminder.state, ReminderState::Scheduled);
+    assert_eq!(out.reminder.channel, ReminderChannel::Webhook);
+
+    let cancelled = reminder_cancel(
+        &ctx,
+        ReminderCancelInput {
+            reminder_id: out.reminder.id.clone(),
+            actor: Actor::Cli { name: "jad".into() },
+            channel: Channel::Cli,
+        },
+    )
+    .await
+    .unwrap();
+    assert_eq!(cancelled.reminder.state, ReminderState::Cancelled);
+}
+
+#[tokio::test]
+async fn reminder_schedule_rejects_past_datetime() {
+    let (ctx, pool, _blob_dir) = fresh_ctx().await;
+    let cust = seed_customer(&pool).await;
+    let drafted = draft_invoice(&ctx, draft_input(&cust, None)).await.unwrap();
+    let err = reminder_schedule(
+        &ctx,
+        ReminderScheduleInput {
+            invoice_id: drafted.invoice.id.clone(),
+            scheduled_at: ctx.clock.now() - chrono::Duration::days(1),
+            channel_scheme: ReminderChannel::Bus,
+            actor: Actor::Cli { name: "jad".into() },
+            channel: Channel::Cli,
+        },
+    )
+    .await
+    .unwrap_err();
+    assert!(matches!(err, CoreError::Validation(_)));
+}
+
+#[tokio::test]
+async fn reminders_tick_dispatches_due_reminders() {
+    let (mut ctx, pool, _blob_dir) = fresh_ctx().await;
+    let cust = seed_customer(&pool).await;
+    let drafted = draft_invoice(&ctx, draft_input(&cust, None)).await.unwrap();
+
+    // Schedule a reminder in the future.
+    let scheduled_at = ctx.clock.now() + chrono::Duration::hours(1);
+    let scheduled = reminder_schedule(
+        &ctx,
+        ReminderScheduleInput {
+            invoice_id: drafted.invoice.id.clone(),
+            scheduled_at,
+            channel_scheme: ReminderChannel::Stdout,
+            actor: Actor::Cli { name: "jad".into() },
+            channel: Channel::Cli,
+        },
+    )
+    .await
+    .unwrap();
+
+    // Now advance the clock past scheduled_at.
+    ctx = ctx.with_clock(Arc::new(FrozenClock(scheduled_at + chrono::Duration::minutes(5))));
+
+    let out = reminders_tick(&ctx).await.unwrap();
+    assert_eq!(out.sent_reminders.len(), 1);
+    assert_eq!(out.sent_reminders[0].id, scheduled.reminder.id);
+    assert!(out.sent_reminders[0].sent_at.is_some());
+
+    // Second tick: nothing to do.
+    let out2 = reminders_tick(&ctx).await.unwrap();
+    assert!(out2.sent_reminders.is_empty());
 }
