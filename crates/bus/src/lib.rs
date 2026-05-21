@@ -31,6 +31,7 @@
 
 #![deny(missing_docs)]
 
+pub mod consumer;
 pub mod error;
 pub mod events;
 pub mod inbox;
@@ -38,6 +39,7 @@ pub mod outbox;
 pub mod publisher;
 pub mod topic_map;
 
+pub use consumer::{Consumer, DispatchError, DispatchOutput};
 pub use error::{IngestError, PublishError, RelayError};
 pub use events::{
     CreditNoteDrafted, CreditNoteIssued, InvoiceDrafted, InvoiceIssued, InvoiceOverdue,

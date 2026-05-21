@@ -261,3 +261,219 @@ fn topic_remap_passes_through_unmapped() {
         "fin.billing.payment.received"
     );
 }
+
+// =============================================================================
+// Consumer (T-0015)
+// =============================================================================
+
+use inv_bus::{Consumer, DispatchError, DispatchOutput};
+use inv_commands::{issue_invoice, IssueInvoiceInput};
+use inv_core::domain::invoice::InvoiceState;
+
+#[tokio::test]
+async fn consumer_charge_created_creates_draft() {
+    let (ctx, pool) = fresh_ctx().await;
+    let cust = seed_customer(&pool).await;
+    let consumer = Consumer::new();
+
+    let payload = json!({
+        "customer_id": cust.to_string(),
+        "currency": "CAD",
+        "seller_jurisdiction": "CA-QC",
+        "lines": [
+            {
+                "description": "Consulting",
+                "quantity": "10",
+                "unit_price": "125.00"
+            }
+        ]
+    })
+    .to_string();
+
+    let out = consumer
+        .dispatch(&ctx, "fin.billing.charge.created", "evt-1", &payload)
+        .await
+        .expect("dispatch ok");
+
+    match out {
+        DispatchOutput::Drafted(o) => {
+            assert_eq!(o.invoice.state, InvoiceState::Draft);
+            assert_eq!(o.invoice.customer_id, cust);
+            assert_eq!(o.invoice.currency, Currency::CAD);
+            assert_eq!(o.lines.len(), 1);
+        }
+        other => panic!("expected Drafted, got {other:?}"),
+    }
+}
+
+#[tokio::test]
+async fn consumer_payment_received_marks_paid() {
+    let (ctx, pool) = fresh_ctx().await;
+    let cust = seed_customer(&pool).await;
+    let drafted = draft_invoice(&ctx, draft_input(&cust)).await.unwrap();
+    let issued = issue_invoice(
+        &ctx,
+        IssueInvoiceInput {
+            invoice_id: drafted.invoice.id.clone(),
+            idempotency_key: None,
+            actor: Actor::Cli { name: "jad".into() },
+            channel: Channel::Cli,
+        },
+    )
+    .await
+    .unwrap();
+
+    let consumer = Consumer::new();
+    let payload = json!({
+        "invoice_ref": issued.invoice.id.to_string(),
+        "amount": issued.invoice.total.to_string(),
+        "received_at": frozen_now().to_rfc3339(),
+    })
+    .to_string();
+
+    let out = consumer
+        .dispatch(&ctx, "fin.billing.payment.received", "evt-2", &payload)
+        .await
+        .expect("dispatch ok");
+
+    match out {
+        DispatchOutput::Paid(o) => {
+            assert!(o.fully_paid);
+            assert_eq!(o.invoice.state, InvoiceState::Paid);
+        }
+        other => panic!("expected Paid, got {other:?}"),
+    }
+}
+
+#[tokio::test]
+async fn consumer_payment_received_accepts_uri_form() {
+    // invoice_ref as `inv://invoice/<typeid>` should resolve identically.
+    let (ctx, pool) = fresh_ctx().await;
+    let cust = seed_customer(&pool).await;
+    let drafted = draft_invoice(&ctx, draft_input(&cust)).await.unwrap();
+    let issued = issue_invoice(
+        &ctx,
+        IssueInvoiceInput {
+            invoice_id: drafted.invoice.id.clone(),
+            idempotency_key: None,
+            actor: Actor::Cli { name: "jad".into() },
+            channel: Channel::Cli,
+        },
+    )
+    .await
+    .unwrap();
+
+    let consumer = Consumer::new();
+    let payload = json!({
+        "invoice_ref": format!("inv://invoice/{}", issued.invoice.id),
+        "amount": issued.invoice.total.to_string(),
+        "received_at": frozen_now().to_rfc3339(),
+    })
+    .to_string();
+
+    let out = consumer
+        .dispatch(&ctx, "fin.billing.payment.received", "evt-uri", &payload)
+        .await
+        .expect("dispatch ok");
+    assert!(matches!(out, DispatchOutput::Paid(_)));
+}
+
+#[tokio::test]
+async fn consumer_payment_refunded_creates_credit_note() {
+    let (ctx, pool) = fresh_ctx().await;
+    let cust = seed_customer(&pool).await;
+    let drafted = draft_invoice(&ctx, draft_input(&cust)).await.unwrap();
+    let issued = issue_invoice(
+        &ctx,
+        IssueInvoiceInput {
+            invoice_id: drafted.invoice.id.clone(),
+            idempotency_key: None,
+            actor: Actor::Cli { name: "jad".into() },
+            channel: Channel::Cli,
+        },
+    )
+    .await
+    .unwrap();
+
+    let consumer = Consumer::new();
+    let payload = json!({
+        "invoice_ref": issued.invoice.id.to_string(),
+        "amount": "50.00",
+        "reason": "duplicate charge",
+        "refund_id": "stripe-refund-abc"
+    })
+    .to_string();
+
+    let out = consumer
+        .dispatch(&ctx, "fin.billing.payment.refunded", "evt-3", &payload)
+        .await
+        .expect("dispatch ok");
+
+    match out {
+        DispatchOutput::Refunded(o) => {
+            assert_eq!(o.credit_note.amount, Decimal::from_str("50.00").unwrap());
+            assert_eq!(o.credit_note.refund_ref.as_deref(), Some("stripe-refund-abc"));
+            assert_eq!(o.credit_note.invoice_id, issued.invoice.id);
+        }
+        other => panic!("expected Refunded, got {other:?}"),
+    }
+}
+
+#[tokio::test]
+async fn consumer_unknown_topic_rejected() {
+    let (ctx, _pool) = fresh_ctx().await;
+    let consumer = Consumer::new();
+    let err = consumer
+        .dispatch(&ctx, "fin.unknown.thing.happened", "evt-x", "{}")
+        .await
+        .unwrap_err();
+    assert!(matches!(err, DispatchError::UnknownTopic(_)));
+}
+
+#[tokio::test]
+async fn consumer_invalid_payload_rejected() {
+    let (ctx, _pool) = fresh_ctx().await;
+    let consumer = Consumer::new();
+    let err = consumer
+        .dispatch(
+            &ctx,
+            "fin.billing.charge.created",
+            "evt-y",
+            r#"{"customer_id": "not-a-typeid", "currency": "CAD", "lines": []}"#,
+        )
+        .await
+        .unwrap_err();
+    // First failure point is customer_id parse — InvalidPayload, not Decode.
+    match err {
+        DispatchError::InvalidPayload { topic, .. } => {
+            assert_eq!(topic, "fin.billing.charge.created");
+        }
+        DispatchError::Command { .. } => {
+            // also acceptable — empty lines would have made it past parse and
+            // failed validation
+        }
+        other => panic!("unexpected error: {other:?}"),
+    }
+}
+
+#[tokio::test]
+async fn consumer_applies_topic_remap() {
+    let (ctx, pool) = fresh_ctx().await;
+    let cust = seed_customer(&pool).await;
+    let map = TopicMap::from_pairs([(
+        "fin.finance.charge.created",
+        "fin.billing.charge.created",
+    )]);
+    let consumer = Consumer::with_remap(map);
+    let payload = json!({
+        "customer_id": cust.to_string(),
+        "currency": "CAD",
+        "lines": [{"description": "X", "quantity": "1", "unit_price": "100"}]
+    })
+    .to_string();
+    let out = consumer
+        .dispatch(&ctx, "fin.finance.charge.created", "evt-remap", &payload)
+        .await
+        .expect("dispatch via remap");
+    assert!(matches!(out, DispatchOutput::Drafted(_)));
+}
