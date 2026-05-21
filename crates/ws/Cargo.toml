@@ -7,5 +7,38 @@ authors.workspace = true
 repository.workspace = true
 description = "inv: WebSocket channel adapter (axum extract::ws)"
 
+[dependencies]
+# Async runtime + framework
+axum = { workspace = true }
+tokio = { workspace = true }
+futures-util = { workspace = true }
+
+# Serde for the JSON frame protocol
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Errors + tracing + traits
+thiserror = { workspace = true }
+tracing = { workspace = true }
+async-trait = { workspace = true }
+chrono = { workspace = true }
+rust_decimal = { workspace = true }
+
+# inv: domain types live in core; commands are the dispatch target;
+# store + bus surface the types CoreCtx + Publisher need.
+inv-core     = { workspace = true }
+inv-store    = { workspace = true }
+inv-commands = { workspace = true }
+inv-bus      = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }
+# Dev-only WebSocket client; separate from axum's runtime ws use.
+tokio-tungstenite = "0.24"
+# Tax fixtures + in-memory pool require the sqlite-backed store.
+inv-store = { workspace = true, features = ["sqlite"] }
+tempfile = { workspace = true }
+rust_decimal = { workspace = true }
+
 [lints]
 workspace = true
