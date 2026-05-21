@@ -70,6 +70,11 @@ tower = "0.5"
 tower-http = { version = "0.6", features = ["trace", "cors", "limit"] }
 rmcp = "1.7"
 
+# Streams/Sinks helpers for the WebSocket adapter (SplitStream + StreamExt
+# used by inv-ws to fan a single ws::WebSocket out into a reader half and
+# a writer half).
+futures-util = "0.3"
+
 # --- CLI -----------------------------------------------------------------
 clap = { version = "4", features = ["derive", "string"] }
 
