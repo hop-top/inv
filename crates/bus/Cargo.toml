@@ -7,5 +7,35 @@ authors.workspace = true
 repository.workspace = true
 description = "inv: bus event types, publisher/consumer adapters, outbox relay, inbox dedup"
 
+[dependencies]
+# Workspace primitives
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+rust_decimal = { workspace = true }
+tracing = { workspace = true }
+thiserror = { workspace = true }
+async-trait = { workspace = true }
+
+# inv crates: bus consumes EmittedEvent envelopes from commands, history-row
+# repositories from store, and the FSM mechanic-event payload structs +
+# topic constants from core. No mutation of upstream code — facade-only.
+inv-core = { workspace = true }
+inv-store = { workspace = true }
+inv-commands = { workspace = true }
+
+# sqlx — needed to scan `credit_note_state_history` directly because the
+# credit-note history repo doesn't yet expose `pending_outbox` /
+# `mark_published`. Once T-0024 ships the symmetric API, this raw-query
+# path collapses into the repo call.
+sqlx = { workspace = true, features = ["any"] }
+
+[dev-dependencies]
+tokio = { workspace = true }
+tempfile = { workspace = true }
+rust_decimal = { workspace = true }
+inv-store = { workspace = true, features = ["sqlite"] }
+
 [lints]
 workspace = true
