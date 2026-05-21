@@ -1479,13 +1479,17 @@ name = "inv-cli"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "axum",
  "chrono",
  "clap",
  "hop-top-kit",
+ "inv-api",
  "inv-bus",
  "inv-commands",
  "inv-core",
+ "inv-mcp",
  "inv-store",
+ "inv-ws",
  "rust_decimal",
  "serde",
  "serde_json",

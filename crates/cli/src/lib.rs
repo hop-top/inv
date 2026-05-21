@@ -40,7 +40,8 @@ fn build_cli() -> Command {
         .subcommand(commands::reminder::command())
         .subcommand(commands::customer::command())
         .subcommand(commands::tax::command())
-        .subcommand(commands::tick::command());
+        .subcommand(commands::tick::command())
+        .subcommand(commands::server::command());
 
     let (cmd, _ctx) = register_output_flags(cmd, RegisterOutputFlagsOptions::default());
     cmd
@@ -93,6 +94,7 @@ async fn async_run(matches: &ArgMatches) -> anyhow::Result<()> {
         Some(("customer", sub)) => commands::customer::dispatch(&ctx, sub).await?,
         Some(("tax", sub)) => commands::tax::dispatch(&ctx, sub).await?,
         Some(("tick", sub)) => commands::tick::dispatch(&ctx, sub).await?,
+        Some(("server", sub)) => commands::server::dispatch(&ctx, sub).await?,
         // `subcommand_required(true)` already rejects this path.
         _ => unreachable!("clap would have rejected an empty subcommand"),
     }

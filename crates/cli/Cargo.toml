@@ -25,6 +25,14 @@ inv-commands = { workspace = true }
 inv-core = { workspace = true }
 inv-store = { workspace = true }
 
+# `inv server` composition: the cli subcommand boots HTTP+WS+MCP and the
+# tickers + outbox in a single tokio runtime. These are server-only deps;
+# all the other inv subcommands stay light.
+inv-api = { workspace = true }
+inv-mcp = { workspace = true }
+inv-ws = { workspace = true }
+axum = { workspace = true }
+
 [dev-dependencies]
 tempfile = { workspace = true }
 

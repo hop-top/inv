@@ -11,5 +11,6 @@ pub mod invoice;
 pub mod parse;
 pub mod reminder;
 pub mod schedule;
+pub mod server;
 pub mod tax;
 pub mod tick;
