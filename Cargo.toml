@@ -69,6 +69,11 @@ axum = { version = "0.8", features = ["macros", "tokio", "ws", "tracing"] }
 tower = "0.5"
 tower-http = { version = "0.6", features = ["trace", "cors", "limit"] }
 rmcp = "1.7"
+# Outbound webhook delivery (inv-api) + base64url encoding for signed-link
+# tokens served by the public-view route. Both sit on the request path so
+# we pin narrowly.
+base64 = "0.22"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 
 # --- CLI -----------------------------------------------------------------
 clap = { version = "4", features = ["derive", "string"] }

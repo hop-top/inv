@@ -7,5 +7,43 @@ authors.workspace = true
 repository.workspace = true
 description = "inv: HTTP API channel adapter (axum)"
 
+[dependencies]
+# Async runtime + serde primitives shared with the rest of the workspace.
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+async-trait = { workspace = true }
+chrono = { workspace = true }
+rust_decimal = { workspace = true }
+
+# HTTP stack.
+axum = { workspace = true }
+tower = { workspace = true }
+tower-http = { workspace = true }
+
+# HMAC-SHA256 over signed-link tokens + outbound webhook signatures.
+sha2 = { workspace = true }
+
+# base64url encoding for the public signed-link token + outbound webhook
+# delivery (handled inside the adapter so the inv-commands surface stays
+# transport-agnostic).
+base64 = { workspace = true }
+reqwest = { workspace = true }
+
+# inv crates we adapt over.
+inv-core     = { workspace = true }
+inv-store    = { workspace = true }
+inv-commands = { workspace = true }
+inv-bus      = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }
+tower = { workspace = true }
+tempfile = { workspace = true }
+# Enable the sqlite backend on inv-store for the integration test pool.
+inv-store = { workspace = true, features = ["sqlite"] }
+
 [lints]
 workspace = true
