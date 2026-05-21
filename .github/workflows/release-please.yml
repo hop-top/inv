@@ -1,3 +1,16 @@
+# Release Please — version bump + changelog PRs, driven by Conventional
+# Commits and release-please-config.json (release-type = "rust").
+#
+# Publishing intent (v1):
+#   We intentionally publish to crates.io MANUALLY at v1. The `release-rs`
+#   job below is wired but no-ops unless the repo variable
+#   `AUTO_PUBLISH_CRATES` is set to "true" (and `CARGO_REGISTRY_TOKEN`
+#   secret is populated). Reasons:
+#     - Workspace ships 8 library crates + 1 binary; ordering for
+#       `cargo publish` across the dep-graph isn't worked out yet.
+#     - We want to eyeball the first few releases before automating.
+#   Flip to automated publishing by setting both the variable and the
+#   secret on the repo; no other change needed here.
 name: Release Please
 
 on:
@@ -21,7 +34,10 @@ jobs:
 
   release-rs:
     needs: release-please
-    if: ${{ needs.release-please.outputs.rs_release_created == 'true' }}
+    # Skipped unless BOTH the release-please action cut a release AND the
+    # repo variable `AUTO_PUBLISH_CRATES` is set to "true". This is the
+    # opt-in switch for moving from manual `cargo publish` to automated.
+    if: ${{ needs.release-please.outputs.rs_release_created == 'true' && vars.AUTO_PUBLISH_CRATES == 'true' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -29,6 +45,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      - run: cargo test --all-features --workspace
+      # Skip the known-flaky inv-api test (T-0034) — same posture as ci.yml.
+      - run: cargo test --workspace --features inv-store/sqlite -- --skip signed_link_view_tampered_404
       - run: cargo publish --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
 

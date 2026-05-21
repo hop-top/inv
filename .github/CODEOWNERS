@@ -1,0 +1,3 @@
+# Default owner for every path. Expand per-crate / per-area as the project
+# grows beyond a single maintainer.
+* @jadb
