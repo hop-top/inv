@@ -1,37 +1,54 @@
 # Personas
 
-**Placeholder at v1.** Personas — descriptive readings of who uses `inv` and
-how — are downstream of v1 and are deliberately empty here.
+Stack-aware reading guides. Each persona below describes a **role** that runs
+`inv` as part of a hop-top toolchain — typically with `fin` as the ledger,
+sometimes with `aps` as the agent runtime, sometimes with an MCP-capable
+agent app on top.
 
-The first wave of `inv` users are operators and engineers who already know
-they want a local-first, agent-native invoicing service. The user / reference
-/ contracts trees serve them directly:
+These are not pure-`inv` personas. The composition is the point. `inv` owns
+the invoice document and FSM; `fin` owns money movement; the two communicate
+over the bus (`inv.billing.*` ↔ `fin.billing.*`). The personas here describe
+who is in front of that stack and what they're trying to do.
 
-- [user/](../user/) — task-oriented guides.
-- [reference/](../reference/) — surface-by-surface lookup tables.
-- [contracts/](../contracts/) — frozen wire shapes.
+## Why personas in inv at v1-alpha (deliberate)
 
-When `inv` reaches v1.x and the operator base diversifies (small studios,
-SaaS billers, agent platforms, ledger integrators), persona pages will land
-here with concrete reading paths per audience.
+The earlier draft of this README hedged that personas might belong in
+`hop-top/aps`. That hedge is **overridden**. v1-alpha personas live here
+because:
 
-## Likely future home
+- The first operators meeting `inv` meet it through one of its five surfaces
+  (CLI, HTTP, WS, MCP, bus). They need reading paths tuned to their surface
+  and their stack composition — not generic role descriptions.
+- `aps` does not yet ship a personas tree. Putting personas there before
+  `aps` is ready to host them would block the value here.
+- Cross-tool personas (anything that mentions both `fin` and `inv`, or an
+  MCP-embedded agent built on top) belong wherever the reader first lands.
+  Today that's `inv`.
 
-Persona-style docs across the hop-top stack live under
-[`hop-top/aps`](https://github.com/hop-top/aps) (Agent + Persona System).
-When `inv` personas land, they'll either:
+## Migration intent
 
-1. Live alongside the user docs here as **reading guides** ("if you're
-   running a freelance invoicing workflow, start with X"), or
-2. Live in `aps` and link out, with this README pointing to them.
+When `aps` ships its own personas tree, the cross-tool personas may move
+there. `inv`-specific reading paths (the surface map, the per-persona
+"reading path" section that points at this doc tree) stay behind. The migrated
+files will leave forwarding stubs.
 
-Pick (1) if the persona is `inv`-specific; pick (2) if it composes across
-multiple hop-top tools (e.g. "self-employed in Quebec running fin + inv").
+## The persona files
 
-See `/Users/jadb/.w/ideacrafterslabs/aps` for the upstream `aps` repo if
-that's the right home in your context.
+| Persona | One-line hook |
+|---|---|
+| [Freelancer (QC, fin+inv local)](freelancer-qc.md) | Solo consultant in Quebec billing US + CA clients from a laptop. |
+| [SaaS biller (DE, fin+inv as a service)](saas-biller-de.md) | Small Berlin team running `inv` behind their own webhook integration for EU + US customers. |
+| [Agent platform integrator](agent-platform-integrator.md) | Engineer embedding `inv` via MCP as a tool in an agent app. |
+| [Agency owner (DZ-16, fin+inv local)](agency-owner-dz.md) | Algiers agency billing DZ-local + DZ-export clients with recurring retainers. |
+
+Each file follows the same shape: context, what they want, what they don't
+need, known v1 gaps, and an ordered reading path that should get them
+productive in ~30 min.
 
 ## See also
 
-- [fin's personas tree](https://github.com/hop-top/fin/tree/main/docs/personas) —
-  prior art for shape + tone.
+- [user/](../user/) — task-oriented guides referenced from every persona.
+- [reference/](../reference/) — surface-by-surface lookup tables.
+- [contracts/](../contracts/) — frozen wire shapes.
+- [stories/](../stories/) — user stories grouped by persona.
+- [fin's personas tree](https://github.com/hop-top/fin/tree/main/docs/personas) — prior art for shape + tone.
