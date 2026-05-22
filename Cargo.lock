@@ -1423,7 +1423,7 @@ dependencies = [
 
 [[package]]
 name = "inv"
-version = "0.0.0"
+version = "0.1.0-alpha.0"
 dependencies = [
  "assert_cmd",
  "inv-cli",
@@ -1432,7 +1432,7 @@ dependencies = [
 
 [[package]]
 name = "inv-api"
-version = "0.0.0"
+version = "0.1.0-alpha.0"
 dependencies = [
  "async-trait",
  "axum",
@@ -1457,7 +1457,7 @@ dependencies = [
 
 [[package]]
 name = "inv-bus"
-version = "0.0.0"
+version = "0.1.0-alpha.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -1476,7 +1476,7 @@ dependencies = [
 
 [[package]]
 name = "inv-cli"
-version = "0.0.0"
+version = "0.1.0-alpha.0"
 dependencies = [
  "anyhow",
  "axum",
@@ -1502,7 +1502,7 @@ dependencies = [
 
 [[package]]
 name = "inv-commands"
-version = "0.0.0"
+version = "0.1.0-alpha.0"
 dependencies = [
  "chrono",
  "inv-core",
@@ -1519,7 +1519,7 @@ dependencies = [
 
 [[package]]
 name = "inv-core"
-version = "0.0.0"
+version = "0.1.0-alpha.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -1541,7 +1541,7 @@ dependencies = [
 
 [[package]]
 name = "inv-mcp"
-version = "0.0.0"
+version = "0.1.0-alpha.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1561,7 +1561,7 @@ dependencies = [
 
 [[package]]
 name = "inv-store"
-version = "0.0.0"
+version = "0.1.0-alpha.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1581,7 +1581,7 @@ dependencies = [
 
 [[package]]
 name = "inv-ws"
-version = "0.0.0"
+version = "0.1.0-alpha.0"
 dependencies = [
  "async-trait",
  "axum",
