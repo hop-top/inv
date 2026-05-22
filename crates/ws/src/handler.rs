@@ -23,21 +23,27 @@ use futures_util::{SinkExt, StreamExt};
 use tokio::sync::{mpsc, oneshot};
 use tracing::{debug, warn};
 
+use inv_bus::{BroadcastPublisher, BusMessage};
 use inv_commands::CoreCtx;
 
-use crate::bus::{topic_matches, BusMessage, SharedPublisher};
 use crate::frames::{
     ClientFrame, EventFrame, RequestFrame, ResponseFrame, ServerFrame, SubMgmtFrame, SubMgmtOp,
     SubMgmtPayload,
 };
 use crate::ops;
+use crate::topics::topic_matches;
+
+/// Convenience alias for the broadcast publisher the WS adapter holds.
+/// Concrete (not `dyn`) because we need both `Publisher::publish` and
+/// the non-trait `subscribe()` fanout side.
+pub type SharedPublisher = Arc<BroadcastPublisher>;
 
 /// Shared state handed to the upgrade handler via `axum::extract::State`.
 #[derive(Clone)]
 pub struct AppState {
     /// Command context (DB, tax tables, etc.).
     pub ctx: Arc<CoreCtx>,
-    /// Bus publisher every connection subscribes against.
+    /// Broadcast publisher every connection subscribes against.
     pub publisher: SharedPublisher,
 }
 

@@ -111,8 +111,9 @@ pub async fn dispatch(ctx: &CoreCtx, m: &ArgMatches) -> anyhow::Result<()> {
     ));
     let api_router = inv_api::router(api_state);
 
-    // WS uses its own local Publisher trait at v1 (T-0027 dedup).
-    let ws_publisher: inv_ws::SharedPublisher = Arc::new(inv_ws::LocalBus::new(1024));
+    // WS shares the broadcast publisher from inv-bus so the outbox
+    // relay and per-connection forwarders see the same event stream.
+    let ws_publisher: inv_ws::SharedPublisher = Arc::new(inv_bus::BroadcastPublisher::new(1024));
     let ws_router = inv_ws::router(ctx_arc.clone(), ws_publisher);
 
     let app = api_router.merge(ws_router);

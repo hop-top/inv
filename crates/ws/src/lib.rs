@@ -19,9 +19,11 @@
 //! ## Bus integration
 //!
 //! Subscribers register a topic pattern (`inv.billing.invoice.#`, etc.)
-//! and the per-connection forwarder pushes any matching [`bus::BusMessage`]
-//! at it. The publisher trait is local to this crate until inv-bus
-//! (T-0014) ships a real one — see [`bus`] for the rationale.
+//! and the per-connection forwarder pushes any matching
+//! [`inv_bus::BusMessage`] at it. The publisher type is
+//! [`inv_bus::BroadcastPublisher`] — a `Publisher` impl that also
+//! exposes a fanout `subscribe()`, so the same publisher the outbox
+//! relay drives feeds every live WebSocket subscription.
 //!
 //! ## Topology
 //!
@@ -41,10 +43,10 @@
 
 #![deny(missing_docs)]
 
-pub mod bus;
 pub mod frames;
 pub mod handler;
 pub mod ops;
+pub mod topics;
 
 use std::sync::Arc;
 
@@ -53,20 +55,26 @@ use axum::Router;
 
 use inv_commands::CoreCtx;
 
-pub use bus::{BusMessage, LocalBus, Publisher, SharedPublisher, Subscriber};
 pub use frames::{
     ClientFrame, ErrorBody, EventFrame, RequestFrame, ResponseBody, ResponseFrame, ServerFrame,
     SubMgmtFrame, SubMgmtOp, SubMgmtPayload,
 };
-pub use handler::AppState;
+pub use handler::{AppState, SharedPublisher};
 pub use ops::{OpError, OP_NAMES};
+pub use topics::topic_matches;
+
+// Re-export the bus types the WS adapter exposes on its API surface,
+// so callers (and integration tests) don't need a direct `inv-bus`
+// dep just to construct the publisher we accept.
+pub use inv_bus::{BroadcastPublisher, BroadcastSubscriber, BusMessage};
 
 /// Build the WebSocket router fragment.
 ///
 /// The returned [`Router`] is stateless from axum's perspective — the
-/// [`CoreCtx`] + [`Publisher`] live inside an [`AppState`] passed via
-/// `with_state`. The caller (typically inv-api at T-0017) merges this
-/// router onto its top-level one with [`axum::Router::merge`].
+/// [`CoreCtx`] + the broadcast publisher live inside an [`AppState`]
+/// passed via `with_state`. The caller (typically inv-api at T-0017)
+/// merges this router onto its top-level one with
+/// [`axum::Router::merge`].
 pub fn router(ctx: Arc<CoreCtx>, publisher: SharedPublisher) -> Router {
     Router::new()
         .route("/ws", get(handler::ws_upgrade))

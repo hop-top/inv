@@ -24,8 +24,9 @@ use inv_store::pool::{connect, Pool};
 use inv_store::repo::CustomerRepo;
 use inv_store::run_migrations;
 
-use inv_ws::bus::{BusMessage, LocalBus, Publisher, SharedPublisher};
+use inv_bus::Publisher;
 use inv_ws::router;
+use inv_ws::{BroadcastPublisher, SharedPublisher};
 
 // ---------------------------------------------------------------------
 // Test scaffolding
@@ -135,7 +136,7 @@ async fn recv_json(ws: &mut WsClient) -> Value {
 #[tokio::test]
 async fn connect_then_ping_round_trips() {
     let (ctx, _pool) = fresh_ctx().await;
-    let publisher: SharedPublisher = Arc::new(LocalBus::default());
+    let publisher: SharedPublisher = Arc::new(BroadcastPublisher::default());
     let url = start_server(ctx, publisher).await;
 
     let mut ws = connect_client(&url).await;
@@ -153,7 +154,7 @@ async fn connect_then_ping_round_trips() {
 async fn invoice_draft_round_trips() {
     let (ctx, pool) = fresh_ctx().await;
     let cust = seed_customer(&pool).await;
-    let publisher: SharedPublisher = Arc::new(LocalBus::default());
+    let publisher: SharedPublisher = Arc::new(BroadcastPublisher::default());
     let url = start_server(ctx, publisher).await;
 
     let mut ws = connect_client(&url).await;
@@ -187,7 +188,7 @@ async fn invoice_draft_round_trips() {
 #[tokio::test]
 async fn invoice_draft_missing_customer_yields_error_frame() {
     let (ctx, _pool) = fresh_ctx().await;
-    let publisher: SharedPublisher = Arc::new(LocalBus::default());
+    let publisher: SharedPublisher = Arc::new(BroadcastPublisher::default());
     let url = start_server(ctx, publisher).await;
 
     let mut ws = connect_client(&url).await;
@@ -216,7 +217,7 @@ async fn invoice_draft_missing_customer_yields_error_frame() {
 #[tokio::test]
 async fn subscribe_then_publish_pushes_event_frame() {
     let (ctx, _pool) = fresh_ctx().await;
-    let bus = Arc::new(LocalBus::default());
+    let bus = Arc::new(BroadcastPublisher::default());
     let publisher: SharedPublisher = bus.clone();
     let url = start_server(ctx, publisher).await;
 
@@ -239,12 +240,13 @@ async fn subscribe_then_publish_pushes_event_frame() {
 
     // 2. Publish a matching event from outside.
     let topic = "inv.billing.invoice.drafted".to_string();
-    bus.publish(BusMessage {
-        topic: topic.clone(),
-        payload: serde_json::json!({"invoice_id": "invoice_test"}),
-        timestamp: frozen_now(),
-    })
-    .await;
+    bus.publish(
+        &topic,
+        serde_json::json!({"invoice_id": "invoice_test"}),
+        frozen_now(),
+    )
+    .await
+    .unwrap();
 
     // 3. Wait for the event frame. Cap the wait so a stuck test doesn't
     //    hang the suite indefinitely.

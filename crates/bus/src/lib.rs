@@ -20,6 +20,9 @@
 //!   the credit-note triplet) are re-exported from `inv-core::state`.
 //! - [`publisher`] — [`Publisher`] trait + [`LoggingPublisher`] (boot
 //!   default) + [`InMemoryPublisher`] (tests).
+//! - [`broadcast`] — [`BroadcastPublisher`] — in-process fanout
+//!   [`Publisher`] used by the WebSocket adapter so per-connection
+//!   subscribers can pull the same event stream the outbox emits.
 //! - [`outbox`] — [`run_outbox_relay`]. Polls
 //!   `invoice_state_history` + `credit_note_state_history` for rows with
 //!   `published_at IS NULL`, reconstructs the mechanic triplet + the
@@ -31,6 +34,7 @@
 
 #![deny(missing_docs)]
 
+pub mod broadcast;
 pub mod consumer;
 pub mod error;
 pub mod events;
@@ -39,6 +43,7 @@ pub mod outbox;
 pub mod publisher;
 pub mod topic_map;
 
+pub use broadcast::{BroadcastPublisher, BroadcastSubscriber, BusMessage};
 pub use consumer::{Consumer, DispatchError, DispatchOutput};
 pub use error::{IngestError, PublishError, RelayError};
 pub use events::{
