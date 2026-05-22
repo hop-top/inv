@@ -64,7 +64,7 @@ communicate through `hop-top/kit`'s event bus over a shared `billing` category.
 
 ### 3.1 One core, thin adapters
 
-Every operation (`draft`, `issue`, `send`, `mark_paid`, `void`, `remind`, `credit`, `schedule_create`, etc.) is defined exactly once in `inv-core/commands/` as an async Rust function taking a typed input and returning a typed output. Each channel adapter does three things only:
+Every operation (`draft`, `issue`, `send`, `mark_paid`, `void`, `remind`, `credit`, `schedule_create`, etc.) is defined exactly once in `crates/commands/` as an async Rust function taking a typed input and returning a typed output. Each channel adapter does three things only:
 
 1. Decode the channel-native request into the command's input type.
 2. Call the command function.
@@ -78,22 +78,19 @@ Invariants (FSM guards, idempotency, tax calculation, validation, audit) live in
 inv/
 ├─ Cargo.toml                  # workspace
 ├─ crates/
-│  ├─ inv-core/                # commands, domain types, FSM facade, tax, schedules, render
-│  │  ├─ domain/
-│  │  │  ├─ invoice/           # Invoice, Line, Tax, State; FSM facade + statig adapter
-│  │  │  ├─ creditnote/
-│  │  │  ├─ schedule/
-│  │  │  └─ customer/
-│  │  ├─ tax/                  # tables, jurisdiction inference, nexus rules
-│  │  ├─ render/               # HTML → PDF; bundled template; configurable template path
-│  │  └─ commands/             # one function per operation
-│  ├─ inv-bus/                 # bus event types; kit bus integration; outbox relay; inbox dedup
-│  ├─ inv-store/               # kit sqlstore wiring; migrations; kit blob wiring
-│  ├─ inv-cli/                 # clap adapter
-│  ├─ inv-api/                 # axum adapter
-│  ├─ inv-ws/                  # tokio-tungstenite adapter
-│  ├─ inv-mcp/                 # MCP server adapter
-│  └─ inv-server/              # binary; composes everything
+│  ├─ core/                    # domain types, FSM facade, tax, render — crate inv-core
+│  │  └─ src/
+│  │     ├─ domain/            # invoice.rs, creditnote.rs, schedule.rs, customer.rs, …
+│  │     ├─ state/             # FSM facade + statig adapter; bus event shapes
+│  │     ├─ tax/               # tables, jurisdiction inference, nexus rules
+│  │     └─ render/            # HTML → PDF; bundled template; configurable template path
+│  ├─ commands/                # one function per operation — crate inv-commands
+│  ├─ bus/                     # event types; kit bus integration; outbox relay; inbox dedup — crate inv-bus
+│  ├─ store/                   # kit sqlstore wiring; migrations; kit blob wiring — crate inv-store
+│  ├─ cli/                     # clap adapter + `inv server` composition — crate inv-cli
+│  ├─ api/                     # axum adapter — crate inv-api
+│  ├─ ws/                      # tokio-tungstenite adapter — crate inv-ws
+│  └─ mcp/                     # MCP server adapter — crate inv-mcp
 ├─ templates/
 │  └─ default/                 # bundled invoice template (HTML + CSS)
 ├─ tax-tables/
@@ -109,7 +106,7 @@ Adding a new channel = new crate that depends on `inv-core`. Zero changes to the
 Rust has no in-tree equivalent of kit's `core/stage`. The most active community state-machine crates are `statig` (hierarchical, async-aware, derive-based) and `rust-fsm` (flat, declarative-macro). v1 ships a facade that wraps `statig` behind an `inv-core` API:
 
 ```
-inv-core/domain/state/
+crates/core/src/state/
 ├─ mod.rs                   # trait StateMachine; types InvoiceState, InvoiceEvent; transition fn
 ├─ events.rs                # bus event shapes: .proposed, .transitioned, .entered
 └─ adapter_statig.rs        # the single shipped adapter
@@ -533,7 +530,7 @@ An internal ticker runs daily (configurable). For every `active` schedule with `
 3. If `auto_issue = true`, run `commands::issue_invoice` immediately and emit `inv.billing.invoice.issued`.
 4. Advance `next_run` and `last_run`.
 
-The ticker is part of `inv-server`; it can be disabled to run `inv` as a pure on-demand library if desired.
+The ticker is composed by `inv server` (in the `inv-cli` crate) and can be disabled to run `inv` as a pure on-demand library if desired.
 
 ## 9. Reminders
 
@@ -543,7 +540,7 @@ Reminders never advance the invoice FSM (the invoice stays in `sent` or `viewed`
 
 ## 10. Channel-specific surfaces
 
-Each adapter exposes the same operation set under its native idiom. The operation set is one-to-one with `inv-core::commands::*`.
+Each adapter exposes the same operation set under its native idiom. The operation set is one-to-one with `inv_commands::*`.
 
 | Operation | CLI | HTTP API | WebSocket | MCP tool |
 |---|---|---|---|---|
