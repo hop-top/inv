@@ -111,23 +111,6 @@ $ inv invoice pay   invoice_01... --amount 1450.00
 
 ---
 
-## "schedule list: --customer required at v1"
-
-**Symptom.** `inv schedule list` errors without `--customer`.
-
-**Cause.** `ScheduleRepo` doesn't expose a cross-customer scan at v1 — the
-adapter requires `--customer`. (Tracked as a follow-up; the SQL fallback is
-deliberately kept out of the adapter layer.)
-
-**Fix.** Loop over customers:
-
-```sh
-$ inv customer list --format json | jq -r '.[].id' | \
-    xargs -I{} inv schedule list --customer {}
-```
-
----
-
 ## "invoice_state_history rows have published_at = NULL forever"
 
 **Symptom.** Events emitted but bus subscribers never see them.

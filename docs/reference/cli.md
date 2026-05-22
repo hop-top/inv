@@ -104,9 +104,16 @@ Print one invoice with lines.
 
 ### `inv creditnote show <id>`
 
-### `inv creditnote list --invoice <typeid>`
+### `inv creditnote list`
 
-List credit notes for an invoice.
+| Flag | Description |
+|---|---|
+| `--invoice <typeid>` | Filter by invoice. |
+| `--state <state>` | One of `draft | issued`. |
+| `--limit <n>` | Pagination limit. |
+| `--offset <n>` | Pagination offset. |
+
+Cross-invoice listing supported; pass `--invoice` to filter.
 
 ---
 
@@ -134,9 +141,16 @@ Terminal.
 
 ### `inv schedule show <id>`
 
-### `inv schedule list --customer <typeid>`
+### `inv schedule list`
 
-**At v1, `--customer` is required.** Cross-customer scan is not implemented.
+| Flag | Description |
+|---|---|
+| `--customer <typeid>` | Filter by customer. |
+| `--state <state>` | One of `active | paused | cancelled`. |
+| `--limit <n>` | Pagination limit. |
+| `--offset <n>` | Pagination offset. |
+
+Cross-customer listing supported; pass `--customer` to filter.
 
 ---
 
