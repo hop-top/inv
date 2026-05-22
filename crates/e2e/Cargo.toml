@@ -1,0 +1,51 @@
+[package]
+name = "inv-e2e"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "inv: end-to-end story-driven tests (one file per user story)"
+publish = false
+
+# Empty lib target — this crate carries integration tests only. The lib
+# itself is a placeholder so `cargo test -p inv-e2e --test <name>` works
+# uniformly across the workspace.
+
+[dependencies]
+
+[dev-dependencies]
+# inv crates under test — pull in every adapter so stories that exercise
+# multiple surfaces (CLI + bus, HTTP + store) live in one crate.
+inv-core = { workspace = true, features = ["schema"] }
+inv-commands = { workspace = true }
+inv-store = { workspace = true, features = ["sqlite"] }
+inv-bus = { workspace = true }
+inv-api = { workspace = true }
+inv-cli = { workspace = true }
+inv-mcp = { workspace = true }
+inv-ws = { workspace = true }
+
+# xrr — published on crates.io as hop-top-xrr. Kept crate-local (not a
+# workspace dep) since it's a test-only dep with a specific alpha pin;
+# upstream will rename + GA. Bump here when that lands.
+hop-top-xrr = "0.1.0-alpha.5"
+
+# Standard test fabric.
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "net", "time"] }
+chrono = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sqlx = { workspace = true, features = ["sqlite", "runtime-tokio-rustls"] }
+axum = { workspace = true }
+tower = { workspace = true }
+tempfile = "3"
+anyhow = { workspace = true }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+rust_decimal = { workspace = true }
+
+# rmcp client for the MCP-touching stories (parity with crates/mcp/tests).
+rmcp = { workspace = true, features = ["client", "transport-io", "schemars"] }
+
+[lints]
+workspace = true

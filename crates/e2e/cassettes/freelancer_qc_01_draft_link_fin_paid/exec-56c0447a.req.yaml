@@ -1,0 +1,10 @@
+xrr: '1'
+adapter: exec
+fingerprint: 56c0447a
+recorded_at: 2026-05-22T23:23:03Z
+payload:
+  argv:
+  - fin-bus-emit
+  - fin.billing.payment.received
+  stdin: '{"amount":"1667.14","invoice_ref":"inv://invoice/invoice_INVID_PLACEHOLDER","received_at":"2026-06-15T10:00:00Z"}'
+  env: {}
