@@ -30,19 +30,17 @@
 //! the "pay" event splits between `…paid` and `…partially_paid`
 //! based on the resulting state.
 
-use chrono::Utc;
 use serde_json::{json, Value};
-use sqlx::Row;
 use tracing::{debug, warn};
 
 use inv_core::domain::creditnote::{CreditNoteState, CreditNoteStateHistory};
-use inv_core::domain::ids::{CreditNoteId, HistoryId};
 use inv_core::domain::invoice::{HistoryChannel, InvoiceState, InvoiceStateHistory};
 use inv_core::state::creditnote::{
     CreditNoteEntered, CreditNoteEvent, CreditNoteProposed, CreditNoteTransitioned,
 };
 use inv_core::state::events::{InvoiceEntered, InvoiceProposed, InvoiceTransitioned};
 use inv_core::state::transitions::InvoiceEvent;
+use inv_store::repo::credit_note::CreditNoteHistoryRepo;
 use inv_store::repo::history::InvoiceHistoryRepo;
 use inv_store::Pool;
 
@@ -96,11 +94,9 @@ pub async fn run_outbox_relay(
     }
 
     // -- credit-note rows ------------------------------------------------
-    // `CreditNoteHistoryRepo` doesn't yet expose pending_outbox /
-    // mark_published (tracked in T-0024). Raw sqlx in the meantime —
-    // identical shape, will collapse onto the repo when T-0024 lands.
-    let cn_rows = fetch_pending_credit_note_history(pool, limit).await?;
-    for row in cn_rows {
+    let cn_repo = CreditNoteHistoryRepo::new(pool);
+    let pending_cn = cn_repo.pending_outbox(limit).await?;
+    for row in pending_cn {
         let events = credit_note_row_to_events(&row);
         for (topic, payload) in events {
             publisher
@@ -108,7 +104,7 @@ pub async fn run_outbox_relay(
                 .await?;
             stats.events_published += 1;
         }
-        mark_credit_note_history_published(pool, &row.id).await?;
+        cn_repo.mark_published(&row.id).await?;
         stats.rows_processed += 1;
     }
 
@@ -349,106 +345,6 @@ fn credit_note_domain_payload(row: &CreditNoteStateHistory) -> Value {
 }
 
 // =============================================================================
-// Raw sqlx fallback for credit_note_state_history (until T-0024 ships).
-// =============================================================================
-
-async fn fetch_pending_credit_note_history(
-    pool: &Pool,
-    limit: i64,
-) -> Result<Vec<CreditNoteStateHistory>, RelayError> {
-    let rows = sqlx::query(
-        "SELECT id, credit_note_id, from_state, to_state, event, actor, channel, \
-                bus_event_id, occurred_at, published_at, metadata \
-         FROM credit_note_state_history WHERE published_at IS NULL \
-         ORDER BY occurred_at ASC LIMIT ?",
-    )
-    .bind(limit)
-    .fetch_all(pool)
-    .await?;
-
-    let mut out: Vec<CreditNoteStateHistory> = Vec::with_capacity(rows.len());
-    for row in rows.iter() {
-        out.push(parse_cn_history_row(row)?);
-    }
-    Ok(out)
-}
-
-async fn mark_credit_note_history_published(
-    pool: &Pool,
-    id: &HistoryId,
-) -> Result<(), RelayError> {
-    sqlx::query("UPDATE credit_note_state_history SET published_at = ? WHERE id = ?")
-        .bind(Utc::now().to_rfc3339())
-        .bind(id.to_string())
-        .execute(pool)
-        .await?;
-    Ok(())
-}
-
-fn parse_cn_history_row(row: &sqlx::any::AnyRow) -> Result<CreditNoteStateHistory, RelayError> {
-    use chrono::DateTime;
-    use std::collections::BTreeMap;
-
-    let id_s: String = row.try_get("id")?;
-    let id: HistoryId = id_s
-        .parse()
-        .map_err(|e: inv_core::domain::ids::IdError| {
-            RelayError::Store(inv_store::StoreError::Id(e.to_string()))
-        })?;
-    let credit_note_id_s: String = row.try_get("credit_note_id")?;
-    let credit_note_id: CreditNoteId = credit_note_id_s
-        .parse()
-        .map_err(|e: inv_core::domain::ids::IdError| {
-            RelayError::Store(inv_store::StoreError::Id(e.to_string()))
-        })?;
-
-    let from_state_s: Option<String> = row.try_get("from_state")?;
-    let from_state = from_state_s.as_deref().map(cn_state_from_str).transpose()?;
-    let to_state_s: String = row.try_get("to_state")?;
-    let to_state = cn_state_from_str(&to_state_s)?;
-    let event: String = row.try_get("event")?;
-    let actor: Option<String> = row.try_get("actor")?;
-    let channel_s: String = row.try_get("channel")?;
-    let channel = channel_from_str(&channel_s)?;
-    let bus_event_id: Option<String> = row.try_get("bus_event_id")?;
-    let occurred_at_s: String = row.try_get("occurred_at")?;
-    let published_at_s: Option<String> = row.try_get("published_at")?;
-    let metadata_s: Option<String> = row.try_get("metadata")?;
-
-    let occurred_at = DateTime::parse_from_rfc3339(&occurred_at_s)
-        .map_err(|e| RelayError::Store(inv_store::StoreError::Other(format!("ts: {e}"))))?
-        .with_timezone(&Utc);
-    let published_at = match published_at_s.as_deref() {
-        None => None,
-        Some(s) => Some(
-            DateTime::parse_from_rfc3339(s)
-                .map_err(|e| RelayError::Store(inv_store::StoreError::Other(format!("ts: {e}"))))?
-                .with_timezone(&Utc),
-        ),
-    };
-    let metadata: BTreeMap<String, String> = match metadata_s.as_deref() {
-        None | Some("") => BTreeMap::new(),
-        Some(s) => serde_json::from_str(s).map_err(|e| {
-            RelayError::Store(inv_store::StoreError::Other(format!("metadata: {e}")))
-        })?,
-    };
-
-    Ok(CreditNoteStateHistory {
-        id,
-        credit_note_id,
-        from_state,
-        to_state,
-        event,
-        actor,
-        channel,
-        bus_event_id,
-        occurred_at,
-        published_at,
-        metadata,
-    })
-}
-
-// =============================================================================
 // Stringify helpers (kept local to keep store internals encapsulated).
 // =============================================================================
 
@@ -471,17 +367,6 @@ fn credit_note_state_str(s: CreditNoteState) -> &'static str {
     }
 }
 
-fn cn_state_from_str(s: &str) -> Result<CreditNoteState, RelayError> {
-    match s {
-        "draft" => Ok(CreditNoteState::Draft),
-        "issued" => Ok(CreditNoteState::Issued),
-        other => Err(RelayError::Store(inv_store::StoreError::InvalidValue {
-            column: "credit_note_state_history.to_state",
-            value: other.to_string(),
-        })),
-    }
-}
-
 fn channel_str(c: HistoryChannel) -> &'static str {
     match c {
         HistoryChannel::Cli => "cli",
@@ -492,25 +377,10 @@ fn channel_str(c: HistoryChannel) -> &'static str {
     }
 }
 
-fn channel_from_str(s: &str) -> Result<HistoryChannel, RelayError> {
-    Ok(match s {
-        "cli" => HistoryChannel::Cli,
-        "api" => HistoryChannel::Api,
-        "ws" => HistoryChannel::Ws,
-        "mcp" => HistoryChannel::Mcp,
-        "bus" => HistoryChannel::Bus,
-        other => {
-            return Err(RelayError::Store(inv_store::StoreError::InvalidValue {
-                column: "credit_note_state_history.channel",
-                value: other.to_string(),
-            }))
-        }
-    })
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::Utc;
     use inv_core::domain::ids::{HistoryId, InvoiceId};
     use std::collections::BTreeMap;
 

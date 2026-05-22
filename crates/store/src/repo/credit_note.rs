@@ -1,5 +1,6 @@
 //! Credit-note repository + credit-note state-history repository.
 
+use chrono::Utc;
 use sqlx::Row;
 
 use inv_core::domain::creditnote::{CreditNote, CreditNoteState, CreditNoteStateHistory};
@@ -275,6 +276,30 @@ impl<'p> CreditNoteHistoryRepo<'p> {
         .fetch_all(self.pool)
         .await?;
         rows.iter().map(row_to_cn_history).collect()
+    }
+
+    /// Outbox query: pending rows that need bus publication.
+    pub async fn pending_outbox(&self, limit: i64) -> Result<Vec<CreditNoteStateHistory>> {
+        let rows = sqlx::query(
+            "SELECT id, credit_note_id, from_state, to_state, event, actor, channel, bus_event_id, \
+                    occurred_at, published_at, metadata \
+             FROM credit_note_state_history WHERE published_at IS NULL \
+             ORDER BY occurred_at ASC LIMIT ?",
+        )
+        .bind(limit)
+        .fetch_all(self.pool)
+        .await?;
+        rows.iter().map(row_to_cn_history).collect()
+    }
+
+    /// Mark an outbox row as published.
+    pub async fn mark_published(&self, id: &HistoryId) -> Result<()> {
+        sqlx::query("UPDATE credit_note_state_history SET published_at = ? WHERE id = ?")
+            .bind(ts_to_string(&Utc::now()))
+            .bind(id.to_string())
+            .execute(self.pool)
+            .await?;
+        Ok(())
     }
 }
 

@@ -24,11 +24,6 @@ pub enum RelayError {
     /// Underlying store error (query, mark-published, …).
     #[error("store: {0}")]
     Store(#[from] inv_store::StoreError),
-
-    /// Sqlx error from a raw query path (credit-note pending-outbox scan
-    /// while T-0024's symmetric API lands).
-    #[error("sqlx: {0}")]
-    Sqlx(#[from] sqlx::Error),
 }
 
 /// Error returned by [`crate::dispatch_inbound_event`].
