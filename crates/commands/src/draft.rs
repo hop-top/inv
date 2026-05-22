@@ -20,7 +20,7 @@ use chrono::{DateTime, Utc};
 use rust_decimal::Decimal;
 use serde_json::json;
 
-use inv_core::domain::ids::{CustomerId, HistoryId, InvoiceId, LineId};
+use inv_core::domain::ids::{CustomerId, HistoryId, InvoiceId, LineId, ScheduleId};
 use inv_core::domain::invoice::{
     HistoryChannel, Invoice, InvoiceLine, InvoiceState, InvoiceStateHistory, TaxCategory,
 };
@@ -72,6 +72,12 @@ pub struct DraftInvoiceInput {
     pub due_at: Option<DateTime<Utc>>,
     /// Optional per-invoice template override (filesystem path).
     pub template_path: Option<String>,
+    /// Originating recurring schedule, if this draft was materialised by
+    /// the schedule ticker. Direct (manual) drafts leave this `None`.
+    /// Persisted on `invoice.schedule_id` for durable provenance —
+    /// the bus event payload also carries it but events can be dropped
+    /// or replayed, so the column is the canonical record.
+    pub schedule_id: Option<ScheduleId>,
 }
 
 impl DraftInvoiceInput {
@@ -195,7 +201,7 @@ pub async fn draft_invoice(
         tax_total: Decimal::ZERO,
         total: subtotal,
         amount_paid: Decimal::ZERO,
-        schedule_id: None,
+        schedule_id: input.schedule_id.clone(),
         template_path: input.template_path.clone(),
         pdf_blob_ref: None,
         idempotency_key: input.idempotency_key.clone(),

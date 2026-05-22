@@ -108,6 +108,7 @@ fn draft_input(customer_id: &CustomerId) -> DraftInvoiceInput {
         channel: Channel::Cli,
         due_at: None,
         template_path: None,
+        schedule_id: None,
     }
 }
 

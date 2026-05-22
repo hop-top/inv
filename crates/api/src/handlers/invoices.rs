@@ -161,6 +161,7 @@ pub async fn draft(
         channel: Channel::Api,
         due_at: body.due_at,
         template_path: body.template_path,
+        schedule_id: None,
     };
 
     let out = draft_invoice(&state.ctx, input).await?;

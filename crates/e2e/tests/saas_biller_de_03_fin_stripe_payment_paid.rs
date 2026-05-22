@@ -66,6 +66,7 @@ async fn fin_payment_received_advances_invoice_to_paid() {
             channel: Channel::Cli,
             due_at: None,
             template_path: None,
+            schedule_id: None,
         },
     )
     .await
@@ -211,6 +212,7 @@ async fn fin_partial_payment_then_remainder_reaches_paid() {
             channel: Channel::Cli,
             due_at: None,
             template_path: None,
+            schedule_id: None,
         },
     )
     .await

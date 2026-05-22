@@ -147,6 +147,7 @@ fn draft_input(
         channel: Channel::Cli,
         due_at: None,
         template_path: None,
+        schedule_id: None,
     }
 }
 
@@ -1109,6 +1110,59 @@ async fn schedules_tick_auto_issue_promotes_to_issued() {
         .unwrap();
     assert_eq!(inv.state, InvoiceState::Issued);
     assert!(inv.number.is_some());
+}
+
+#[tokio::test]
+async fn schedules_tick_stamps_invoice_schedule_id_provenance() {
+    // T-0039: invoices materialised by schedules_tick carry the
+    // originating schedule's id on `invoice.schedule_id`. Direct drafts
+    // (via draft_invoice) keep it None. The bus event payload is
+    // unchanged — it also still carries schedule_id.
+    let (mut ctx, pool, _blob_dir) = fresh_ctx().await;
+    let cust = seed_customer(&pool).await;
+    ctx = ctx.with_clock(Arc::new(FrozenClock(
+        Utc.with_ymd_and_hms(2026, 6, 5, 0, 0, 0).unwrap(),
+    )));
+
+    // Direct draft (manual): schedule_id must be None.
+    let direct = draft_invoice(&ctx, draft_input(&cust, None))
+        .await
+        .expect("direct draft ok");
+    assert!(
+        direct.invoice.schedule_id.is_none(),
+        "direct draft must NOT carry schedule_id",
+    );
+    let direct_persisted = InvoiceRepo::new(&pool)
+        .get(&direct.invoice.id)
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(direct_persisted.schedule_id.is_none());
+
+    // Materialised draft: schedule_id == originating schedule's id.
+    let created = schedule_create(&ctx, schedule_input(&cust, false))
+        .await
+        .unwrap();
+    let out = schedules_tick(&ctx).await.expect("tick ok");
+    assert_eq!(out.ran_schedule_ids.len(), 1);
+    assert_eq!(
+        out.drafts[0].invoice.schedule_id.as_ref(),
+        Some(&created.schedule.id),
+        "materialised invoice in command output must carry schedule_id",
+    );
+
+    // Verify the column was actually persisted (not just the in-memory
+    // struct populated). This is the durability assertion.
+    let materialised = InvoiceRepo::new(&pool)
+        .get(&out.drafts[0].invoice.id)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        materialised.schedule_id.as_ref(),
+        Some(&created.schedule.id),
+        "persisted invoice row must carry schedule_id",
+    );
 }
 
 // ---------------------------------------------------------------------

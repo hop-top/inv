@@ -123,6 +123,7 @@ pub async fn draft(ctx: &CoreCtx, input: InvoiceDraftInput) -> Result<serde_json
         channel: mcp_channel(),
         due_at: input.due_at,
         template_path: input.template_path,
+        schedule_id: None,
     };
     let out = draft_invoice(ctx, req).await?;
     let wire = DraftOutputWire {

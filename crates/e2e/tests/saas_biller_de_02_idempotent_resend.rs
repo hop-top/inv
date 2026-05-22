@@ -60,6 +60,7 @@ async fn draft_idempotency_key_replays() {
         channel: Channel::Cli,
         due_at: None,
         template_path: None,
+        schedule_id: None,
     };
     let first = draft_invoice(&ctx, input()).await.expect("first");
     let second = draft_invoice(&ctx, input()).await.expect("second");
@@ -158,6 +159,7 @@ async fn send_idempotency_key_currently_not_deduped() {
             channel: Channel::Cli,
             due_at: None,
             template_path: None,
+            schedule_id: None,
         },
     )
     .await

@@ -317,6 +317,7 @@ pub async fn schedules_tick(ctx: &CoreCtx) -> Result<SchedulesTickOutput, CoreEr
             channel: Channel::Bus,
             due_at: None,
             template_path: None,
+            schedule_id: Some(schedule.id.clone()),
         };
         let drafted = draft_invoice(ctx, draft_input).await?;
         events.extend(drafted.emitted_events.iter().cloned());

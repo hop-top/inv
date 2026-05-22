@@ -56,6 +56,7 @@ async fn void_after_paid_rejected_and_credit_note_lifecycle() {
             channel: Channel::Cli,
             due_at: None,
             template_path: None,
+            schedule_id: None,
         },
     )
     .await

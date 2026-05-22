@@ -55,6 +55,7 @@ async fn dz_local_invoice_resolves_standard_and_reduced_tva() {
             channel: Channel::Cli,
             due_at: None,
             template_path: None,
+            schedule_id: None,
         },
     )
     .await

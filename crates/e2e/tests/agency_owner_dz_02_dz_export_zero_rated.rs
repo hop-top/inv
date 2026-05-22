@@ -48,6 +48,7 @@ async fn dz_to_foreign_buyer_resolves_zero_rated_export() {
             channel: Channel::Cli,
             due_at: None,
             template_path: None,
+            schedule_id: None,
         },
     )
     .await
@@ -111,6 +112,7 @@ async fn dz_to_foreign_with_explicit_zero_rated_records_rate_id() {
             channel: Channel::Cli,
             due_at: None,
             template_path: None,
+            schedule_id: None,
         },
     )
     .await

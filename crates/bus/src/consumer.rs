@@ -198,6 +198,7 @@ impl Consumer {
             channel: Channel::Bus,
             due_at: p.due_date,
             template_path: None,
+            schedule_id: None,
         };
         draft_invoice(ctx, input).await.map_err(|e| DispatchError::Command {
             command: "draft_invoice",

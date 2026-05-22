@@ -48,6 +48,7 @@ async fn reminder_ladder_dispatches_and_overdue_flags() {
             channel: Channel::Cli,
             due_at: Some("2026-06-30T00:00:00Z".parse().unwrap()),
             template_path: None,
+            schedule_id: None,
         },
     )
     .await

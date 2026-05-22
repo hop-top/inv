@@ -71,6 +71,7 @@ async fn full_lifecycle_with_fin_payment() {
             channel: Channel::Cli,
             due_at: Some("2026-06-30T00:00:00Z".parse().unwrap()),
             template_path: None,
+            schedule_id: None,
         },
     )
     .await

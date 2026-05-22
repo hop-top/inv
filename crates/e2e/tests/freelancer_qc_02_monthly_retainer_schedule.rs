@@ -88,13 +88,14 @@ async fn schedule_create_then_tick_materialises_and_auto_issues() {
     assert_eq!(inv.state, InvoiceState::Issued);
     let num = inv.number.as_deref().expect("issued -> number");
     assert!(num.starts_with("INV-2026-"), "got {num}");
-    // T-0036 sub-finding: schedules_tick does not yet stamp
-    // invoice.schedule_id with the originating schedule's id (the
-    // payload of the inv.billing.schedule.materialised event carries
-    // it, but the invoice row itself doesn't get the FK). Materialisation
-    // verified by: tick returned the schedule's id in ran_schedule_ids,
-    // a draft was created, and tick2 doesn't re-fire — the link in the
-    // invoice row is a separate enhancement.
+    // T-0039: materialised invoice carries durable schedule provenance.
+    // The bus event payload still includes schedule_id, but the column
+    // is the canonical record — surviving event drops/replays/filters.
+    assert_eq!(
+        inv.schedule_id.as_ref(),
+        Some(&created.schedule.id),
+        "materialised invoice must carry originating schedule_id",
+    );
     // Subtotal = 5000 + 10*150 = 6500.
     // Tax: per-line resolution rounds each line individually before
     // summing, so the sum can differ from naive `6500 * (0.05 + 0.09975)`.

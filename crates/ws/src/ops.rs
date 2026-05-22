@@ -371,6 +371,7 @@ impl DraftInvoiceWire {
             channel,
             due_at: self.due_at,
             template_path: self.template_path,
+            schedule_id: None,
         })
     }
 }

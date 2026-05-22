@@ -272,6 +272,7 @@ pub fn build_draft_input(matches: &ArgMatches, actor: Actor) -> Result<DraftInvo
         channel: Channel::Cli,
         due_at,
         template_path,
+        schedule_id: None,
     })
 }
 
