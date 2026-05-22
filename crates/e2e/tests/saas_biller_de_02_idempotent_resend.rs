@@ -4,21 +4,15 @@
 //! store (UNIQUE constraint + no duplicate history row),
 //! bus outbox (no double-emit on replay).
 //!
-//! ## Implementation status (T-0036 sub-finding)
+//! ## Implementation status (T-0037)
 //!
-//! `idempotency_key` dedup at the command layer is currently implemented
-//! ONLY on `draft_invoice` (idempotency_replay: true on second call).
-//! The `send_invoice` + `send_invoice_render` paths accept the field on
-//! their inputs but do NOT yet dedup — a second call with the same key
-//! re-runs the FSM transition. The story's "second send returns
-//! `idempotency_replay: true`" criterion isn't met today.
-//!
-//! Rather than silently weaken the assertion, this test:
-//!   1. Exercises draft-level idempotency end-to-end (assertion passes).
-//!   2. Asserts the CURRENT send-replay behaviour (no dedup) so a
-//!      future T-#### that implements send idempotency flips this
-//!      assertion deliberately. The test serves as the regression
-//!      anchor + the "unmet criterion" beacon.
+//! `idempotency_key` dedup at the command layer is now implemented on
+//! BOTH `draft_invoice` and `send_invoice` / `send_invoice_render`.
+//! Send-level dedup is scoped per-(invoice_id, idempotency_key) via
+//! the `send_idempotency` table. On a hit, the command returns the
+//! same shape with `idempotency_replay: true`, no FSM mutation, no
+//! second `send` history row, no duplicate `inv.billing.invoice.sent`
+//! event.
 
 mod common;
 
@@ -136,10 +130,13 @@ async fn http_draft_idempotency_returns_replay_flag() {
 }
 
 #[tokio::test]
-async fn send_idempotency_key_currently_not_deduped() {
-    // Documents the CURRENT behaviour gap noted in the module-level
-    // doc. When send_invoice gains true idempotency, this test will
-    // need to be updated to assert dedup (same as draft above).
+async fn send_idempotency_key_replays() {
+    // T-0037: send_invoice now honours idempotency_key.
+    // Second call with the same (invoice_id, idempotency_key):
+    //   - returns the same shape with `idempotency_replay: true`
+    //   - does NOT advance the FSM a second time (no extra history row)
+    //   - does NOT write to the sink
+    //   - does NOT emit any events (incl. `inv.billing.invoice.sent`)
     let (ctx, pool, _captured, _blob) = common::fresh_ctx().await;
     let cust = common::seed_customer_qc(&pool).await;
     let drafted = draft_invoice(
@@ -176,38 +173,52 @@ async fn send_idempotency_key_currently_not_deduped() {
     .await
     .unwrap();
 
-    let mk_send = || SendInvoiceInput {
-        invoice_id: issued.invoice.id.clone(),
-        destination_uri: "stdout".to_string(),
-        idempotency_key: Some("send-1".into()),
-        actor: Actor::Cli { name: "jad".into() },
-        channel: Channel::Cli,
-        sink: None,
-    };
+    fn mk_send<'s>(
+        invoice_id: inv_core::domain::ids::InvoiceId,
+        sink: &'s mut dyn inv_commands::SendSink,
+    ) -> SendInvoiceInput<'s> {
+        SendInvoiceInput {
+            invoice_id,
+            destination_uri: "stdout".to_string(),
+            idempotency_key: Some("send-1".into()),
+            actor: Actor::Cli { name: "jad".into() },
+            channel: Channel::Cli,
+            sink: Some(sink),
+        }
+    }
 
     let mut sink1: Vec<u8> = Vec::new();
-    let mut input1 = mk_send();
-    input1.sink = Some(&mut sink1);
-    let s1 = send_invoice(&ctx, input1).await.expect("send1");
+    let s1 = send_invoice(&ctx, mk_send(issued.invoice.id.clone(), &mut sink1))
+        .await
+        .expect("send1");
     assert_eq!(s1.invoice.state, inv_core::domain::invoice::InvoiceState::Sent);
+    assert!(!s1.idempotency_replay, "first call must NOT be a replay");
+    let s1_delivered = s1.delivered_to.clone();
+    drop(s1);
+    assert!(!sink1.is_empty(), "first call writes bytes to the sink");
+    let sink1_len = sink1.len();
 
-    // Second call with same key + same body: today, FSM permits the
-    // Sent → Sent self-edge, so we get a new history row + new emitted
-    // event set. When dedup ships, this test will need updating.
+    // Second call with same key: must replay, no new history row, no
+    // sink write, no events.
     let mut sink2: Vec<u8> = Vec::new();
-    let mut input2 = mk_send();
-    input2.sink = Some(&mut sink2);
-    let s2 = send_invoice(&ctx, input2).await.expect("send2 (current behaviour)");
+    let s2 = send_invoice(&ctx, mk_send(issued.invoice.id.clone(), &mut sink2))
+        .await
+        .expect("send2 (replay)");
+    assert!(s2.idempotency_replay, "second call must replay");
+    assert!(s2.emitted_events.is_empty(), "replay must NOT emit");
+    assert_eq!(s2.delivered_to, s1_delivered, "delivered_to preserved");
+    drop(s2);
+    assert!(sink2.is_empty(), "replay must NOT write to the sink");
+
     let hist = InvoiceHistoryRepo::new(&pool)
         .list_for_invoice(&issued.invoice.id)
         .await
         .unwrap();
     let send_rows = hist.iter().filter(|h| h.event == "send").count();
-    assert_eq!(
-        send_rows, 2,
-        "current behaviour: send w/ same idempotency_key inserts a second history row (gap)",
-    );
-    let _ = s2;
+    assert_eq!(send_rows, 1, "replay must not insert a second send history row");
+
+    // Sink1 sanity — len unchanged after replay (closing the loop).
+    assert_eq!(sink1.len(), sink1_len);
 }
 
 // =============================================================================

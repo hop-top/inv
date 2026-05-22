@@ -20,6 +20,21 @@
 //! at v1 we explicitly allow it as a no-op on the state but a new
 //! history row + `inv.billing.invoice.sent` event is still recorded so
 //! the audit trail captures every send).
+//!
+//! ## Idempotency (T-0037)
+//!
+//! When `idempotency_key` is set, we look up
+//! `(invoice_id, idempotency_key)` in the `send_idempotency` table
+//! before doing anything. On a hit the command returns the same
+//! [`SendInvoiceOutput`] shape with `idempotency_replay: true`, no FSM
+//! mutation, no new history row, no emitted events, and no sink write
+//! (`file://` doesn't re-write the bytes; `stdout` doesn't push to the
+//! sink). The rendered HTML / PDF are re-computed from the current
+//! (post-send) invoice state — deterministic given the frozen tax
+//! snapshot — so callers can still display them.
+//!
+//! The idempotency key is scoped per-invoice: different invoices with
+//! the same key never collide.
 
 use std::collections::BTreeMap;
 use std::io::Write;
@@ -41,6 +56,7 @@ use inv_core::state::{
 use inv_store::repo::customer::CustomerRepo;
 use inv_store::repo::history::InvoiceHistoryRepo;
 use inv_store::repo::invoice::{InvoiceLineRepo, InvoiceRepo};
+use inv_store::repo::send_idempotency::{SendIdempotencyRecord, SendIdempotencyRepo};
 
 use crate::ctx::{Actor, Channel, CoreCtx};
 use crate::draft::history_channel_str;
@@ -121,11 +137,16 @@ pub struct SendInvoiceOutput {
     pub html: String,
     /// PDF bytes delivered (stub engine returns HTML).
     pub pdf: Vec<u8>,
-    /// Bus events the command would emit.
+    /// Bus events the command would emit. Empty on idempotency replay.
     pub emitted_events: Vec<EmittedEvent>,
     /// Resolved destination (`file:///tmp/x.html`, `stdout`, …) for
     /// audit / display.
     pub delivered_to: String,
+    /// True if the command short-circuited on an idempotency-key hit
+    /// (no FSM mutation, no new history row, no sink write, no events).
+    /// `invoice` / `lines` reflect the current (post-original-send)
+    /// state; `html` / `pdf` are re-rendered from that state.
+    pub idempotency_replay: bool,
 }
 
 /// Input for [`send_invoice_render`].
@@ -192,6 +213,15 @@ pub async fn send_invoice(
         }
     }
 
+    // Idempotency replay: BEFORE mutating, sink-writing, or rendering
+    // anything dispatch-heavy. The hit path re-loads + re-renders the
+    // current invoice state (cheap) and returns with no side effects.
+    if let Some(key) = input.idempotency_key.as_deref() {
+        if let Some(replay) = try_replay(ctx, &input.invoice_id, key).await? {
+            return Ok(replay);
+        }
+    }
+
     // Render + FSM-mutate shared with the render-only path.
     let prepared = prepare_send(
         ctx,
@@ -234,7 +264,15 @@ pub async fn send_invoice(
         _ => unreachable!("scheme guard above"),
     };
 
-    finalize_send(ctx, prepared, input.actor, input.channel, delivered_to).await
+    finalize_send(
+        ctx,
+        prepared,
+        input.actor,
+        input.channel,
+        delivered_to,
+        input.idempotency_key.as_deref(),
+    )
+    .await
 }
 
 /// Render an invoice + persist the FSM transition + history row, then
@@ -255,6 +293,18 @@ pub async fn send_invoice_render(
     input: SendInvoiceRenderInput,
 ) -> Result<SendInvoiceOutput, CoreError> {
     input.validate()?;
+
+    // Idempotency replay: same precondition as `send_invoice`. Adapter
+    // dispatches (HTTP, link mint, bus publish) are NOT replayed — the
+    // caller sees `idempotency_replay: true` and skips the dispatch
+    // step. This matches the contract callers already follow for the
+    // draft path.
+    if let Some(key) = input.idempotency_key.as_deref() {
+        if let Some(replay) = try_replay(ctx, &input.invoice_id, key).await? {
+            return Ok(replay);
+        }
+    }
+
     let prepared = prepare_send(
         ctx,
         &input.invoice_id,
@@ -263,7 +313,15 @@ pub async fn send_invoice_render(
     )
     .await?;
     let delivered_to = input.destination_uri.clone();
-    finalize_send(ctx, prepared, input.actor, input.channel, delivered_to).await
+    finalize_send(
+        ctx,
+        prepared,
+        input.actor,
+        input.channel,
+        delivered_to,
+        input.idempotency_key.as_deref(),
+    )
+    .await
 }
 
 /// Intermediate output of [`prepare_send`] — everything the FSM mutate
@@ -347,12 +405,18 @@ async fn prepare_send(
 /// Commit the FSM mutation + history row + bus events. Called from
 /// both `send_invoice` (after a local sink write) and
 /// `send_invoice_render` (after the caller has captured the bytes).
+///
+/// When `idempotency_key` is set, also records the
+/// `(invoice_id, idempotency_key)` row in `send_idempotency` inside the
+/// same transaction. A future call with the same tuple short-circuits
+/// before reaching this function (see [`try_replay`]).
 async fn finalize_send(
     ctx: &CoreCtx,
     prepared: PreparedSend,
     actor: Actor,
     channel: Channel,
     delivered_to: String,
+    idempotency_key: Option<&str>,
 ) -> Result<SendInvoiceOutput, CoreError> {
     let PreparedSend {
         mut invoice,
@@ -391,6 +455,19 @@ async fn finalize_send(
         let mut tx = ctx.db.begin().await.map_err(inv_store::StoreError::from)?;
         InvoiceRepo::save_in_tx(&mut tx, &invoice).await?;
         InvoiceHistoryRepo::save_in_tx(&mut tx, &history).await?;
+        if let Some(key) = idempotency_key {
+            SendIdempotencyRepo::insert_in_tx(
+                &mut tx,
+                &SendIdempotencyRecord {
+                    invoice_id: invoice.id.clone(),
+                    idempotency_key: key.to_string(),
+                    history_id: history.id.clone(),
+                    delivered_to: delivered_to.clone(),
+                    created_at: now,
+                },
+            )
+            .await?;
+        }
         tx.commit().await.map_err(inv_store::StoreError::from)?;
     }
 
@@ -411,7 +488,60 @@ async fn finalize_send(
         pdf,
         emitted_events: emitted,
         delivered_to,
+        idempotency_replay: false,
     })
+}
+
+/// Idempotency replay path. Looks up the
+/// `(invoice_id, idempotency_key)` tuple in `send_idempotency`; on a
+/// hit, reloads the current invoice + lines + customer, re-renders
+/// HTML + PDF deterministically from that state, and returns a
+/// `SendInvoiceOutput` with `idempotency_replay: true` and an empty
+/// `emitted_events` vector. Returns `Ok(None)` when no prior row
+/// matches (caller proceeds with the normal send path).
+async fn try_replay(
+    ctx: &CoreCtx,
+    invoice_id: &InvoiceId,
+    idempotency_key: &str,
+) -> Result<Option<SendInvoiceOutput>, CoreError> {
+    let repo = SendIdempotencyRepo::new(&ctx.db);
+    let Some(record) = repo.find(invoice_id, idempotency_key).await? else {
+        return Ok(None);
+    };
+
+    let inv_repo = InvoiceRepo::new(&ctx.db);
+    let line_repo = InvoiceLineRepo::new(&ctx.db);
+    let cust_repo = CustomerRepo::new(&ctx.db);
+
+    let invoice = inv_repo
+        .get(invoice_id)
+        .await?
+        .ok_or_else(|| CoreError::NotFound(format!("invoice {invoice_id}")))?;
+    let lines = line_repo.list_for_invoice(invoice_id).await?;
+    let customer = cust_repo
+        .get(&invoice.customer_id)
+        .await?
+        .ok_or_else(|| {
+            CoreError::NotFound(format!(
+                "customer {} (referenced by invoice {})",
+                invoice.customer_id, invoice_id
+            ))
+        })?;
+
+    let render_ctx = RenderContext::new(invoice.clone(), customer, lines.clone());
+    let template_path = invoice.template_path.as_deref().map(std::path::Path::new);
+    let html = render_html(template_path, &render_ctx).await?;
+    let pdf = render_pdf(&html).await?;
+
+    Ok(Some(SendInvoiceOutput {
+        invoice,
+        lines,
+        html,
+        pdf,
+        emitted_events: Vec::new(),
+        delivered_to: record.delivered_to,
+        idempotency_replay: true,
+    }))
 }
 
 fn scheme_of(uri: &str) -> String {

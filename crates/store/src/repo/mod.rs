@@ -13,6 +13,7 @@ pub mod history;
 pub mod invoice;
 pub mod reminder;
 pub mod schedule;
+pub mod send_idempotency;
 
 pub use bus_inbox::{BusInboxRecord, BusInboxRepo};
 pub use credit_note::{CreditNoteHistoryRepo, CreditNoteRepo};
@@ -21,6 +22,7 @@ pub use history::InvoiceHistoryRepo;
 pub use invoice::{InvoiceLineRepo, InvoiceRepo};
 pub use reminder::ReminderRepo;
 pub use schedule::ScheduleRepo;
+pub use send_idempotency::{SendIdempotencyRecord, SendIdempotencyRepo};
 
 // ---------------------------------------------------------------------
 // Shared helpers

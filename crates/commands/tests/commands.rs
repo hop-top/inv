@@ -572,6 +572,201 @@ async fn send_unsupported_scheme_returns_not_implemented() {
 }
 
 // ---------------------------------------------------------------------
+// send_invoice idempotency (T-0037)
+// ---------------------------------------------------------------------
+
+/// Helper: walk draft → issue and return the issued invoice id, ready
+/// for a send call.
+async fn drafted_then_issued(ctx: &CoreCtx, pool: &Pool) -> inv_core::domain::ids::InvoiceId {
+    let cust = seed_customer(pool).await;
+    let drafted = draft_invoice(ctx, draft_input(&cust, None))
+        .await
+        .unwrap();
+    let issued = issue_invoice(
+        ctx,
+        IssueInvoiceInput {
+            invoice_id: drafted.invoice.id.clone(),
+            idempotency_key: None,
+            actor: Actor::Cli { name: "jad".into() },
+            channel: Channel::Cli,
+        },
+    )
+    .await
+    .unwrap();
+    issued.invoice.id
+}
+
+#[tokio::test]
+async fn send_idempotency_same_key_replays_no_mutation() {
+    // T-0037: second call with same (invoice_id, idempotency_key)
+    // returns the same shape with `idempotency_replay: true`, does NOT
+    // write a second history row, does NOT emit events, does NOT push
+    // bytes to the sink.
+    let (ctx, pool, _blob_dir) = fresh_ctx().await;
+    let invoice_id = drafted_then_issued(&ctx, &pool).await;
+
+    let mut sink1: Vec<u8> = Vec::new();
+    let out1 = send_invoice(
+        &ctx,
+        SendInvoiceInput {
+            invoice_id: invoice_id.clone(),
+            destination_uri: "stdout".to_string(),
+            idempotency_key: Some("send-key-1".into()),
+            actor: Actor::Cli { name: "jad".into() },
+            channel: Channel::Cli,
+            sink: Some(&mut sink1),
+        },
+    )
+    .await
+    .expect("first send");
+    assert_eq!(out1.invoice.state, InvoiceState::Sent);
+    assert!(!out1.idempotency_replay);
+    assert!(!sink1.is_empty(), "first send writes the rendered bytes");
+    assert!(
+        out1.emitted_events
+            .iter()
+            .any(|e| e.topic == "inv.billing.invoice.sent"),
+        "first send emits invoice.sent",
+    );
+    let first_delivered = out1.delivered_to.clone();
+
+    let mut sink2: Vec<u8> = Vec::new();
+    let out2 = send_invoice(
+        &ctx,
+        SendInvoiceInput {
+            invoice_id: invoice_id.clone(),
+            destination_uri: "stdout".to_string(),
+            idempotency_key: Some("send-key-1".into()),
+            actor: Actor::Cli { name: "jad".into() },
+            channel: Channel::Cli,
+            sink: Some(&mut sink2),
+        },
+    )
+    .await
+    .expect("second send (replay)");
+
+    assert!(out2.idempotency_replay, "replay flag is set on the second call");
+    assert!(out2.emitted_events.is_empty(), "replay must not emit");
+    assert_eq!(out2.delivered_to, first_delivered);
+    assert_eq!(out2.invoice.state, InvoiceState::Sent);
+    assert!(sink2.is_empty(), "replay must not push bytes to the sink");
+
+    let hist = InvoiceHistoryRepo::new(&pool)
+        .list_for_invoice(&invoice_id)
+        .await
+        .unwrap();
+    let send_rows = hist.iter().filter(|h| h.event == "send").count();
+    assert_eq!(send_rows, 1, "no second send history row on replay");
+}
+
+#[tokio::test]
+async fn send_idempotency_different_key_proceeds() {
+    // Different key on same invoice: NOT a replay. The Sent → Sent
+    // self-edge runs, a second `send` history row + event set lands.
+    let (ctx, pool, _blob_dir) = fresh_ctx().await;
+    let invoice_id = drafted_then_issued(&ctx, &pool).await;
+
+    let mut sink1: Vec<u8> = Vec::new();
+    let out1 = send_invoice(
+        &ctx,
+        SendInvoiceInput {
+            invoice_id: invoice_id.clone(),
+            destination_uri: "stdout".to_string(),
+            idempotency_key: Some("key-a".into()),
+            actor: Actor::Cli { name: "jad".into() },
+            channel: Channel::Cli,
+            sink: Some(&mut sink1),
+        },
+    )
+    .await
+    .unwrap();
+    assert!(!out1.idempotency_replay);
+
+    let mut sink2: Vec<u8> = Vec::new();
+    let out2 = send_invoice(
+        &ctx,
+        SendInvoiceInput {
+            invoice_id: invoice_id.clone(),
+            destination_uri: "stdout".to_string(),
+            idempotency_key: Some("key-b".into()),
+            actor: Actor::Cli { name: "jad".into() },
+            channel: Channel::Cli,
+            sink: Some(&mut sink2),
+        },
+    )
+    .await
+    .unwrap();
+    assert!(
+        !out2.idempotency_replay,
+        "different key on same invoice must NOT replay"
+    );
+    assert!(!sink2.is_empty(), "different key still writes bytes");
+
+    let hist = InvoiceHistoryRepo::new(&pool)
+        .list_for_invoice(&invoice_id)
+        .await
+        .unwrap();
+    let send_rows = hist.iter().filter(|h| h.event == "send").count();
+    assert_eq!(send_rows, 2, "two distinct sends -> two history rows");
+}
+
+#[tokio::test]
+async fn send_idempotency_key_scoped_per_invoice() {
+    // Same key, different invoices: NOT a collision. Each invoice has
+    // its own idempotency surface.
+    let (ctx, pool, _blob_dir) = fresh_ctx().await;
+    let invoice_a = drafted_then_issued(&ctx, &pool).await;
+    let invoice_b = drafted_then_issued(&ctx, &pool).await;
+    assert_ne!(invoice_a, invoice_b, "precondition: two distinct invoices");
+
+    let mut sink_a: Vec<u8> = Vec::new();
+    let out_a = send_invoice(
+        &ctx,
+        SendInvoiceInput {
+            invoice_id: invoice_a.clone(),
+            destination_uri: "stdout".to_string(),
+            idempotency_key: Some("shared-key".into()),
+            actor: Actor::Cli { name: "jad".into() },
+            channel: Channel::Cli,
+            sink: Some(&mut sink_a),
+        },
+    )
+    .await
+    .unwrap();
+    assert!(!out_a.idempotency_replay);
+
+    let mut sink_b: Vec<u8> = Vec::new();
+    let out_b = send_invoice(
+        &ctx,
+        SendInvoiceInput {
+            invoice_id: invoice_b.clone(),
+            destination_uri: "stdout".to_string(),
+            idempotency_key: Some("shared-key".into()),
+            actor: Actor::Cli { name: "jad".into() },
+            channel: Channel::Cli,
+            sink: Some(&mut sink_b),
+        },
+    )
+    .await
+    .unwrap();
+    assert!(
+        !out_b.idempotency_replay,
+        "same key on different invoice must NOT replay"
+    );
+    assert!(!sink_b.is_empty());
+
+    // Each invoice has exactly one send history row.
+    for id in [&invoice_a, &invoice_b] {
+        let hist = InvoiceHistoryRepo::new(&pool)
+            .list_for_invoice(id)
+            .await
+            .unwrap();
+        let send_rows = hist.iter().filter(|h| h.event == "send").count();
+        assert_eq!(send_rows, 1, "one send per invoice (key is per-invoice)");
+    }
+}
+
+// ---------------------------------------------------------------------
 // mark_paid (T-0012)
 // ---------------------------------------------------------------------
 
