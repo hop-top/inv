@@ -6,6 +6,13 @@
 //! (`bus://`, `webhook://`, `link://`) are recognised but return
 //! [`CoreError::NotImplemented`] — they land in T-0013 (channels).
 //!
+//! Channel adapters that own a transport the command layer doesn't
+//! understand (HTTP for `webhook://`, signed-link minting for `link://`,
+//! a bus publisher for `bus://`) call [`send_invoice_render`] instead.
+//! That sibling returns the rendered bytes + records the real
+//! destination string on the history row, leaving the actual dispatch
+//! to the adapter.
+//!
 //! ## FSM
 //!
 //! `Issued → Sent` and `Viewed → Sent`. Re-sending an already-`Sent`
@@ -121,6 +128,39 @@ pub struct SendInvoiceOutput {
     pub delivered_to: String,
 }
 
+/// Input for [`send_invoice_render`].
+///
+/// Mirror of [`SendInvoiceInput`] with the sink stripped — the
+/// render-only path doesn't write anywhere. The destination URI is
+/// recorded verbatim on the history row so a `webhook://example.com/x`
+/// shows up as `webhook://example.com/x` in the audit trail (not as
+/// `stdout`, which is what the v1 work-around persisted).
+#[derive(Debug, Clone)]
+pub struct SendInvoiceRenderInput {
+    /// Invoice to send.
+    pub invoice_id: InvoiceId,
+    /// Destination URI. Recorded verbatim — no scheme validation.
+    pub destination_uri: String,
+    /// Caller-supplied dedupe key.
+    pub idempotency_key: Option<String>,
+    /// Who triggered.
+    pub actor: Actor,
+    /// Channel the request arrived on.
+    pub channel: Channel,
+}
+
+impl SendInvoiceRenderInput {
+    /// Pure validation.
+    pub fn validate(&self) -> Result<(), CoreError> {
+        if self.destination_uri.trim().is_empty() {
+            return Err(CoreError::Validation(
+                "destination_uri must not be empty".into(),
+            ));
+        }
+        Ok(())
+    }
+}
+
 /// Send an issued (or already-sent) invoice via the URI scheme.
 #[tracing::instrument(skip_all, fields(
     invoice_id = %input.invoice_id,
@@ -133,13 +173,16 @@ pub async fn send_invoice(
     input.validate()?;
 
     // Validate the scheme up front so we never half-mutate on an
-    // unsupported destination.
+    // unsupported destination. Channels that own a transport the
+    // command layer doesn't speak (HTTP for webhook, signed-link
+    // minting for link, a bus publisher for bus) call
+    // `send_invoice_render` instead and dispatch themselves.
     let scheme = scheme_of(&input.destination_uri);
     match scheme.as_str() {
         "file" | "stdout" => {}
         "bus" | "webhook" | "link" => {
             return Err(CoreError::NotImplemented(format!(
-                "send_invoice: {scheme}:// dispatch lands in T-0013"
+                "send_invoice: {scheme}:// dispatch must go through send_invoice_render + an adapter-owned transport"
             )));
         }
         other => {
@@ -149,18 +192,110 @@ pub async fn send_invoice(
         }
     }
 
+    // Render + FSM-mutate shared with the render-only path.
+    let prepared = prepare_send(
+        ctx,
+        &input.invoice_id,
+        &input.actor,
+        input.channel,
+    )
+    .await?;
+
+    // Dispatch via the local sink (file:// or stdout).
+    let delivered_to = match scheme.as_str() {
+        "file" => {
+            let path = file_path_from_uri(&input.destination_uri)?;
+            if let Some(parent) = path.parent() {
+                if !parent.as_os_str().is_empty() {
+                    std::fs::create_dir_all(parent).map_err(|e| {
+                        CoreError::Validation(format!(
+                            "creating directory {}: {e}",
+                            parent.display()
+                        ))
+                    })?;
+                }
+            }
+            std::fs::write(&path, &prepared.pdf).map_err(|e| {
+                CoreError::Validation(format!("writing {}: {e}", path.display()))
+            })?;
+            format!("file://{}", path.display())
+        }
+        "stdout" => {
+            let sink = input.sink.as_deref_mut().ok_or_else(|| {
+                CoreError::Validation(
+                    "send_invoice: stdout destination requires a sink (none supplied)".into(),
+                )
+            })?;
+            sink.write_all(&prepared.pdf).map_err(|e| {
+                CoreError::Validation(format!("writing to stdout sink: {e}"))
+            })?;
+            "stdout".to_string()
+        }
+        _ => unreachable!("scheme guard above"),
+    };
+
+    finalize_send(ctx, prepared, input.actor, input.channel, delivered_to).await
+}
+
+/// Render an invoice + persist the FSM transition + history row, then
+/// return the rendered bytes for an adapter to dispatch.
+///
+/// The destination string is recorded verbatim on the history row and
+/// included in the emitted `inv.billing.invoice.sent` event. This is
+/// the entry point channel adapters use for transports the command
+/// layer doesn't speak natively — `webhook://...` (HTTP POST owned by
+/// the api adapter), `link://` (signed-link minting), `bus://...`
+/// (publisher owned by inv-bus).
+#[tracing::instrument(skip_all, fields(
+    invoice_id = %input.invoice_id,
+    destination = %input.destination_uri
+))]
+pub async fn send_invoice_render(
+    ctx: &CoreCtx,
+    input: SendInvoiceRenderInput,
+) -> Result<SendInvoiceOutput, CoreError> {
+    input.validate()?;
+    let prepared = prepare_send(
+        ctx,
+        &input.invoice_id,
+        &input.actor,
+        input.channel,
+    )
+    .await?;
+    let delivered_to = input.destination_uri.clone();
+    finalize_send(ctx, prepared, input.actor, input.channel, delivered_to).await
+}
+
+/// Intermediate output of [`prepare_send`] — everything the FSM mutate
+/// path needs that doesn't depend on the destination scheme.
+struct PreparedSend {
+    invoice: Invoice,
+    lines: Vec<InvoiceLine>,
+    html: String,
+    pdf: Vec<u8>,
+    from_state: InvoiceState,
+    to_state: InvoiceState,
+    now: DateTime<Utc>,
+}
+
+/// Load invoice + lines + customer, FSM-resolve the target state,
+/// render HTML + PDF. Performs NO writes — leaves state mutation +
+/// history row + bus events to [`finalize_send`].
+async fn prepare_send(
+    ctx: &CoreCtx,
+    invoice_id: &InvoiceId,
+    _actor: &Actor,
+    _channel: Channel,
+) -> Result<PreparedSend, CoreError> {
     let inv_repo = InvoiceRepo::new(&ctx.db);
     let line_repo = InvoiceLineRepo::new(&ctx.db);
     let cust_repo = CustomerRepo::new(&ctx.db);
 
-    let mut invoice = inv_repo
-        .get(&input.invoice_id)
+    let invoice = inv_repo
+        .get(invoice_id)
         .await?
-        .ok_or_else(|| CoreError::NotFound(format!("invoice {}", input.invoice_id)))?;
-    // After fetching we don't use the repo's mutating API; the focused
-    // UPDATE in `update_invoice_for_send` is what persists changes.
-    let _ = &inv_repo;
-    let lines = line_repo.list_for_invoice(&input.invoice_id).await?;
+        .ok_or_else(|| CoreError::NotFound(format!("invoice {invoice_id}")))?;
+    let lines = line_repo.list_for_invoice(invoice_id).await?;
 
     // FSM: Issued|Viewed → Sent. Sent → Sent is a "resend" — we permit
     // it explicitly here (it isn't legal in the FSM table). The history
@@ -168,7 +303,6 @@ pub async fn send_invoice(
     let from_state = invoice.state;
     let to_state = match from_state {
         InvoiceState::Issued | InvoiceState::Viewed => {
-            // Use the FSM table as the source of truth (will yield Sent).
             next_state(from_state, &InvoiceEvent::Send)?
         }
         InvoiceState::Sent => InvoiceState::Sent,
@@ -188,69 +322,61 @@ pub async fn send_invoice(
         .ok_or_else(|| {
             CoreError::NotFound(format!(
                 "customer {} (referenced by invoice {})",
-                invoice.customer_id, input.invoice_id
+                invoice.customer_id, invoice_id
             ))
         })?;
 
     let now = ctx.clock.now();
 
-    // Render (HTML always; PDF via stub engine).
     let render_ctx = RenderContext::new(invoice.clone(), customer, lines.clone());
-    let template_path = invoice
-        .template_path
-        .as_deref()
-        .map(std::path::Path::new);
+    let template_path = invoice.template_path.as_deref().map(std::path::Path::new);
     let html = render_html(template_path, &render_ctx).await?;
     let pdf = render_pdf(&html).await?;
 
-    // Dispatch.
-    let delivered_to = match scheme.as_str() {
-        "file" => {
-            let path = file_path_from_uri(&input.destination_uri)?;
-            if let Some(parent) = path.parent() {
-                if !parent.as_os_str().is_empty() {
-                    std::fs::create_dir_all(parent).map_err(|e| {
-                        CoreError::Validation(format!(
-                            "creating directory {}: {e}",
-                            parent.display()
-                        ))
-                    })?;
-                }
-            }
-            std::fs::write(&path, &pdf).map_err(|e| {
-                CoreError::Validation(format!("writing {}: {e}", path.display()))
-            })?;
-            format!("file://{}", path.display())
-        }
-        "stdout" => {
-            let sink = input.sink.as_deref_mut().ok_or_else(|| {
-                CoreError::Validation(
-                    "send_invoice: stdout destination requires a sink (none supplied)".into(),
-                )
-            })?;
-            sink.write_all(&pdf).map_err(|e| {
-                CoreError::Validation(format!("writing to stdout sink: {e}"))
-            })?;
-            "stdout".to_string()
-        }
-        _ => unreachable!("scheme guard above"),
-    };
+    Ok(PreparedSend {
+        invoice,
+        lines,
+        html,
+        pdf,
+        from_state,
+        to_state,
+        now,
+    })
+}
 
-    // State mutation + audit row in a single sqlx transaction
-    // (design §3.5). InvoiceRepo::save_in_tx is an upsert and does
-    // not CASCADE-wipe history rows (T-0024).
+/// Commit the FSM mutation + history row + bus events. Called from
+/// both `send_invoice` (after a local sink write) and
+/// `send_invoice_render` (after the caller has captured the bytes).
+async fn finalize_send(
+    ctx: &CoreCtx,
+    prepared: PreparedSend,
+    actor: Actor,
+    channel: Channel,
+    delivered_to: String,
+) -> Result<SendInvoiceOutput, CoreError> {
+    let PreparedSend {
+        mut invoice,
+        lines,
+        html,
+        pdf,
+        from_state,
+        to_state,
+        now,
+    } = prepared;
+
     invoice.state = to_state;
     invoice.sent_at = Some(now);
     invoice.updated_at = now;
 
+    let history_channel = HistoryChannel::from(channel);
     let history = InvoiceStateHistory {
         id: HistoryId::new(),
         invoice_id: invoice.id.clone(),
         from_state: Some(from_state),
         to_state,
         event: InvoiceEvent::Send.tag().to_string(),
-        actor: Some(input.actor.audit_string()),
-        channel: HistoryChannel::from(input.channel),
+        actor: Some(actor.audit_string()),
+        channel: history_channel,
         bus_event_id: None,
         reason: None,
         occurred_at: now,
@@ -268,9 +394,15 @@ pub async fn send_invoice(
         tx.commit().await.map_err(inv_store::StoreError::from)?;
     }
 
-    // Bus events.
-    let emitted =
-        build_sent_events(&invoice, from_state, to_state, &input.actor, history.channel, now, &delivered_to);
+    let emitted = build_sent_events(
+        &invoice,
+        from_state,
+        to_state,
+        &actor,
+        history_channel,
+        now,
+        &delivered_to,
+    );
 
     Ok(SendInvoiceOutput {
         invoice,

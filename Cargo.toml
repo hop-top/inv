@@ -53,6 +53,10 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 # for the local backend. Lightweight; no key-management story shipped at
 # v1 — the signing key is passed in by the caller.
 sha2 = "0.10"
+# Constant-time byte comparison for bearer-token auth (inv-api). Already
+# pulled in transitively by sha2/rustls/etc.; pinned here so the api crate
+# can take a direct dep.
+subtle = "2"
 
 # --- Async traits --------------------------------------------------------
 # Needed by inv-store::blob::BlobStore — native async-fn-in-trait is

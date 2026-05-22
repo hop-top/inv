@@ -15,9 +15,9 @@ use serde_json::{json, Value};
 
 use inv_commands::{
     draft_invoice, issue_invoice, mark_overdue_ticker, mark_paid, reminders_tick,
-    schedules_tick, send_invoice, void_invoice, Actor, Channel, DraftInvoiceInput,
-    DraftLineInput, EmittedEvent, IssueInvoiceInput, MarkPaidInput, SendInvoiceInput,
-    VoidInvoiceInput,
+    schedules_tick, send_invoice, send_invoice_render, void_invoice, Actor, Channel,
+    DraftInvoiceInput, DraftLineInput, EmittedEvent, IssueInvoiceInput, MarkPaidInput,
+    SendInvoiceInput, SendInvoiceRenderInput, VoidInvoiceInput,
 };
 use inv_core::domain::ids::{CustomerId, InvoiceId};
 use inv_core::domain::invoice::{Invoice, InvoiceLine, InvoiceState, TaxCategory};
@@ -400,23 +400,20 @@ async fn send_webhook(
     invoice_id: InvoiceId,
     body: SendBody,
 ) -> Result<Json<Value>, ApiError> {
-    // Capture bytes by driving send_invoice through a Vec<u8> sink under
-    // the `stdout` scheme. Translating the destination URI here keeps
-    // the command FSM happy (it would otherwise reject `webhook://` as
-    // NotImplemented per design §7) while preserving its history-row
-    // semantics — albeit with `destination = "stdout"`. Once T-0014 lets
-    // the command emit raw bytes without an FSM mutation, we'll thread
-    // the real `webhook://` destination through.
-    let mut sink: Vec<u8> = Vec::new();
-    let input = SendInvoiceInput {
+    // The command layer doesn't speak HTTP, so the api adapter owns
+    // webhook dispatch. `send_invoice_render` runs the same render +
+    // FSM + history pipeline as `send_invoice` but skips the local
+    // sink — the destination URI we hand it (the real `webhook://...`
+    // string) is what lands on the history row's `destination`
+    // metadata + on the `inv.billing.invoice.sent` event payload.
+    let input = SendInvoiceRenderInput {
         invoice_id,
-        destination_uri: "stdout".into(),
+        destination_uri: body.destination_uri.clone(),
         idempotency_key: body.idempotency_key.clone(),
         actor: api_actor(),
         channel: Channel::Api,
-        sink: Some(&mut sink),
     };
-    let out = send_invoice(&state.ctx, input).await?;
+    let out = send_invoice_render(&state.ctx, input).await?;
 
     // Dispatch over HTTP with X-Inv-Signature.
     webhook::dispatch(

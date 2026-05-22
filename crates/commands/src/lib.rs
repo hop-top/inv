@@ -78,6 +78,7 @@ pub use schedule::{
     ScheduleStateChangeInput, ScheduleStateChangeOutput, SchedulesTickOutput,
 };
 pub use send::{
-    send_invoice, SendInvoiceInput, SendInvoiceOutput, SendSink,
+    send_invoice, send_invoice_render, SendInvoiceInput, SendInvoiceOutput,
+    SendInvoiceRenderInput, SendSink,
 };
 pub use void::{void_invoice, VoidInvoiceInput, VoidInvoiceOutput};

@@ -26,6 +26,10 @@ tower-http = { workspace = true }
 # HMAC-SHA256 over signed-link tokens + outbound webhook signatures.
 sha2 = { workspace = true }
 
+# Constant-time byte comparison for bearer-token auth (timing-side-channel
+# hardening — see crate::auth).
+subtle = { workspace = true }
+
 # base64url encoding for the public signed-link token + outbound webhook
 # delivery (handled inside the adapter so the inv-commands surface stays
 # transport-agnostic).

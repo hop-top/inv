@@ -27,6 +27,7 @@ use inv_core::domain::ids::CustomerId;
 use inv_core::tax::TaxTable;
 use inv_store::pool::{connect, Pool};
 use inv_store::repo::customer::CustomerRepo;
+use inv_store::repo::history::InvoiceHistoryRepo;
 use inv_store::run_migrations;
 
 // =============================================================================
@@ -538,6 +539,7 @@ async fn webhook_send_signs_outbound_body() {
 
     let (state, pool) = fresh_state().await;
     let cust = seed_customer(&pool).await;
+    use inv_core::domain::ids::InvoiceId;
 
     // Spin up a one-shot HTTP listener that accepts the POST and
     // captures the X-Inv-Signature header + body.
@@ -609,13 +611,19 @@ async fn webhook_send_signs_outbound_body() {
                 .uri(&format!("/v1/invoices/{inv_id}/send"))
                 .header("content-type", "application/json")
                 .body(Body::from(
-                    json!({ "destination_uri": webhook_uri }).to_string(),
+                    json!({ "destination_uri": webhook_uri.clone() }).to_string(),
                 ))
                 .unwrap(),
         )
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::OK, "send via webhook failed");
+    let resp_body = body_json(resp).await;
+    assert_eq!(
+        resp_body["delivered_to"].as_str().unwrap(),
+        webhook_uri,
+        "response delivered_to should reflect the real webhook URL",
+    );
 
     server.await.expect("listener exited cleanly");
     let sig = captured_sig.lock().await.clone().expect("X-Inv-Signature missing");
@@ -625,6 +633,26 @@ async fn webhook_send_signs_outbound_body() {
     let expected = inv_api::webhook::signature_header(&body, &state.config.webhook_signing_key);
     assert_eq!(sig, expected, "signature header mismatch");
     assert!(!body.is_empty(), "webhook receiver got empty body");
+
+    // The history row must record the real webhook URL — not "stdout"
+    // (which is what the v1 work-around persisted before T-0032).
+    let invoice_id: InvoiceId = inv_id.parse().expect("inv id parse");
+    let history = InvoiceHistoryRepo::new(&pool)
+        .list_for_invoice(&invoice_id)
+        .await
+        .expect("history list");
+    let send_row = history
+        .iter()
+        .find(|h| h.event == "send")
+        .expect("missing send history row");
+    let recorded_destination = send_row
+        .metadata
+        .get("destination")
+        .expect("send row missing destination metadata");
+    assert_eq!(
+        recorded_destination, &webhook_uri,
+        "history row should record the real webhook URL, not stdout",
+    );
 }
 
 // =============================================================================
