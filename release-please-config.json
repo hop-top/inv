@@ -20,11 +20,14 @@
       "changelog-path": "CHANGELOG.md",
       "bump-minor-pre-major": true,
       "bump-patch-for-minor-pre-major": true,
+      "versioning": "prerelease",
+      "prerelease": true,
+      "prerelease-type": "alpha",
       "extra-files": [
         {
           "type": "toml",
           "path": "Cargo.toml",
-          "jsonpath": "$.package.version"
+          "jsonpath": "$.workspace.package.version"
         }
       ]
     }
