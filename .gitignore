@@ -18,3 +18,9 @@ target/
 *.rs.bk
 **/*.rs.bk
 *.pdb
+
+# Per-task worktrees (sibling layout intended, but accept nested for ergonomics)
+inv-T-*/
+# Symlinks added so nested worktrees can resolve ../kit and ../uri-poly path deps
+/kit
+/uri-poly
