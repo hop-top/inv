@@ -18,8 +18,8 @@ use inv_commands::{
 use inv_core::domain::ids::{CustomerId, ScheduleId};
 use inv_core::domain::invoice::TaxCategory;
 use inv_core::domain::money::Currency;
-use inv_core::domain::schedule::Cadence;
-use inv_store::repo::schedule::ScheduleRepo;
+use inv_core::domain::schedule::{Cadence, ScheduleState};
+use inv_store::repo::schedule::{ScheduleFilter, ScheduleRepo};
 
 use crate::error::ApiError;
 use crate::state::ApiState;
@@ -174,7 +174,7 @@ pub async fn get(
 }
 
 // =============================================================================
-// GET /v1/schedules  (?customer_id=)
+// GET /v1/schedules  (?customer_id=&state=&limit=&offset=)
 // =============================================================================
 
 /// Query parameters for [`list`].
@@ -183,6 +183,15 @@ pub struct ListQuery {
     /// Restrict to schedules for a specific customer.
     #[serde(default)]
     pub customer_id: Option<String>,
+    /// Restrict to a specific lifecycle state (`active`, `paused`, `cancelled`).
+    #[serde(default)]
+    pub state: Option<String>,
+    /// Max rows.
+    #[serde(default)]
+    pub limit: Option<i64>,
+    /// Offset for paging.
+    #[serde(default)]
+    pub offset: Option<i64>,
 }
 
 /// `GET /v1/schedules`.
@@ -190,20 +199,37 @@ pub async fn list(
     State(state): State<Arc<ApiState>>,
     Query(q): Query<ListQuery>,
 ) -> Result<Json<Value>, ApiError> {
-    let repo = ScheduleRepo::new(&state.ctx.db);
-    let rows = match q.customer_id.as_deref() {
-        None | Some("") => {
-            // Mirror credit_notes::list: no store-level list_all at v1.
-            Vec::new()
-        }
-        Some(s) => {
-            let customer_id: CustomerId = s
-                .parse()
-                .map_err(|e| ApiError::BadRequest(format!("invalid customer id: {e}")))?;
-            repo.list_for_customer(&customer_id)
-                .await
-                .map_err(inv_commands::CoreError::from)?
-        }
+    let customer_id = match q.customer_id.as_deref() {
+        None | Some("") => None,
+        Some(s) => Some(
+            s.parse::<CustomerId>()
+                .map_err(|e| ApiError::BadRequest(format!("invalid customer id: {e}")))?,
+        ),
     };
+    let sched_state = match q.state.as_deref() {
+        None | Some("") => None,
+        Some(s) => Some(parse_schedule_state(s)?),
+    };
+    let filter = ScheduleFilter {
+        customer_id,
+        state: sched_state,
+        limit: q.limit,
+        offset: q.offset,
+    };
+    let rows = ScheduleRepo::new(&state.ctx.db)
+        .list(&filter)
+        .await
+        .map_err(inv_commands::CoreError::from)?;
     Ok(Json(json!({ "schedules": rows })))
+}
+
+fn parse_schedule_state(s: &str) -> Result<ScheduleState, ApiError> {
+    match s {
+        "active" => Ok(ScheduleState::Active),
+        "paused" => Ok(ScheduleState::Paused),
+        "cancelled" => Ok(ScheduleState::Cancelled),
+        other => Err(ApiError::BadRequest(format!(
+            "invalid schedule state `{other}` (want active | paused | cancelled)"
+        ))),
+    }
 }

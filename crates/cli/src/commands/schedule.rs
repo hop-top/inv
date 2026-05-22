@@ -11,8 +11,8 @@ use inv_commands::{
 };
 use inv_core::domain::invoice::TaxCategory;
 use inv_core::domain::money::Currency;
-use inv_core::domain::schedule::Cadence;
-use inv_store::repo::schedule::ScheduleRepo;
+use inv_core::domain::schedule::{Cadence, ScheduleState};
+use inv_store::repo::schedule::{ScheduleFilter, ScheduleRepo};
 
 use super::parse::{
     parse_customer_id, parse_date, parse_line, parse_schedule_id, LineSpec,
@@ -49,11 +49,26 @@ pub fn command() -> Command {
         )
         .subcommand(
             Command::new("list")
-                .about("List schedules (optionally for one customer)")
+                .about("List schedules (optionally filtered)")
                 .arg(
                     Arg::new("customer")
                         .long("customer")
                         .help("Filter by customer typeid"),
+                )
+                .arg(
+                    Arg::new("state")
+                        .long("state")
+                        .help("Filter by lifecycle state (active | paused | cancelled)"),
+                )
+                .arg(
+                    Arg::new("limit")
+                        .long("limit")
+                        .help("Max rows"),
+                )
+                .arg(
+                    Arg::new("offset")
+                        .long("offset")
+                        .help("Offset for paging"),
                 ),
         )
 }
@@ -241,27 +256,48 @@ async fn run_show(ctx: &CoreCtx, matches: &ArgMatches) -> Result<()> {
 }
 
 async fn run_list(ctx: &CoreCtx, matches: &ArgMatches) -> Result<()> {
-    // ScheduleRepo only exposes `list_for_customer` and `due`. For
-    // an unfiltered listing we use `due(date_in_far_future)` to grab
-    // every schedule regardless of next_run, then filter client-side
-    // — but a simpler choice at v1 is to require --customer for the
-    // moment. When a customer-less list is requested, we walk the
-    // customers via a direct SQL fallback through the pool. Keep that
-    // behind a TODO so we don't sneak schema-aware SQL into the
-    // adapter layer.
-    let customer = match matches.get_one::<String>("customer") {
-        None => {
-            return Err(anyhow!(
-                "schedule list: --customer required at v1 (cross-customer scan not implemented)"
-            ));
-        }
-        Some(raw) => parse_customer_id(raw)?,
+    let customer_id = match matches.get_one::<String>("customer") {
+        None => None,
+        Some(raw) => Some(parse_customer_id(raw)?),
     };
-    let rows = ScheduleRepo::new(&ctx.db)
-        .list_for_customer(&customer)
-        .await?;
+    let state = match matches.get_one::<String>("state") {
+        None => None,
+        Some(raw) => Some(parse_schedule_state(raw)?),
+    };
+    let limit = match matches.get_one::<String>("limit") {
+        None => None,
+        Some(raw) => Some(
+            raw.parse::<i64>()
+                .map_err(|e| anyhow!("invalid --limit `{raw}`: {e}"))?,
+        ),
+    };
+    let offset = match matches.get_one::<String>("offset") {
+        None => None,
+        Some(raw) => Some(
+            raw.parse::<i64>()
+                .map_err(|e| anyhow!("invalid --offset `{raw}`: {e}"))?,
+        ),
+    };
+    let filter = ScheduleFilter {
+        customer_id,
+        state,
+        limit,
+        offset,
+    };
+    let rows = ScheduleRepo::new(&ctx.db).list(&filter).await?;
     render_list(matches, serde_json::to_value(rows)?, &columns())?;
     Ok(())
+}
+
+fn parse_schedule_state(s: &str) -> Result<ScheduleState> {
+    match s {
+        "active" => Ok(ScheduleState::Active),
+        "paused" => Ok(ScheduleState::Paused),
+        "cancelled" => Ok(ScheduleState::Cancelled),
+        other => Err(anyhow!(
+            "invalid --state `{other}` (want active | paused | cancelled)"
+        )),
+    }
 }
 
 fn columns() -> Vec<ColumnSpec> {

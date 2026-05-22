@@ -11,6 +11,19 @@ use super::{metadata_from_json, metadata_to_json, parse_ts, ts_to_string};
 use crate::error::{Result, StoreError};
 use crate::pool::Pool;
 
+/// Filter for listing schedules.
+#[derive(Debug, Default, Clone)]
+pub struct ScheduleFilter {
+    /// Restrict to a specific customer.
+    pub customer_id: Option<CustomerId>,
+    /// Restrict to a specific lifecycle state.
+    pub state: Option<ScheduleState>,
+    /// Max rows.
+    pub limit: Option<i64>,
+    /// Offset for paging.
+    pub offset: Option<i64>,
+}
+
 /// Schedule repository.
 #[derive(Debug, Clone)]
 pub struct ScheduleRepo<'p> {
@@ -89,17 +102,54 @@ impl<'p> ScheduleRepo<'p> {
         row.as_ref().map(row_to_schedule).transpose()
     }
 
-    /// List schedules for a customer.
-    pub async fn list_for_customer(&self, customer_id: &CustomerId) -> Result<Vec<Schedule>> {
-        let rows = sqlx::query(
+    /// List with filters. With no filter set, returns every schedule
+    /// across all customers ordered by `created_at ASC`.
+    pub async fn list(&self, filter: &ScheduleFilter) -> Result<Vec<Schedule>> {
+        // Build the WHERE dynamically. Each placeholder is `?` (sqlite's
+        // form; sqlx::Any rewrites to the native form per backend).
+        let mut sql = String::from(
             "SELECT id, customer_id, template_lines, currency, cadence, start_date, end_date, \
                     auto_issue, next_run, last_run, state, metadata, created_at, updated_at \
-             FROM schedules WHERE customer_id = ? ORDER BY created_at ASC",
-        )
-        .bind(customer_id.to_string())
-        .fetch_all(self.pool)
-        .await?;
+             FROM schedules WHERE 1=1",
+        );
+        if filter.customer_id.is_some() {
+            sql.push_str(" AND customer_id = ?");
+        }
+        if filter.state.is_some() {
+            sql.push_str(" AND state = ?");
+        }
+        sql.push_str(" ORDER BY created_at ASC");
+        if filter.limit.is_some() {
+            sql.push_str(" LIMIT ?");
+        }
+        if filter.offset.is_some() {
+            sql.push_str(" OFFSET ?");
+        }
+
+        let mut q = sqlx::query(&sql);
+        if let Some(c) = filter.customer_id.as_ref() {
+            q = q.bind(c.to_string());
+        }
+        if let Some(s) = filter.state {
+            q = q.bind(state_to_str(s));
+        }
+        if let Some(l) = filter.limit {
+            q = q.bind(l);
+        }
+        if let Some(o) = filter.offset {
+            q = q.bind(o);
+        }
+        let rows = q.fetch_all(self.pool).await?;
         rows.iter().map(row_to_schedule).collect()
+    }
+
+    /// List schedules for a customer. Thin wrapper around [`Self::list`].
+    pub async fn list_for_customer(&self, customer_id: &CustomerId) -> Result<Vec<Schedule>> {
+        self.list(&ScheduleFilter {
+            customer_id: Some(customer_id.clone()),
+            ..Default::default()
+        })
+        .await
     }
 
     /// Active schedules whose `next_run` is on or before `cutoff` (a date

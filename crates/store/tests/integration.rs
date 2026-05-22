@@ -28,7 +28,9 @@ use inv_core::domain::schedule::{Cadence, Schedule, ScheduleLine, ScheduleState}
 
 use inv_store::pool::{backend_of, connect, Backend};
 use inv_store::repo::bus_inbox::BusInboxRecord;
+use inv_store::repo::credit_note::CreditNoteFilter;
 use inv_store::repo::invoice::InvoiceFilter;
+use inv_store::repo::schedule::ScheduleFilter;
 use inv_store::repo::{
     BusInboxRepo, CreditNoteRepo, CustomerRepo, InvoiceHistoryRepo, InvoiceLineRepo, InvoiceRepo,
     ReminderRepo, ScheduleRepo,
@@ -441,6 +443,219 @@ async fn invoice_save_preserves_history_rows() {
     assert!(back.issued_at.is_some());
     // created_at is preserved across upserts.
     assert_eq!(back.created_at, inv.created_at);
+}
+
+#[tokio::test]
+async fn schedule_list_filters_and_pages() {
+    let pool = fresh_pool().await;
+    let cust_repo = CustomerRepo::new(&pool);
+    let sched_repo = ScheduleRepo::new(&pool);
+
+    let c1 = sample_customer();
+    cust_repo.save(&c1).await.unwrap();
+    let mut c2 = sample_customer();
+    c2.id = CustomerId::new();
+    cust_repo.save(&c2).await.unwrap();
+
+    fn make_sched(
+        customer_id: &CustomerId,
+        state: ScheduleState,
+        created_offset_days: i64,
+    ) -> Schedule {
+        Schedule {
+            id: ScheduleId::new(),
+            customer_id: customer_id.clone(),
+            template_lines: vec![ScheduleLine {
+                description: "Monthly retainer".into(),
+                quantity: Decimal::from_str("1").unwrap(),
+                unit_price: Decimal::from_str("2500.00").unwrap(),
+                tax_category: TaxCategory::Standard,
+                id: LineId::new(),
+            }],
+            currency: Currency::CAD,
+            cadence: Cadence::Monthly { dom: 1 },
+            start_date: NaiveDate::from_ymd_opt(2026, 2, 1).unwrap(),
+            end_date: None,
+            auto_issue: true,
+            next_run: NaiveDate::from_ymd_opt(2026, 2, 1).unwrap(),
+            last_run: None,
+            state,
+            metadata: BTreeMap::new(),
+            created_at: Utc
+                .with_ymd_and_hms(2026, 1, 1, 0, 0, 0)
+                .unwrap()
+                + chrono::Duration::days(created_offset_days),
+            updated_at: Utc.with_ymd_and_hms(2026, 1, 31, 0, 0, 0).unwrap(),
+        }
+    }
+
+    let s1 = make_sched(&c1.id, ScheduleState::Active, 0);
+    let s2 = make_sched(&c1.id, ScheduleState::Paused, 1);
+    let s3 = make_sched(&c2.id, ScheduleState::Active, 2);
+    let s4 = make_sched(&c2.id, ScheduleState::Cancelled, 3);
+    sched_repo.save(&s1).await.unwrap();
+    sched_repo.save(&s2).await.unwrap();
+    sched_repo.save(&s3).await.unwrap();
+    sched_repo.save(&s4).await.unwrap();
+
+    // No filter -> all rows.
+    let all = sched_repo.list(&ScheduleFilter::default()).await.unwrap();
+    assert_eq!(all.len(), 4);
+
+    // State filter -> only active.
+    let active = sched_repo
+        .list(&ScheduleFilter {
+            state: Some(ScheduleState::Active),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert_eq!(active.len(), 2);
+    assert!(active.iter().all(|s| s.state == ScheduleState::Active));
+
+    // Customer filter -> only c1's schedules.
+    let by_cust = sched_repo
+        .list(&ScheduleFilter {
+            customer_id: Some(c1.id.clone()),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert_eq!(by_cust.len(), 2);
+    assert!(by_cust.iter().all(|s| s.customer_id == c1.id));
+
+    // Customer + state filter combo.
+    let by_cust_state = sched_repo
+        .list(&ScheduleFilter {
+            customer_id: Some(c1.id.clone()),
+            state: Some(ScheduleState::Paused),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert_eq!(by_cust_state.len(), 1);
+    assert_eq!(by_cust_state[0].id, s2.id);
+
+    // limit + offset paging.
+    let page = sched_repo
+        .list(&ScheduleFilter {
+            limit: Some(2),
+            offset: Some(1),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert_eq!(page.len(), 2);
+    // Order is created_at ASC, so offset 1 + limit 2 yields s2, s3.
+    assert_eq!(page[0].id, s2.id);
+    assert_eq!(page[1].id, s3.id);
+
+    // Wrapper still works.
+    let wrap = sched_repo.list_for_customer(&c1.id).await.unwrap();
+    assert_eq!(wrap.len(), 2);
+}
+
+#[tokio::test]
+async fn credit_note_list_filters_and_pages() {
+    let pool = fresh_pool().await;
+    let cust_repo = CustomerRepo::new(&pool);
+    let inv_repo = InvoiceRepo::new(&pool);
+    let cn_repo = CreditNoteRepo::new(&pool);
+
+    let c = sample_customer();
+    cust_repo.save(&c).await.unwrap();
+    let inv1 = sample_invoice(&c.id);
+    let mut inv2 = sample_invoice(&c.id);
+    inv2.id = InvoiceId::new();
+    inv_repo.save(&inv1).await.unwrap();
+    inv_repo.save(&inv2).await.unwrap();
+
+    fn make_cn(
+        invoice_id: &InvoiceId,
+        state: CreditNoteState,
+        created_offset_days: i64,
+    ) -> CreditNote {
+        CreditNote {
+            id: CreditNoteId::new(),
+            number: None,
+            invoice_id: invoice_id.clone(),
+            state,
+            amount: Decimal::from_str("100.00").unwrap(),
+            currency: Currency::CAD,
+            reason: None,
+            refund_ref: None,
+            issued_at: None,
+            created_at: Utc
+                .with_ymd_and_hms(2026, 1, 1, 0, 0, 0)
+                .unwrap()
+                + chrono::Duration::days(created_offset_days),
+            metadata: BTreeMap::new(),
+        }
+    }
+
+    let cn1 = make_cn(&inv1.id, CreditNoteState::Draft, 0);
+    let cn2 = make_cn(&inv1.id, CreditNoteState::Issued, 1);
+    let cn3 = make_cn(&inv2.id, CreditNoteState::Draft, 2);
+    let cn4 = make_cn(&inv2.id, CreditNoteState::Issued, 3);
+    cn_repo.save(&cn1).await.unwrap();
+    cn_repo.save(&cn2).await.unwrap();
+    cn_repo.save(&cn3).await.unwrap();
+    cn_repo.save(&cn4).await.unwrap();
+
+    // No filter -> all rows.
+    let all = cn_repo.list(&CreditNoteFilter::default()).await.unwrap();
+    assert_eq!(all.len(), 4);
+
+    // State filter -> only drafts.
+    let drafts = cn_repo
+        .list(&CreditNoteFilter {
+            state: Some(CreditNoteState::Draft),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert_eq!(drafts.len(), 2);
+    assert!(drafts.iter().all(|n| n.state == CreditNoteState::Draft));
+
+    // Invoice filter -> only inv1's notes.
+    let by_inv = cn_repo
+        .list(&CreditNoteFilter {
+            invoice_id: Some(inv1.id.clone()),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert_eq!(by_inv.len(), 2);
+    assert!(by_inv.iter().all(|n| n.invoice_id == inv1.id));
+
+    // Invoice + state filter combo.
+    let by_inv_state = cn_repo
+        .list(&CreditNoteFilter {
+            invoice_id: Some(inv1.id.clone()),
+            state: Some(CreditNoteState::Issued),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert_eq!(by_inv_state.len(), 1);
+    assert_eq!(by_inv_state[0].id, cn2.id);
+
+    // limit + offset paging.
+    let page = cn_repo
+        .list(&CreditNoteFilter {
+            limit: Some(2),
+            offset: Some(1),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert_eq!(page.len(), 2);
+    assert_eq!(page[0].id, cn2.id);
+    assert_eq!(page[1].id, cn3.id);
+
+    // Wrapper still works.
+    let wrap = cn_repo.list_for_invoice(&inv1.id).await.unwrap();
+    assert_eq!(wrap.len(), 2);
 }
 
 #[tokio::test]

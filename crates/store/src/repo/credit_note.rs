@@ -14,6 +14,19 @@ use super::{
 use crate::error::{Result, StoreError};
 use crate::pool::Pool;
 
+/// Filter for listing credit notes.
+#[derive(Debug, Default, Clone)]
+pub struct CreditNoteFilter {
+    /// Restrict to credit notes against a specific invoice.
+    pub invoice_id: Option<InvoiceId>,
+    /// Restrict to a specific lifecycle state.
+    pub state: Option<CreditNoteState>,
+    /// Max rows.
+    pub limit: Option<i64>,
+    /// Offset for paging.
+    pub offset: Option<i64>,
+}
+
 /// Credit-note repository.
 #[derive(Debug, Clone)]
 pub struct CreditNoteRepo<'p> {
@@ -85,16 +98,54 @@ impl<'p> CreditNoteRepo<'p> {
         row.as_ref().map(row_to_credit_note).transpose()
     }
 
-    /// List credit notes against a given invoice.
-    pub async fn list_for_invoice(&self, invoice_id: &InvoiceId) -> Result<Vec<CreditNote>> {
-        let rows = sqlx::query(
+    /// List with filters. With no filter set, returns every credit
+    /// note across all invoices ordered by `created_at ASC`.
+    pub async fn list(&self, filter: &CreditNoteFilter) -> Result<Vec<CreditNote>> {
+        // Build the WHERE dynamically. Each placeholder is `?` (sqlite's
+        // form; sqlx::Any rewrites to the native form per backend).
+        let mut sql = String::from(
             "SELECT id, number, invoice_id, state, amount, currency, reason, refund_ref, issued_at, created_at, metadata \
-             FROM credit_notes WHERE invoice_id = ? ORDER BY created_at ASC",
-        )
-        .bind(invoice_id.to_string())
-        .fetch_all(self.pool)
-        .await?;
+             FROM credit_notes WHERE 1=1",
+        );
+        if filter.invoice_id.is_some() {
+            sql.push_str(" AND invoice_id = ?");
+        }
+        if filter.state.is_some() {
+            sql.push_str(" AND state = ?");
+        }
+        sql.push_str(" ORDER BY created_at ASC");
+        if filter.limit.is_some() {
+            sql.push_str(" LIMIT ?");
+        }
+        if filter.offset.is_some() {
+            sql.push_str(" OFFSET ?");
+        }
+
+        let mut q = sqlx::query(&sql);
+        if let Some(i) = filter.invoice_id.as_ref() {
+            q = q.bind(i.to_string());
+        }
+        if let Some(s) = filter.state {
+            q = q.bind(cn_state_to_str(s));
+        }
+        if let Some(l) = filter.limit {
+            q = q.bind(l);
+        }
+        if let Some(o) = filter.offset {
+            q = q.bind(o);
+        }
+        let rows = q.fetch_all(self.pool).await?;
         rows.iter().map(row_to_credit_note).collect()
+    }
+
+    /// List credit notes against a given invoice. Thin wrapper around
+    /// [`Self::list`].
+    pub async fn list_for_invoice(&self, invoice_id: &InvoiceId) -> Result<Vec<CreditNote>> {
+        self.list(&CreditNoteFilter {
+            invoice_id: Some(invoice_id.clone()),
+            ..Default::default()
+        })
+        .await
     }
 }
 

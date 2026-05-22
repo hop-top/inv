@@ -13,8 +13,9 @@ use inv_commands::{
     create_credit_note, issue_credit_note, Actor, Channel, CreateCreditNoteInput,
     IssueCreditNoteInput,
 };
+use inv_core::domain::creditnote::CreditNoteState;
 use inv_core::domain::ids::{CreditNoteId, InvoiceId};
-use inv_store::repo::credit_note::CreditNoteRepo;
+use inv_store::repo::credit_note::{CreditNoteFilter, CreditNoteRepo};
 
 use crate::error::ApiError;
 use crate::state::ApiState;
@@ -113,7 +114,7 @@ pub async fn get(
 }
 
 // =============================================================================
-// GET /v1/credit-notes  (?invoice_id=)
+// GET /v1/credit-notes  (?invoice_id=&state=&limit=&offset=)
 // =============================================================================
 
 /// Query parameters for [`list`].
@@ -122,6 +123,15 @@ pub struct ListQuery {
     /// Restrict to credit notes against a specific invoice.
     #[serde(default)]
     pub invoice_id: Option<String>,
+    /// Restrict to a specific lifecycle state (`draft`, `issued`).
+    #[serde(default)]
+    pub state: Option<String>,
+    /// Max rows.
+    #[serde(default)]
+    pub limit: Option<i64>,
+    /// Offset for paging.
+    #[serde(default)]
+    pub offset: Option<i64>,
 }
 
 /// `GET /v1/credit-notes`.
@@ -129,21 +139,36 @@ pub async fn list(
     State(state): State<Arc<ApiState>>,
     Query(q): Query<ListQuery>,
 ) -> Result<Json<Value>, ApiError> {
-    let repo = CreditNoteRepo::new(&state.ctx.db);
-    let rows = match q.invoice_id.as_deref() {
-        None | Some("") => {
-            // No store-side "list all credit notes" method at v1. Return
-            // empty until a paginated list_all lands.
-            Vec::new()
-        }
-        Some(s) => {
-            let invoice_id: InvoiceId = s
-                .parse()
-                .map_err(|e| ApiError::BadRequest(format!("invalid invoice id: {e}")))?;
-            repo.list_for_invoice(&invoice_id)
-                .await
-                .map_err(inv_commands::CoreError::from)?
-        }
+    let invoice_id = match q.invoice_id.as_deref() {
+        None | Some("") => None,
+        Some(s) => Some(
+            s.parse::<InvoiceId>()
+                .map_err(|e| ApiError::BadRequest(format!("invalid invoice id: {e}")))?,
+        ),
     };
+    let cn_state = match q.state.as_deref() {
+        None | Some("") => None,
+        Some(s) => Some(parse_credit_note_state(s)?),
+    };
+    let filter = CreditNoteFilter {
+        invoice_id,
+        state: cn_state,
+        limit: q.limit,
+        offset: q.offset,
+    };
+    let rows = CreditNoteRepo::new(&state.ctx.db)
+        .list(&filter)
+        .await
+        .map_err(inv_commands::CoreError::from)?;
     Ok(Json(json!({ "credit_notes": rows })))
+}
+
+fn parse_credit_note_state(s: &str) -> Result<CreditNoteState, ApiError> {
+    match s {
+        "draft" => Ok(CreditNoteState::Draft),
+        "issued" => Ok(CreditNoteState::Issued),
+        other => Err(ApiError::BadRequest(format!(
+            "invalid credit-note state `{other}` (want draft | issued)"
+        ))),
+    }
 }

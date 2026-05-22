@@ -9,7 +9,8 @@ use inv_commands::{
     create_credit_note, issue_credit_note, Actor, Channel, CoreCtx,
     CreateCreditNoteInput, IssueCreditNoteInput,
 };
-use inv_store::repo::credit_note::CreditNoteRepo;
+use inv_core::domain::creditnote::CreditNoteState;
+use inv_store::repo::credit_note::{CreditNoteFilter, CreditNoteRepo};
 
 use super::parse::{parse_credit_note_id, parse_decimal, parse_invoice_id};
 use crate::render::{render_list, render_value};
@@ -74,12 +75,26 @@ pub fn command() -> Command {
         )
         .subcommand(
             Command::new("list")
-                .about("List credit notes for an invoice")
+                .about("List credit notes (optionally filtered)")
                 .arg(
                     Arg::new("invoice")
                         .long("invoice")
-                        .help("Invoice typeid")
-                        .required(true),
+                        .help("Invoice typeid"),
+                )
+                .arg(
+                    Arg::new("state")
+                        .long("state")
+                        .help("Filter by lifecycle state (draft | issued)"),
+                )
+                .arg(
+                    Arg::new("limit")
+                        .long("limit")
+                        .help("Max rows"),
+                )
+                .arg(
+                    Arg::new("offset")
+                        .long("offset")
+                        .help("Offset for paging"),
                 ),
         )
 }
@@ -163,15 +178,47 @@ async fn run_show(ctx: &CoreCtx, matches: &ArgMatches) -> Result<()> {
 }
 
 async fn run_list(ctx: &CoreCtx, matches: &ArgMatches) -> Result<()> {
-    let invoice_raw = matches
-        .get_one::<String>("invoice")
-        .ok_or_else(|| anyhow!("--invoice required"))?;
-    let invoice_id = parse_invoice_id(invoice_raw)?;
-    let rows = CreditNoteRepo::new(&ctx.db)
-        .list_for_invoice(&invoice_id)
-        .await?;
+    let invoice_id = match matches.get_one::<String>("invoice") {
+        None => None,
+        Some(raw) => Some(parse_invoice_id(raw)?),
+    };
+    let state = match matches.get_one::<String>("state") {
+        None => None,
+        Some(raw) => Some(parse_credit_note_state(raw)?),
+    };
+    let limit = match matches.get_one::<String>("limit") {
+        None => None,
+        Some(raw) => Some(
+            raw.parse::<i64>()
+                .map_err(|e| anyhow!("invalid --limit `{raw}`: {e}"))?,
+        ),
+    };
+    let offset = match matches.get_one::<String>("offset") {
+        None => None,
+        Some(raw) => Some(
+            raw.parse::<i64>()
+                .map_err(|e| anyhow!("invalid --offset `{raw}`: {e}"))?,
+        ),
+    };
+    let filter = CreditNoteFilter {
+        invoice_id,
+        state,
+        limit,
+        offset,
+    };
+    let rows = CreditNoteRepo::new(&ctx.db).list(&filter).await?;
     render_list(matches, serde_json::to_value(rows)?, &columns())?;
     Ok(())
+}
+
+fn parse_credit_note_state(s: &str) -> Result<CreditNoteState> {
+    match s {
+        "draft" => Ok(CreditNoteState::Draft),
+        "issued" => Ok(CreditNoteState::Issued),
+        other => Err(anyhow!(
+            "invalid --state `{other}` (want draft | issued)"
+        )),
+    }
 }
 
 fn columns() -> Vec<ColumnSpec> {

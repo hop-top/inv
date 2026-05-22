@@ -528,6 +528,273 @@ async fn webhook_send_signs_outbound_body() {
 }
 
 // =============================================================================
+// GET /v1/schedules
+// =============================================================================
+
+#[tokio::test]
+async fn list_schedules_returns_all_seeded() {
+    use chrono::NaiveDate;
+    use inv_core::domain::ids::{LineId, ScheduleId};
+    use inv_core::domain::invoice::TaxCategory;
+    use inv_core::domain::money::Currency;
+    use inv_core::domain::schedule::{Cadence, Schedule, ScheduleLine, ScheduleState};
+    use inv_store::repo::schedule::ScheduleRepo;
+
+    let (state, pool) = fresh_state().await;
+    let c1 = seed_customer(&pool).await;
+    let c2 = seed_customer(&pool).await;
+
+    let sched_repo = ScheduleRepo::new(&pool);
+
+    let mk = |cust: &CustomerId, st: ScheduleState, off: i64| Schedule {
+        id: ScheduleId::new(),
+        customer_id: cust.clone(),
+        template_lines: vec![ScheduleLine {
+            description: "Retainer".into(),
+            quantity: Decimal::from_str("1").unwrap(),
+            unit_price: Decimal::from_str("1000.00").unwrap(),
+            tax_category: TaxCategory::Standard,
+            id: LineId::new(),
+        }],
+        currency: Currency::CAD,
+        cadence: Cadence::Monthly { dom: 1 },
+        start_date: NaiveDate::from_ymd_opt(2026, 2, 1).unwrap(),
+        end_date: None,
+        auto_issue: true,
+        next_run: NaiveDate::from_ymd_opt(2026, 2, 1).unwrap(),
+        last_run: None,
+        state: st,
+        metadata: BTreeMap::new(),
+        created_at: frozen_now() + chrono::Duration::seconds(off),
+        updated_at: frozen_now(),
+    };
+
+    sched_repo.save(&mk(&c1, ScheduleState::Active, 0)).await.unwrap();
+    sched_repo.save(&mk(&c1, ScheduleState::Paused, 1)).await.unwrap();
+    sched_repo.save(&mk(&c2, ScheduleState::Active, 2)).await.unwrap();
+
+    let app = router(state);
+
+    // Cross-customer list returns all 3.
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/v1/schedules")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body = body_json(resp).await;
+    assert_eq!(body["schedules"].as_array().unwrap().len(), 3);
+
+    // state=active narrows to 2.
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/v1/schedules?state=active")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body = body_json(resp).await;
+    assert_eq!(body["schedules"].as_array().unwrap().len(), 2);
+
+    // customer_id narrows to c1's 2 schedules.
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri(&format!("/v1/schedules?customer_id={c1}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body = body_json(resp).await;
+    assert_eq!(body["schedules"].as_array().unwrap().len(), 2);
+
+    // limit + offset paging.
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/v1/schedules?limit=1&offset=1")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body = body_json(resp).await;
+    assert_eq!(body["schedules"].as_array().unwrap().len(), 1);
+
+    // Invalid state -> 400.
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/v1/schedules?state=bogus")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+}
+
+// =============================================================================
+// GET /v1/credit-notes
+// =============================================================================
+
+#[tokio::test]
+async fn list_credit_notes_returns_all_seeded() {
+    use inv_core::domain::creditnote::{CreditNote, CreditNoteState};
+    use inv_core::domain::ids::{CreditNoteId, InvoiceId};
+    use inv_core::domain::invoice::{Invoice, InvoiceState};
+    use inv_core::domain::jurisdiction::Jurisdiction;
+    use inv_core::domain::money::Currency;
+    use inv_store::repo::credit_note::CreditNoteRepo;
+    use inv_store::repo::invoice::InvoiceRepo;
+
+    let (state, pool) = fresh_state().await;
+    let cust = seed_customer(&pool).await;
+
+    fn mk_inv(cust: &CustomerId) -> Invoice {
+        Invoice {
+            id: InvoiceId::new(),
+            number: None,
+            customer_id: cust.clone(),
+            seller_jurisdiction: Jurisdiction::QuebecCa,
+            currency: Currency::CAD,
+            state: InvoiceState::Draft,
+            issued_at: None,
+            due_at: None,
+            sent_at: None,
+            viewed_at: None,
+            paid_at: None,
+            voided_at: None,
+            subtotal: Decimal::from_str("100.00").unwrap(),
+            tax_total: Decimal::ZERO,
+            total: Decimal::from_str("100.00").unwrap(),
+            amount_paid: Decimal::ZERO,
+            schedule_id: None,
+            template_path: None,
+            pdf_blob_ref: None,
+            idempotency_key: None,
+            nexus_review: false,
+            metadata: BTreeMap::new(),
+            created_at: frozen_now(),
+            updated_at: frozen_now(),
+        }
+    }
+
+    let inv1 = mk_inv(&cust);
+    let inv2 = mk_inv(&cust);
+    InvoiceRepo::new(&pool).save(&inv1).await.unwrap();
+    InvoiceRepo::new(&pool).save(&inv2).await.unwrap();
+
+    let cn_repo = CreditNoteRepo::new(&pool);
+    let mk_cn = |inv: &InvoiceId, st: CreditNoteState, off: i64| CreditNote {
+        id: CreditNoteId::new(),
+        number: None,
+        invoice_id: inv.clone(),
+        state: st,
+        amount: Decimal::from_str("25.00").unwrap(),
+        currency: Currency::CAD,
+        reason: None,
+        refund_ref: None,
+        issued_at: None,
+        created_at: frozen_now() + chrono::Duration::seconds(off),
+        metadata: BTreeMap::new(),
+    };
+    cn_repo.save(&mk_cn(&inv1.id, CreditNoteState::Draft, 0)).await.unwrap();
+    cn_repo.save(&mk_cn(&inv1.id, CreditNoteState::Issued, 1)).await.unwrap();
+    cn_repo.save(&mk_cn(&inv2.id, CreditNoteState::Draft, 2)).await.unwrap();
+
+    let app = router(state);
+
+    // Cross-invoice list returns all 3.
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/v1/credit-notes")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body = body_json(resp).await;
+    assert_eq!(body["credit_notes"].as_array().unwrap().len(), 3);
+
+    // state=draft narrows to 2.
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/v1/credit-notes?state=draft")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body = body_json(resp).await;
+    assert_eq!(body["credit_notes"].as_array().unwrap().len(), 2);
+
+    // invoice_id narrows to inv1's 2 notes.
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri(&format!("/v1/credit-notes?invoice_id={}", inv1.id))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body = body_json(resp).await;
+    assert_eq!(body["credit_notes"].as_array().unwrap().len(), 2);
+
+    // limit + offset paging.
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/v1/credit-notes?limit=1&offset=1")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body = body_json(resp).await;
+    assert_eq!(body["credit_notes"].as_array().unwrap().len(), 1);
+
+    // Invalid state -> 400.
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/v1/credit-notes?state=bogus")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+}
+
+// =============================================================================
 // helpers
 // =============================================================================
 
