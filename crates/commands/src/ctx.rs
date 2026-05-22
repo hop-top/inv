@@ -126,11 +126,6 @@ impl From<Channel> for HistoryChannel {
 /// (not via the outbox relay), and other call-sites can attach one when
 /// they need synchronous publishes. Test harnesses without a bus still
 /// build.
-///
-/// TODO(post-T-0031): once every command consumes `ctx.publisher`
-/// directly, the [`crate::EmittedEvent`] envelope can collapse into
-/// publish-then-return and the legacy return-events-in-output path can
-/// be dropped. Out of scope for T-0031 — leave `EmittedEvent` as-is.
 #[derive(Clone)]
 pub struct CoreCtx {
     /// Async sqlx pool the repos use.

@@ -33,11 +33,6 @@ pub enum PublishError {
 /// `payload` is the JSON body, `occurred_at` is the wall-clock the event
 /// represents (taken from the originating command's clock so the bus
 /// timestamp lines up with the audit row).
-///
-/// TODO(post-T-0031): once every command consumes `ctx.publisher`
-/// directly, the [`crate::EmittedEvent`] envelope can collapse into a
-/// publish-then-return shape and the legacy return-events-in-output
-/// path can be dropped.
 #[async_trait]
 pub trait Publisher: Send + Sync {
     /// Publish `payload` on `topic`. Backends MAY retry internally; an
