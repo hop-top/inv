@@ -16,7 +16,8 @@ use serde_json::{json, Value};
 use inv_commands::{
     draft_invoice, issue_invoice, mark_overdue_ticker, mark_paid, reminders_tick,
     schedules_tick, send_invoice, void_invoice, Actor, Channel, DraftInvoiceInput,
-    DraftLineInput, IssueInvoiceInput, MarkPaidInput, SendInvoiceInput, VoidInvoiceInput,
+    DraftLineInput, EmittedEvent, IssueInvoiceInput, MarkPaidInput, SendInvoiceInput,
+    VoidInvoiceInput,
 };
 use inv_core::domain::ids::{CustomerId, InvoiceId};
 use inv_core::domain::invoice::{Invoice, InvoiceLine, InvoiceState, TaxCategory};
@@ -76,35 +77,10 @@ pub struct InvoiceResponse {
     /// Line items (sorted by position).
     pub lines: Vec<InvoiceLine>,
     /// Bus events the command would emit (T-0014 wires the real bus).
-    pub emitted_events: Vec<EmittedEventOut>,
+    pub emitted_events: Vec<EmittedEvent>,
     /// True if the command short-circuited on an idempotency hit.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub idempotency_replay: Option<bool>,
-}
-
-/// Wire shape for [`inv_commands::EmittedEvent`].
-#[derive(Debug, Serialize)]
-pub struct EmittedEventOut {
-    /// Dotted topic name.
-    pub topic: String,
-    /// Event payload.
-    pub payload: Value,
-    /// Wall-clock at emit time.
-    pub emitted_at: DateTime<Utc>,
-}
-
-impl From<inv_commands::EmittedEvent> for EmittedEventOut {
-    fn from(e: inv_commands::EmittedEvent) -> Self {
-        Self {
-            topic: e.topic,
-            payload: e.payload,
-            emitted_at: e.emitted_at,
-        }
-    }
-}
-
-fn into_events(events: Vec<inv_commands::EmittedEvent>) -> Vec<EmittedEventOut> {
-    events.into_iter().map(Into::into).collect()
 }
 
 // =============================================================================
@@ -198,7 +174,7 @@ pub async fn draft(
         Json(InvoiceResponse {
             invoice: out.invoice,
             lines: out.lines,
-            emitted_events: into_events(out.emitted_events),
+            emitted_events: out.emitted_events,
             idempotency_replay: Some(out.idempotency_replay),
         }),
     ))
@@ -309,7 +285,7 @@ pub async fn issue(
     Ok(Json(InvoiceResponse {
         invoice: out.invoice,
         lines: out.lines,
-        emitted_events: into_events(out.emitted_events),
+        emitted_events: out.emitted_events,
         idempotency_replay: None,
     }))
 }
@@ -415,7 +391,7 @@ pub async fn send(
     Ok(Json(json!({
         "invoice": out.invoice,
         "delivered_to": out.delivered_to,
-        "emitted_events": into_events(out.emitted_events),
+        "emitted_events": out.emitted_events,
     })))
 }
 
@@ -455,7 +431,7 @@ async fn send_webhook(
     Ok(Json(json!({
         "invoice": out.invoice,
         "delivered_to": body.destination_uri,
-        "emitted_events": into_events(out.emitted_events),
+        "emitted_events": out.emitted_events,
     })))
 }
 
@@ -500,7 +476,7 @@ pub async fn pay(
     Ok(Json(json!({
         "invoice": out.invoice,
         "fully_paid": out.fully_paid,
-        "emitted_events": into_events(out.emitted_events),
+        "emitted_events": out.emitted_events,
     })))
 }
 
@@ -537,7 +513,7 @@ pub async fn void(
     let out = void_invoice(&state.ctx, input).await?;
     Ok(Json(json!({
         "invoice": out.invoice,
-        "emitted_events": into_events(out.emitted_events),
+        "emitted_events": out.emitted_events,
     })))
 }
 
@@ -553,7 +529,7 @@ pub async fn tick_schedules(
     Ok(Json(json!({
         "ran_schedule_ids": out.ran_schedule_ids.iter().map(|id| id.to_string()).collect::<Vec<_>>(),
         "drafts_count": out.drafts.len(),
-        "emitted_events": into_events(out.emitted_events),
+        "emitted_events": out.emitted_events,
     })))
 }
 
@@ -564,7 +540,7 @@ pub async fn tick_reminders(
     let out = reminders_tick(&state.ctx).await?;
     Ok(Json(json!({
         "sent_reminders": out.sent_reminders,
-        "emitted_events": into_events(out.emitted_events),
+        "emitted_events": out.emitted_events,
     })))
 }
 
@@ -575,7 +551,7 @@ pub async fn tick_overdue(
     let out = mark_overdue_ticker(&state.ctx).await?;
     Ok(Json(json!({
         "overdue_invoices": out.overdue_invoices,
-        "emitted_events": into_events(out.emitted_events),
+        "emitted_events": out.emitted_events,
     })))
 }
 

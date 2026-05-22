@@ -100,16 +100,11 @@ pub async fn create(
         channel: Channel::Api,
     };
     let out = schedule_create(&state.ctx, input).await?;
-    let emitted: Vec<crate::handlers::invoices::EmittedEventOut> = out
-        .emitted_events
-        .into_iter()
-        .map(Into::into)
-        .collect();
     Ok((
         StatusCode::CREATED,
         Json(json!({
             "schedule": out.schedule,
-            "emitted_events": emitted,
+            "emitted_events": out.emitted_events,
         })),
     ))
 }
@@ -132,14 +127,9 @@ pub async fn pause(
         channel: Channel::Api,
     };
     let out = schedule_pause(&state.ctx, input).await?;
-    let emitted: Vec<crate::handlers::invoices::EmittedEventOut> = out
-        .emitted_events
-        .into_iter()
-        .map(Into::into)
-        .collect();
     Ok(Json(json!({
         "schedule": out.schedule,
-        "emitted_events": emitted,
+        "emitted_events": out.emitted_events,
     })))
 }
 
@@ -157,14 +147,9 @@ pub async fn cancel(
         channel: Channel::Api,
     };
     let out = schedule_cancel(&state.ctx, input).await?;
-    let emitted: Vec<crate::handlers::invoices::EmittedEventOut> = out
-        .emitted_events
-        .into_iter()
-        .map(Into::into)
-        .collect();
     Ok(Json(json!({
         "schedule": out.schedule,
-        "emitted_events": emitted,
+        "emitted_events": out.emitted_events,
     })))
 }
 

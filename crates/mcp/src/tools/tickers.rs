@@ -17,7 +17,7 @@ pub async fn tick_schedules(ctx: &CoreCtx) -> Result<serde_json::Value, McpError
     crate::tools::common::to_value(&serde_json::json!({
         "ran_schedule_ids": out.ran_schedule_ids.iter().map(|i| i.to_string()).collect::<Vec<_>>(),
         "drafts_count": out.drafts.len(),
-        "emitted_events": crate::tools::common::events_to_wire(&out.emitted_events),
+        "emitted_events": out.emitted_events,
     }))
 }
 
@@ -26,7 +26,7 @@ pub async fn tick_reminders(ctx: &CoreCtx) -> Result<serde_json::Value, McpError
     let out = reminders_tick(ctx).await?;
     crate::tools::common::to_value(&serde_json::json!({
         "sent_reminders": out.sent_reminders,
-        "emitted_events": crate::tools::common::events_to_wire(&out.emitted_events),
+        "emitted_events": out.emitted_events,
     }))
 }
 
@@ -35,6 +35,6 @@ pub async fn tick_overdue(ctx: &CoreCtx) -> Result<serde_json::Value, McpError> 
     let out = mark_overdue_ticker(ctx).await?;
     crate::tools::common::to_value(&serde_json::json!({
         "overdue_invoices": out.overdue_invoices,
-        "emitted_events": crate::tools::common::events_to_wire(&out.emitted_events),
+        "emitted_events": out.emitted_events,
     }))
 }

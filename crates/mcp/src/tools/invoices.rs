@@ -21,7 +21,7 @@ use serde::{Deserialize, Serialize};
 
 use inv_commands::{
     draft_invoice, issue_invoice, mark_paid, void_invoice, DraftInvoiceInput, DraftLineInput,
-    IssueInvoiceInput, MarkPaidInput, VoidInvoiceInput,
+    EmittedEvent, IssueInvoiceInput, MarkPaidInput, VoidInvoiceInput,
 };
 use inv_core::domain::address::Address;
 use inv_core::domain::customer::Customer;
@@ -90,7 +90,7 @@ pub struct InvoiceDraftInput {
 struct DraftOutputWire<'a> {
     invoice: &'a inv_core::domain::invoice::Invoice,
     lines: &'a [inv_core::domain::invoice::InvoiceLine],
-    emitted_events: Vec<crate::tools::common::EmittedEventWire>,
+    emitted_events: &'a [EmittedEvent],
     idempotency_replay: bool,
 }
 
@@ -130,7 +130,7 @@ pub async fn draft(ctx: &CoreCtx, input: InvoiceDraftInput) -> Result<serde_json
     let wire = DraftOutputWire {
         invoice: &out.invoice,
         lines: &out.lines,
-        emitted_events: crate::tools::common::events_to_wire(&out.emitted_events),
+        emitted_events: &out.emitted_events,
         idempotency_replay: out.idempotency_replay,
     };
     crate::tools::common::to_value(&wire)
@@ -160,7 +160,7 @@ struct IssueOutputWire<'a> {
     /// verbatim at v1; we expose length only to keep tool outputs JSON
     /// without base64-blasting megabytes).
     pdf_len: usize,
-    emitted_events: Vec<crate::tools::common::EmittedEventWire>,
+    emitted_events: &'a [EmittedEvent],
 }
 
 /// Run `issue_invoice`.
@@ -181,7 +181,7 @@ pub async fn issue(ctx: &CoreCtx, input: InvoiceIssueInput) -> Result<serde_json
         lines: &out.lines,
         html: &out.html,
         pdf_len: out.pdf.len(),
-        emitted_events: crate::tools::common::events_to_wire(&out.emitted_events),
+        emitted_events: &out.emitted_events,
     };
     crate::tools::common::to_value(&wire)
 }
@@ -209,7 +209,7 @@ struct SendOutputWire<'a> {
     invoice: &'a inv_core::domain::invoice::Invoice,
     delivered_to: &'a str,
     bytes_written: usize,
-    emitted_events: Vec<crate::tools::common::EmittedEventWire>,
+    emitted_events: &'a [EmittedEvent],
 }
 
 /// Run `send_invoice`. The `stdout` scheme uses an in-memory `Vec<u8>`
@@ -236,7 +236,7 @@ pub async fn send(ctx: &CoreCtx, input: InvoiceSendInput) -> Result<serde_json::
         invoice: &out.invoice,
         delivered_to: &out.delivered_to,
         bytes_written: sink.len(),
-        emitted_events: crate::tools::common::events_to_wire(&out.emitted_events),
+        emitted_events: &out.emitted_events,
     };
     crate::tools::common::to_value(&wire)
 }
@@ -268,7 +268,7 @@ pub struct InvoicePayInput {
 struct PayOutputWire<'a> {
     invoice: &'a inv_core::domain::invoice::Invoice,
     fully_paid: bool,
-    emitted_events: Vec<crate::tools::common::EmittedEventWire>,
+    emitted_events: &'a [EmittedEvent],
 }
 
 /// Run `mark_paid`.
@@ -290,7 +290,7 @@ pub async fn pay(ctx: &CoreCtx, input: InvoicePayInput) -> Result<serde_json::Va
     let wire = PayOutputWire {
         invoice: &out.invoice,
         fully_paid: out.fully_paid,
-        emitted_events: crate::tools::common::events_to_wire(&out.emitted_events),
+        emitted_events: &out.emitted_events,
     };
     crate::tools::common::to_value(&wire)
 }

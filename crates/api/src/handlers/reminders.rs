@@ -50,16 +50,11 @@ pub async fn schedule(
         channel: Channel::Api,
     };
     let out = reminder_schedule(&state.ctx, input).await?;
-    let emitted: Vec<crate::handlers::invoices::EmittedEventOut> = out
-        .emitted_events
-        .into_iter()
-        .map(Into::into)
-        .collect();
     Ok((
         StatusCode::CREATED,
         Json(json!({
             "reminder": out.reminder,
-            "emitted_events": emitted,
+            "emitted_events": out.emitted_events,
         })),
     ))
 }
@@ -82,14 +77,9 @@ pub async fn cancel(
         channel: Channel::Api,
     };
     let out = reminder_cancel(&state.ctx, input).await?;
-    let emitted: Vec<crate::handlers::invoices::EmittedEventOut> = out
-        .emitted_events
-        .into_iter()
-        .map(Into::into)
-        .collect();
     Ok(Json(json!({
         "reminder": out.reminder,
-        "emitted_events": emitted,
+        "emitted_events": out.emitted_events,
     })))
 }
 

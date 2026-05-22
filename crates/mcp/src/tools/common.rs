@@ -12,37 +12,9 @@
 use rmcp::model::CallToolResult;
 use serde::Serialize;
 
-use inv_commands::{Actor, Channel, EmittedEvent};
+use inv_commands::{Actor, Channel};
 
 use crate::error::McpError;
-
-/// Wire-form for [`EmittedEvent`]. The command-layer type isn't
-/// `Serialize` (it lives behind an internal-event abstraction at v1),
-/// so we ship a lightweight JSON-friendly mirror.
-#[derive(Debug, Clone, Serialize)]
-pub struct EmittedEventWire {
-    /// Dotted topic name.
-    pub topic: String,
-    /// Event payload (JSON).
-    pub payload: serde_json::Value,
-    /// Wall-clock at emit time (RFC 3339).
-    pub emitted_at: String,
-}
-
-impl From<&EmittedEvent> for EmittedEventWire {
-    fn from(e: &EmittedEvent) -> Self {
-        Self {
-            topic: e.topic.clone(),
-            payload: e.payload.clone(),
-            emitted_at: e.emitted_at.to_rfc3339(),
-        }
-    }
-}
-
-/// Convenience: convert a slice of `EmittedEvent` into wire-form.
-pub fn events_to_wire(events: &[EmittedEvent]) -> Vec<EmittedEventWire> {
-    events.iter().map(EmittedEventWire::from).collect()
-}
 
 /// Single Actor used for every MCP-originated command call.
 pub fn mcp_actor() -> Actor {

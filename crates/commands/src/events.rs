@@ -7,6 +7,7 @@
 //! against without spinning up the bus stack.
 
 use chrono::{DateTime, Utc};
+use serde::Serialize;
 use serde_json::Value;
 
 /// One bus event that a command would emit.
@@ -15,7 +16,7 @@ use serde_json::Value;
 /// `inv.billing.invoice.issued`), `payload` is the JSON body, and
 /// `emitted_at` is the wall-clock the command captured at emit time
 /// (taken from the injected clock so tests can pin it).
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct EmittedEvent {
     /// Dotted topic name.
     pub topic: String,

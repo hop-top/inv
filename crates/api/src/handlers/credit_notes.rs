@@ -58,16 +58,11 @@ pub async fn draft(
         channel: Channel::Api,
     };
     let out = create_credit_note(&state.ctx, input).await?;
-    let emitted: Vec<crate::handlers::invoices::EmittedEventOut> = out
-        .emitted_events
-        .into_iter()
-        .map(Into::into)
-        .collect();
     Ok((
         StatusCode::CREATED,
         Json(json!({
             "credit_note": out.credit_note,
-            "emitted_events": emitted,
+            "emitted_events": out.emitted_events,
         })),
     ))
 }
@@ -91,14 +86,9 @@ pub async fn issue(
         channel: Channel::Api,
     };
     let out = issue_credit_note(&state.ctx, input).await?;
-    let emitted: Vec<crate::handlers::invoices::EmittedEventOut> = out
-        .emitted_events
-        .into_iter()
-        .map(Into::into)
-        .collect();
     Ok(Json(json!({
         "credit_note": out.credit_note,
-        "emitted_events": emitted,
+        "emitted_events": out.emitted_events,
     })))
 }
 
