@@ -34,7 +34,6 @@ pub struct ScheduleLineWire {
     pub unit_price: Decimal,
     /// Tax-category override.
     #[serde(default)]
-    #[schemars(with = "Option<String>")]
     pub tax_category: Option<TaxCategory>,
 }
 

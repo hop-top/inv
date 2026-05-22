@@ -12,6 +12,7 @@ use serde::{Deserialize, Serialize};
 
 /// A postal address.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Address {
     /// ISO 3166-1 alpha-2 country code (e.g. `"CA"`, `"US"`, `"DZ"`).
     pub country: String,

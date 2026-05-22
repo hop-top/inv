@@ -19,6 +19,7 @@ use thiserror::Error;
 
 /// Seller jurisdiction (ISO 3166-2 subdivision).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum Jurisdiction {
     /// Quebec, Canada (`CA-QC`).
     #[serde(rename = "CA-QC")]

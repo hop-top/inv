@@ -55,7 +55,6 @@ pub struct DraftLineWire {
     pub unit_price: Decimal,
     /// Tax category override (default `standard`).
     #[serde(default)]
-    #[schemars(with = "Option<String>")]
     pub tax_category: Option<TaxCategory>,
 }
 
@@ -65,9 +64,8 @@ pub struct InvoiceDraftInput {
     /// Bill-to customer id (MTI; must already exist).
     pub customer_id: String,
     /// Seller jurisdiction (drives tax resolution at issue). One of
-    /// `quebec_ca`, `delaware_us`, `algiers_dz`, etc. (see
+    /// `CA-QC`, `US-DE`, `DZ-16` (see
     /// `inv_core::domain::jurisdiction::Jurisdiction`).
-    #[schemars(with = "String")]
     pub seller_jurisdiction: Jurisdiction,
     /// ISO 4217 currency code (USD, CAD, or DZD at v1).
     pub currency: String,
@@ -362,7 +360,6 @@ pub struct InvoiceListInput {
     /// Restrict to a state (`draft`, `issued`, `sent`, `viewed`,
     /// `partially_paid`, `paid`, `voided`).
     #[serde(default)]
-    #[schemars(with = "Option<String>")]
     pub state: Option<InvoiceState>,
     /// Max rows.
     #[serde(default)]
@@ -398,43 +395,6 @@ pub async fn list(ctx: &CoreCtx, input: InvoiceListInput) -> Result<serde_json::
 // inv_customer_add / inv_customer_show / inv_customer_list
 // =============================================================================
 
-/// Wire-form postal address (mirrors [`Address`] one-for-one; the
-/// inv-core type isn't `JsonSchema`-derivable from this crate, so we
-/// ship a JSON-schemared mirror and deserialize from it).
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
-pub struct AddressWire {
-    /// ISO 3166-1 alpha-2 country code (e.g. "CA", "US", "DZ").
-    pub country: String,
-    /// ISO 3166-2 subdivision code, no country prefix.
-    #[serde(default)]
-    pub region: Option<String>,
-    /// City.
-    #[serde(default)]
-    pub city: Option<String>,
-    /// Postal code.
-    #[serde(default)]
-    pub postal: Option<String>,
-    /// First address line.
-    #[serde(default)]
-    pub line1: Option<String>,
-    /// Second address line.
-    #[serde(default)]
-    pub line2: Option<String>,
-}
-
-impl From<AddressWire> for Address {
-    fn from(w: AddressWire) -> Self {
-        Address {
-            country: w.country,
-            region: w.region,
-            city: w.city,
-            postal: w.postal,
-            line1: w.line1,
-            line2: w.line2,
-        }
-    }
-}
-
 /// Input for `inv_customer_add`.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct CustomerAddInput {
@@ -447,7 +407,7 @@ pub struct CustomerAddInput {
     #[serde(default)]
     pub email: Option<String>,
     /// Postal address.
-    pub address: AddressWire,
+    pub address: Address,
 }
 
 /// Upsert a customer.
@@ -468,7 +428,7 @@ pub async fn customer_add(
         id,
         display_name: input.display_name,
         email: input.email,
-        address: input.address.into(),
+        address: input.address,
         metadata: BTreeMap::new(),
         created_at: now,
         updated_at: now,

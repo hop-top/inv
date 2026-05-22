@@ -30,6 +30,11 @@ serde_json = "1"
 serde_yaml = "0.9"
 toml = "0.8"
 
+# JSON Schema derive. Gated behind crate features (see inv-core's `schema`
+# feature, inv-mcp's hard dep). `chrono04` brings JsonSchema impls for
+# chrono::DateTime so downstream derives covering timestamp fields compile.
+schemars = { version = "1", features = ["chrono04"] }
+
 # --- Error types ---------------------------------------------------------
 thiserror = "2"
 anyhow = "1"

@@ -39,6 +39,7 @@ pub const TOPIC_ENTERED: &str = "inv.billing.invoice.entered";
 /// return an error to veto the transition (matches kit `core/stage`
 /// semantics — see design §3.3).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct InvoiceProposed {
     /// Invoice the transition would affect.
     pub invoice_id: InvoiceId,
@@ -94,6 +95,7 @@ impl InvoiceProposed {
 /// Not veto-able. Carries both endpoints so consumers don't have to maintain
 /// a cache to render "X went from A to B".
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct InvoiceTransitioned {
     /// Invoice that moved.
     pub invoice_id: InvoiceId,
@@ -152,6 +154,7 @@ impl InvoiceTransitioned {
 /// kit `core/stage` semantics: `.entered` fires once per leaf state entry,
 /// after entry actions, after `.transitioned`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct InvoiceEntered {
     /// Invoice that entered the state.
     pub invoice_id: InvoiceId,

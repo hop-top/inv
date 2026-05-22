@@ -18,6 +18,7 @@ use std::collections::BTreeMap;
 /// Lifecycle state of a credit note.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum CreditNoteState {
     /// Mutable.
     Draft,
@@ -27,6 +28,7 @@ pub enum CreditNoteState {
 
 /// A credit note against an invoice.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct CreditNote {
     /// Stable identifier.
     pub id: CreditNoteId,
@@ -39,6 +41,7 @@ pub struct CreditNote {
     /// Lifecycle state.
     pub state: CreditNoteState,
     /// Amount being credited (positive Decimal in the invoice currency).
+    #[cfg_attr(feature = "schema", schemars(with = "String"))]
     pub amount: Decimal,
     /// Same currency as the linked invoice.
     pub currency: Currency,
@@ -61,6 +64,7 @@ pub struct CreditNote {
 
 /// A row in the credit-note state-history table (audit + outbox).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct CreditNoteStateHistory {
     /// Stable identifier.
     pub id: HistoryId,

@@ -1528,6 +1528,7 @@ dependencies = [
  "insta",
  "mti",
  "rust_decimal",
+ "schemars",
  "serde",
  "serde_json",
  "statig",

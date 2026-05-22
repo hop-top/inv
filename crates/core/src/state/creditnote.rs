@@ -52,6 +52,7 @@ use thiserror::Error;
 /// (`Void`, `Cancel`, etc.) can be added without rippling through callers.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", tag = "kind")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum CreditNoteEvent {
     /// Move `Draft -> Issued`. Assigns the human number on commit.
     Issue,
@@ -75,6 +76,7 @@ impl CreditNoteEvent {
 /// interchangeably.
 #[derive(Debug, Clone, PartialEq, Eq, Error, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", tag = "kind")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum TransitionError {
     /// The event has no legal effect from the given state.
     #[error("illegal transition: {event} not allowed from {state:?}")]
@@ -419,6 +421,7 @@ pub const TOPIC_ENTERED: &str = "inv.billing.creditnote.entered";
 /// return an error to veto the transition (matches kit `core/stage`
 /// semantics).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct CreditNoteProposed {
     /// Credit note the transition would affect.
     pub credit_note_id: CreditNoteId,
@@ -474,6 +477,7 @@ impl CreditNoteProposed {
 /// Not veto-able. Carries both endpoints so consumers don't need to maintain
 /// a cache to render "X went from A to B".
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct CreditNoteTransitioned {
     /// Credit note that moved.
     pub credit_note_id: CreditNoteId,
@@ -529,6 +533,7 @@ impl CreditNoteTransitioned {
 /// subscriber listening for "any time a credit note enters `Issued`" can
 /// match on the topic + payload without inspecting the prior state.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct CreditNoteEntered {
     /// Credit note that entered the state.
     pub credit_note_id: CreditNoteId,

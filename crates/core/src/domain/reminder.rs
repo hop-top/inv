@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 /// Mirrors the inv delivery scheme (file/stdout/bus/webhook/link).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum ReminderChannel {
     /// Write the rendered PDF to a configured file path.
     File,
@@ -29,6 +30,7 @@ pub enum ReminderChannel {
 /// Lifecycle state of a [`Reminder`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum ReminderState {
     /// Enqueued, not yet sent.
     Scheduled,
@@ -40,6 +42,7 @@ pub enum ReminderState {
 
 /// A reminder to be sent against an invoice.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Reminder {
     /// Stable identifier.
     pub id: ReminderId,

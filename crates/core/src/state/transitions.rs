@@ -35,6 +35,7 @@ use thiserror::Error;
 /// without consulting any external state.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", tag = "kind")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum InvoiceEvent {
     /// Move `Draft -> Issued`.
     Issue,
@@ -49,8 +50,10 @@ pub enum InvoiceEvent {
     /// full, partial, or remainder-completing.
     Pay {
         /// Amount paid in this single transaction.
+        #[cfg_attr(feature = "schema", schemars(with = "String"))]
         amount_paid: Decimal,
         /// Invoice total (after tax) for comparison.
+        #[cfg_attr(feature = "schema", schemars(with = "String"))]
         total: Decimal,
     },
     /// Void the invoice. Legal only pre-payment; never after `Paid`.
@@ -75,6 +78,7 @@ impl InvoiceEvent {
 /// Why a `(state, event)` pair was rejected by the transition table.
 #[derive(Debug, Clone, PartialEq, Eq, Error, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", tag = "kind")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum TransitionError {
     /// The event has no legal effect from the given state.
     ///
@@ -90,6 +94,7 @@ pub enum TransitionError {
     #[error("payment must be positive (got amount_paid={amount_paid})")]
     NonPositivePayment {
         /// The non-positive amount the caller passed in.
+        #[cfg_attr(feature = "schema", schemars(with = "String"))]
         amount_paid: Decimal,
     },
 }

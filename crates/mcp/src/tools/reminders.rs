@@ -23,8 +23,7 @@ pub struct ReminderScheduleWire {
     pub invoice_id: String,
     /// When the ticker should dispatch (must be in the future).
     pub scheduled_at: DateTime<Utc>,
-    /// Delivery channel scheme (`email`, `webhook`, etc.).
-    #[schemars(with = "String")]
+    /// Delivery channel scheme (`file`, `stdout`, `bus`, `webhook`, `link`).
     pub channel_scheme: ReminderChannel,
 }
 

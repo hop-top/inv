@@ -21,6 +21,20 @@ use thiserror::Error;
 #[serde(into = "String", try_from = "String")]
 pub struct Currency([u8; 3]);
 
+// Wire form is the 3-letter string (see `serde(into/try_from)` above); the
+// schema mirrors that — not the raw `[u8; 3]` byte array. We cannot derive
+// `JsonSchema` here because serde's `transparent`/`into`/`try_from` and
+// schemars's matching attrs don't co-exist on the same struct in v1.x.
+#[cfg(feature = "schema")]
+impl schemars::JsonSchema for Currency {
+    fn schema_name() -> std::borrow::Cow<'static, str> {
+        "Currency".into()
+    }
+    fn json_schema(g: &mut schemars::SchemaGenerator) -> schemars::Schema {
+        <String as schemars::JsonSchema>::json_schema(g)
+    }
+}
+
 /// Errors from constructing a [`Currency`].
 #[derive(Debug, Error)]
 pub enum CurrencyError {

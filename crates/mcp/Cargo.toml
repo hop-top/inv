@@ -23,13 +23,15 @@ chrono = { workspace = true }
 rust_decimal = { workspace = true }
 async-trait = { workspace = true }
 
-# schemars is brought in via rmcp's `schemars` feature (v1.x). Pinning a
-# direct `schemars = "1"` workspace dep is unnecessary at v1 — see report
-# for rationale.
-schemars = { version = "1", features = ["chrono04"] }
+# schemars is brought in via rmcp's `schemars` feature (v1.x) AND used
+# directly on tool input/output structs. Pin via workspace so the version
+# (+ chrono04 feature) matches what `inv-core[schema]` derives expect.
+schemars = { workspace = true }
 
-# inv internal crates
-inv-core = { workspace = true }
+# inv internal crates. `inv-core[schema]` turns on `JsonSchema` derives on
+# every public domain type so we can use them directly in tool inputs
+# without local wire-form mirrors.
+inv-core = { workspace = true, features = ["schema"] }
 inv-store = { workspace = true }
 inv-commands = { workspace = true }
 

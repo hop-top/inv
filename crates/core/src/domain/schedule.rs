@@ -167,9 +167,22 @@ impl<'de> Deserialize<'de> for Cadence {
     }
 }
 
+#[cfg(feature = "schema")]
+impl schemars::JsonSchema for Cadence {
+    fn schema_name() -> std::borrow::Cow<'static, str> {
+        "Cadence".into()
+    }
+    fn json_schema(g: &mut schemars::SchemaGenerator) -> schemars::Schema {
+        // Wire form is the string grammar (monthly@<dom> | quarterly@<dom> |
+        // yearly@<MM-DD>) — see Display/FromStr above. Schema mirrors that.
+        <String as schemars::JsonSchema>::json_schema(g)
+    }
+}
+
 /// Lifecycle state of a [`Schedule`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum ScheduleState {
     /// Actively materialising invoices on every cycle.
     Active,
@@ -183,12 +196,15 @@ pub enum ScheduleState {
 /// without identifiers or computed totals (those land on the materialised
 /// invoice each cycle).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ScheduleLine {
     /// Free-form description.
     pub description: String,
     /// Quantity.
+    #[cfg_attr(feature = "schema", schemars(with = "String"))]
     pub quantity: Decimal,
     /// Per-unit price.
+    #[cfg_attr(feature = "schema", schemars(with = "String"))]
     pub unit_price: Decimal,
     /// Tax category override (default `Standard`).
     #[serde(default)]
@@ -201,6 +217,7 @@ pub struct ScheduleLine {
 
 /// A recurring schedule.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Schedule {
     /// Stable identifier.
     pub id: ScheduleId,

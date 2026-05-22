@@ -139,6 +139,17 @@ macro_rules! define_entity_id {
                 Self::parse(&s).map_err(serde::de::Error::custom)
             }
         }
+
+        #[cfg(feature = "schema")]
+        impl schemars::JsonSchema for $name {
+            fn schema_name() -> std::borrow::Cow<'static, str> {
+                stringify!($name).into()
+            }
+            fn json_schema(g: &mut schemars::SchemaGenerator) -> schemars::Schema {
+                // Wire form is the bare typeid string (see `Serialize` above).
+                <String as schemars::JsonSchema>::json_schema(g)
+            }
+        }
     };
 }
 

@@ -12,6 +12,7 @@ use std::collections::BTreeMap;
 
 /// A customer.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Customer {
     /// Stable identifier.
     pub id: CustomerId,

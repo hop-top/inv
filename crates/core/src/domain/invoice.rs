@@ -18,6 +18,7 @@ use std::collections::BTreeMap;
 /// flag + bus event, not an FSM state.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum InvoiceState {
     /// Mutable: lines, customer, dates may change.
     Draft,
@@ -43,6 +44,7 @@ pub enum InvoiceState {
 /// zero-rated"). `Exempt` is 0 % with different audit semantics.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum TaxCategory {
     /// Default rate for the jurisdiction.
     #[default]
@@ -57,6 +59,7 @@ pub enum TaxCategory {
 
 /// A single line on an invoice.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct InvoiceLine {
     /// Stable identifier.
     pub id: LineId,
@@ -67,8 +70,10 @@ pub struct InvoiceLine {
     /// Free-form description.
     pub description: String,
     /// Quantity (Decimal — supports 0.5 hours, 1.25 kg, etc.).
+    #[cfg_attr(feature = "schema", schemars(with = "String"))]
     pub quantity: Decimal,
     /// Per-unit price in invoice currency.
+    #[cfg_attr(feature = "schema", schemars(with = "String"))]
     pub unit_price: Decimal,
     /// Tax rates applied (typeid-ish ids from `tax_rates` table — possibly
     /// multiple, e.g., GST + QST on a QC sale).
@@ -78,8 +83,10 @@ pub struct InvoiceLine {
     #[serde(default)]
     pub tax_category: TaxCategory,
     /// Tax amount on this line (sum across applied rates).
+    #[cfg_attr(feature = "schema", schemars(with = "String"))]
     pub tax_amount: Decimal,
     /// `(quantity * unit_price) + tax_amount`.
+    #[cfg_attr(feature = "schema", schemars(with = "String"))]
     pub line_total: Decimal,
     /// Free-form metadata.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
@@ -88,6 +95,7 @@ pub struct InvoiceLine {
 
 /// An invoice.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Invoice {
     /// Stable identifier.
     pub id: InvoiceId,
@@ -124,12 +132,16 @@ pub struct Invoice {
     pub voided_at: Option<DateTime<Utc>>,
 
     /// Sum of line subtotals (before tax).
+    #[cfg_attr(feature = "schema", schemars(with = "String"))]
     pub subtotal: Decimal,
     /// Sum of line tax amounts.
+    #[cfg_attr(feature = "schema", schemars(with = "String"))]
     pub tax_total: Decimal,
     /// `subtotal + tax_total`.
+    #[cfg_attr(feature = "schema", schemars(with = "String"))]
     pub total: Decimal,
     /// Sum of payments received against this invoice so far.
+    #[cfg_attr(feature = "schema", schemars(with = "String"))]
     pub amount_paid: Decimal,
 
     /// If non-null, the recurring schedule that produced this invoice.
@@ -163,6 +175,7 @@ pub struct Invoice {
 /// Doubles as the transactional outbox: when `published_at` is `None`,
 /// the bus relay still needs to publish the corresponding event.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct InvoiceStateHistory {
     /// Stable identifier (one row per transition).
     pub id: HistoryId,
@@ -200,6 +213,7 @@ pub struct InvoiceStateHistory {
 /// Channel an FSM transition (or any command) arrived through.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum HistoryChannel {
     /// Triggered by the CLI adapter.
     Cli,

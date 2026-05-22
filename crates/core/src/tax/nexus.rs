@@ -14,6 +14,7 @@ use std::collections::HashMap;
 
 /// Threshold + enabled flag for a single US state.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct NexusThreshold {
     /// Operator switch — false means the engine never applies this state's
     /// rate even if the threshold is crossed.
@@ -22,6 +23,7 @@ pub struct NexusThreshold {
     /// Revenue threshold (in seller currency, typically USD). `None` =
     /// revenue does not gate nexus for this state.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "schema", schemars(with = "Option<String>"))]
     pub revenue: Option<Decimal>,
     /// Transaction-count threshold. `None` = txn count does not gate.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -55,6 +57,8 @@ impl NexusThreshold {
 /// (e.g. `"CA"`, `"NY"`).
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(transparent)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "schema", schemars(transparent))]
 pub struct NexusConfig {
     /// State -> threshold map.
     pub states: HashMap<String, NexusThreshold>,

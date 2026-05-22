@@ -19,6 +19,7 @@ use thiserror::Error;
 /// - `rate` — array of [`TaxRate`] (TOML `[[rate]]` blocks).
 /// - `nexus` — table keyed by US state code, value is a [`NexusThreshold`].
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct TaxFile {
     /// Array of tax rate rows.
     #[serde(default, rename = "rate")]

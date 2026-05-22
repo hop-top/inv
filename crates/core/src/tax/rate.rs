@@ -17,6 +17,7 @@ use serde::{Deserialize, Serialize};
 /// neither key applies to any buyer (rare — usually you want at least
 /// `country`).
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct AppliesToBuyer {
     /// ISO 3166-1 alpha-2 country code (e.g. `"CA"`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -33,6 +34,7 @@ pub struct AppliesToBuyer {
 /// tuple. Multiple rows may match a given line (e.g. QC seller selling
 /// to a QC buyer matches both `ca-qc-gst` and `ca-qc-qst`).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct TaxRate {
     /// Stable identifier (e.g. `"ca-qc-gst"`). Recorded on each
     /// `invoice_lines.tax_rate_ids` entry for audit.
@@ -48,6 +50,7 @@ pub struct TaxRate {
     #[serde(default)]
     pub category: TaxCategory,
     /// Rate as a fraction (e.g. `0.05` for 5 %).
+    #[cfg_attr(feature = "schema", schemars(with = "String"))]
     pub rate: Decimal,
     /// First date the row is effective (inclusive).
     pub effective_from: NaiveDate,

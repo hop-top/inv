@@ -17,6 +17,7 @@ use thiserror::Error;
 /// Buyer scope relative to the seller, per design §6.1 step 1.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum BuyerScope {
     /// Same country and same region as the seller.
     DomesticLocal,
@@ -28,9 +29,11 @@ pub enum BuyerScope {
 
 /// Output of [`resolve_tax`].
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ResolvedTax {
     /// Tax amount on this line, rounded to the line currency's scale
     /// using banker's rounding.
+    #[cfg_attr(feature = "schema", schemars(with = "String"))]
     pub amount: Decimal,
     /// IDs of every tax-table row that contributed to `amount`. Recorded
     /// on the invoice line (`tax_rate_ids`) for audit.
