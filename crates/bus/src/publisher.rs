@@ -1,5 +1,6 @@
-//! [`Publisher`] trait + the two concrete impls that ship at v1
-//! (kit-backed publisher lands when `poly-kit#sdk-rs-runtime` does).
+//! [`Publisher`] trait (re-exported from `inv-commands` since T-0031) +
+//! the two concrete impls that ship at v1 (kit-backed publisher lands
+//! when `poly-kit#sdk-rs-runtime` does).
 //!
 //! - [`LoggingPublisher`]: writes each publish to `tracing::info!`. Used
 //!   on inv-server boot until subscribers come online.
@@ -14,25 +15,11 @@ use tracing::info;
 
 use crate::error::PublishError;
 
-/// Async trait every publisher implements.
-///
-/// `topic` is the dotted name (e.g. `inv.billing.invoice.issued`),
-/// `payload` is the JSON body, `occurred_at` is the wall-clock the event
-/// represents (taken from the originating command's clock so the bus
-/// timestamp lines up with the audit row).
-#[async_trait]
-pub trait Publisher: Send + Sync {
-    /// Publish `payload` on `topic`. Backends MAY retry internally; an
-    /// `Err` return means the publish was not accepted and the caller
-    /// (typically [`crate::run_outbox_relay`]) MUST NOT mark the
-    /// originating outbox row as published.
-    async fn publish(
-        &self,
-        topic: &str,
-        payload: Value,
-        occurred_at: DateTime<Utc>,
-    ) -> Result<(), PublishError>;
-}
+// The canonical `Publisher` trait lives in `inv-commands` so
+// `CoreCtx.publisher` can reference it without a dep cycle (this crate
+// already depends on `inv-commands`). Re-exporting keeps every existing
+// `inv_bus::Publisher` import compiling unchanged.
+pub use inv_commands::Publisher;
 
 // =============================================================================
 // LoggingPublisher

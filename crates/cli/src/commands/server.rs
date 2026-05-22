@@ -93,17 +93,24 @@ pub async fn dispatch(ctx: &CoreCtx, m: &ArgMatches) -> anyhow::Result<()> {
     let reminders_secs: u64 = parse_secs(m, "reminders-interval-secs")?;
     let overdue_secs: u64 = parse_secs(m, "overdue-interval-secs")?;
 
-    // Take ownership of CoreCtx behind an Arc — every task gets a handle.
-    // The CLI dispatch builds CoreCtx fresh per invocation (not Arc-aware),
-    // so we clone what we need by re-running the build via the consumed
-    // ctx's storage primitives. For v1 we just wrap the existing ctx in
-    // an Arc; CoreCtx is Clone (verify) — if not, lift it out of build().
-    let ctx_arc = Arc::new(ctx.clone());
-
     tracing::info!(addr = %listen, mcp, "inv server starting");
 
     // ----- Build adapter routers ----------------------------------------
+    // Outbox relay publisher: writes every drained event to tracing.
     let publisher: Arc<inv_bus::LoggingPublisher> = Arc::new(inv_bus::LoggingPublisher);
+
+    // WS + synchronous-publish publisher: a single broadcast channel so
+    // the api `/v/{token}` view route's synchronous publish (T-0031),
+    // every per-connection ws subscriber, and the outbox relay all see
+    // the same event stream.
+    let ws_publisher: inv_ws::SharedPublisher = Arc::new(inv_bus::BroadcastPublisher::new(1024));
+
+    // Attach the broadcast publisher to CoreCtx so view-route emits land
+    // immediately. The history outbox stays the canonical delivery path
+    // — synchronous publish is a real-time fanout shortcut.
+    let mut ctx_with_pub = ctx.clone();
+    ctx_with_pub.publisher = Some(ws_publisher.clone() as Arc<dyn inv_commands::Publisher>);
+    let ctx_arc = Arc::new(ctx_with_pub);
 
     let api_state = Arc::new(ApiState::new(
         ctx_arc.clone(),
@@ -111,9 +118,6 @@ pub async fn dispatch(ctx: &CoreCtx, m: &ArgMatches) -> anyhow::Result<()> {
     ));
     let api_router = inv_api::router(api_state);
 
-    // WS shares the broadcast publisher from inv-bus so the outbox
-    // relay and per-connection forwarders see the same event stream.
-    let ws_publisher: inv_ws::SharedPublisher = Arc::new(inv_bus::BroadcastPublisher::new(1024));
     let ws_router = inv_ws::router(ctx_arc.clone(), ws_publisher);
 
     let app = api_router.merge(ws_router);

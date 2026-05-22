@@ -16,6 +16,7 @@ thiserror = { workspace = true }
 chrono = { workspace = true }
 rust_decimal = { workspace = true }
 tracing = { workspace = true }
+async-trait = { workspace = true }
 
 # inv crates: commands sit on top of core (domain + state + render + tax)
 # and store (repository structs). This is the seam that breaks the would-be

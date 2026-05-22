@@ -14,6 +14,8 @@ use inv_core::tax::{NexusConfig, TaxTable};
 use inv_store::blob::BlobStore;
 use inv_store::pool::Pool;
 
+use crate::publisher::Publisher;
+
 /// Trait so tests can inject a fixed clock.
 ///
 /// Production wiring uses [`SystemClock`]; tests use a
@@ -114,12 +116,21 @@ impl From<Channel> for HistoryChannel {
 
 /// Bundle of dependencies that every command in this crate consumes.
 ///
-/// `bus_publisher` is `None` at v1 — events are returned in the command
-/// output for the test harness, and T-0014 will hook an actual
-/// publisher behind a trait. `blob_store` is `Option` to keep the
-/// dependency soft: when absent (e.g. lightweight test harnesses or
-/// adapters that don't need PDF persistence), commands that render
-/// content skip the persistence step and leave `pdf_blob_ref` unset.
+/// `blob_store` is `Option` to keep the dependency soft: when absent
+/// (e.g. lightweight test harnesses or adapters that don't need PDF
+/// persistence), commands that render content skip the persistence step
+/// and leave `pdf_blob_ref` unset.
+///
+/// `publisher` is `Option` for the same reason: T-0031 wires it in for
+/// the api `/v/{token}` view route so the bus event fires immediately
+/// (not via the outbox relay), and other call-sites can attach one when
+/// they need synchronous publishes. Test harnesses without a bus still
+/// build.
+///
+/// TODO(post-T-0031): once every command consumes `ctx.publisher`
+/// directly, the [`crate::EmittedEvent`] envelope can collapse into
+/// publish-then-return and the legacy return-events-in-output path can
+/// be dropped. Out of scope for T-0031 — leave `EmittedEvent` as-is.
 #[derive(Clone)]
 pub struct CoreCtx {
     /// Async sqlx pool the repos use.
@@ -134,10 +145,18 @@ pub struct CoreCtx {
     /// When `None`, commands skip blob persistence and leave the
     /// invoice's `pdf_blob_ref` field unchanged.
     pub blob_store: Option<Arc<dyn BlobStore>>,
+    /// Optional bus publisher (T-0031). When `Some`, call-sites that
+    /// want a synchronous publish (e.g. the api `/v/{token}` view route
+    /// emitting `inv.billing.invoice.viewed`) can fire directly rather
+    /// than relying on the outbox relay. When `None`, those call-sites
+    /// silently skip — the canonical event still lives in the history
+    /// outbox and will be published on the next relay tick.
+    pub publisher: Option<Arc<dyn Publisher>>,
 }
 
 impl CoreCtx {
-    /// Construct with the default [`SystemClock`] and no blob store.
+    /// Construct with the default [`SystemClock`], no blob store, no
+    /// publisher.
     pub fn new(db: Pool, tax_table: TaxTable, nexus: NexusConfig) -> Self {
         Self {
             db,
@@ -145,6 +164,7 @@ impl CoreCtx {
             nexus: Arc::new(nexus),
             clock: Arc::new(SystemClock),
             blob_store: None,
+            publisher: None,
         }
     }
 
@@ -161,6 +181,15 @@ impl CoreCtx {
         self.blob_store = Some(blob_store);
         self
     }
+
+    /// Attach a bus publisher (T-0031). Call-sites that need synchronous
+    /// publishes (e.g. the api `/v/{token}` view route) read from
+    /// `ctx.publisher` directly; absence is fine — the outbox relay
+    /// remains the canonical delivery path.
+    pub fn with_publisher(mut self, publisher: Arc<dyn Publisher>) -> Self {
+        self.publisher = Some(publisher);
+        self
+    }
 }
 
 impl std::fmt::Debug for CoreCtx {
@@ -170,6 +199,7 @@ impl std::fmt::Debug for CoreCtx {
             .field("tax_table_rows", &self.tax_table.len())
             .field("nexus_states", &self.nexus.states.len())
             .field("blob_store", &self.blob_store.is_some())
+            .field("publisher", &self.publisher.is_some())
             .finish()
     }
 }

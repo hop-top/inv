@@ -47,6 +47,7 @@ pub mod events;
 pub mod issue;
 pub mod overdue;
 pub mod pay;
+pub mod publisher;
 pub mod reminder;
 pub mod schedule;
 pub mod send;
@@ -65,6 +66,7 @@ pub use events::EmittedEvent;
 pub use issue::{issue_invoice, IssueInvoiceInput, IssueInvoiceOutput};
 pub use overdue::{mark_overdue_ticker, OverdueTickerOutput};
 pub use pay::{mark_paid, MarkPaidInput, MarkPaidOutput};
+pub use publisher::{PublishError, Publisher};
 pub use reminder::{
     reminder_cancel, reminder_schedule, reminders_tick, ReminderCancelInput,
     ReminderCancelOutput, ReminderScheduleInput, ReminderScheduleOutput,

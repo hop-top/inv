@@ -19,6 +19,7 @@ use serde_json::{json, Value};
 use tower::ServiceExt;
 
 use inv_api::{router, ApiConfig, ApiState};
+use inv_bus::InMemoryPublisher;
 use inv_commands::{Clock, CoreCtx};
 use inv_core::domain::address::Address;
 use inv_core::domain::customer::Customer;
@@ -76,13 +77,36 @@ async fn fresh_state() -> (Arc<ApiState>, Pool) {
 }
 
 async fn fresh_state_with_config(config: ApiConfig) -> (Arc<ApiState>, Pool) {
+    let (state, pool, _pub) = fresh_state_with_config_and_publisher(config).await;
+    (state, pool)
+}
+
+/// Variant that wires an [`InMemoryPublisher`] into the [`CoreCtx`] so
+/// tests can assert the events the api adapter fires synchronously
+/// (T-0031: `inv.billing.invoice.viewed` from the `/v/{token}` route).
+async fn fresh_state_with_publisher() -> (Arc<ApiState>, Pool, Arc<InMemoryPublisher>) {
+    fresh_state_with_config_and_publisher(ApiConfig {
+        link_signing_key: b"test-link-key".to_vec(),
+        link_ttl: Duration::from_secs(3600),
+        webhook_signing_key: b"test-webhook-key".to_vec(),
+        public_base_url: "http://localhost:7400".into(),
+        bearer_tokens: Vec::new(),
+    })
+    .await
+}
+
+async fn fresh_state_with_config_and_publisher(
+    config: ApiConfig,
+) -> (Arc<ApiState>, Pool, Arc<InMemoryPublisher>) {
     let pool = connect("sqlite::memory:").await.expect("connect");
     run_migrations(&pool).await.expect("migrate");
     let (table, nexus) = TaxTable::load_from_str(FIXTURE_TOML).expect("tax fixture");
+    let publisher: Arc<InMemoryPublisher> = Arc::new(InMemoryPublisher::new());
     let ctx = CoreCtx::new(pool.clone(), table, nexus)
-        .with_clock(Arc::new(FrozenClock(frozen_now())));
+        .with_clock(Arc::new(FrozenClock(frozen_now())))
+        .with_publisher(publisher.clone() as Arc<dyn inv_commands::Publisher>);
     let state = Arc::new(ApiState::new(Arc::new(ctx), config));
-    (state, pool)
+    (state, pool, publisher)
 }
 
 async fn seed_customer(pool: &Pool) -> CustomerId {
@@ -395,6 +419,82 @@ async fn signed_link_view_expired_404() {
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn signed_link_view_publishes_invoice_viewed_event() {
+    // T-0031: when CoreCtx carries a publisher, the /v/{token} route
+    // emits `inv.billing.invoice.viewed` synchronously on the first
+    // Sent → Viewed transition. Tests assert capture via InMemoryPublisher.
+    let (state, pool, captured) = fresh_state_with_publisher().await;
+    let cust = seed_customer(&pool).await;
+    let app = router(state.clone());
+
+    // Drive draft → issue → send (file:// to a tempdir so the FSM moves
+    // into Sent; link:// would NOT advance state, and webhook:// requires
+    // a live receiver).
+    let inv_id = draft_and_issue(&app, &cust).await;
+    let tmpdir = tempfile::tempdir().expect("tempdir");
+    let dest = format!("file://{}/invoice.pdf", tmpdir.path().display());
+    let send_resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(&format!("/v1/invoices/{inv_id}/send"))
+                .header("content-type", "application/json")
+                .body(Body::from(json!({ "destination_uri": dest }).to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(send_resp.status(), StatusCode::OK, "send via file:// failed");
+
+    // Snapshot captured events at the boundary so we can assert the view
+    // route adds exactly one new `viewed` row.
+    let before = captured.captured();
+    assert!(
+        before.iter().all(|e| e.topic != "inv.billing.invoice.viewed"),
+        "precondition: no viewed events yet, got: {:?}",
+        before.iter().map(|e| &e.topic).collect::<Vec<_>>()
+    );
+
+    // View the invoice via a freshly-minted signed token.
+    let token = inv_api::signed_link::sign(
+        &inv_id,
+        3600,
+        &state.config.link_signing_key,
+    );
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .uri(&format!("/v/{token}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // Assert the publisher captured exactly one new viewed event for
+    // this invoice, on the canonical topic, with the right shape.
+    let after = captured.captured();
+    let new_viewed: Vec<_> = after
+        .iter()
+        .skip(before.len())
+        .filter(|e| e.topic == "inv.billing.invoice.viewed")
+        .collect();
+    assert_eq!(
+        new_viewed.len(),
+        1,
+        "expected exactly one viewed event, got: {:?}",
+        after.iter().map(|e| &e.topic).collect::<Vec<_>>()
+    );
+    let payload = &new_viewed[0].payload;
+    assert_eq!(payload["invoice_id"], inv_id);
+    assert_eq!(payload["channel"], "api");
+    assert_eq!(payload["actor"], "link.viewer");
+    assert_eq!(new_viewed[0].occurred_at, frozen_now());
 }
 
 #[tokio::test]

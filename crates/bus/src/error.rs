@@ -1,18 +1,12 @@
 //! Error types for publish, relay, and inbox ingest.
+//!
+//! `PublishError` lives in `inv-commands` (T-0031) so [`inv_commands::CoreCtx`]
+//! can hold an `Option<Arc<dyn Publisher>>` without a dep cycle. This crate
+//! re-exports it from its root for backwards compatibility.
 
 use thiserror::Error;
 
-/// Error returned by [`crate::Publisher::publish`].
-#[derive(Debug, Error)]
-pub enum PublishError {
-    /// Backend (kit bus, log target, in-memory sink, …) refused the publish.
-    #[error("publish failed: {0}")]
-    Backend(String),
-
-    /// JSON serialisation of the payload failed.
-    #[error("payload json error: {0}")]
-    Json(#[from] serde_json::Error),
-}
+pub use inv_commands::PublishError;
 
 /// Error returned by [`crate::run_outbox_relay`].
 #[derive(Debug, Error)]
