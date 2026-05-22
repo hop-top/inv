@@ -97,14 +97,78 @@ async fn resource_read_returns_full_invoice_json() {
     let parsed: serde_json::Value = serde_json::from_str(&body).expect("json");
     assert_eq!(parsed["id"], inv_id);
     assert_eq!(parsed["state"], "draft");
-    // v1 deviation: the resource handler serialises only the Invoice
-    // struct (state, totals, timestamps) — lines are NOT joined into
-    // the payload as the story aspires to. Fetching lines requires a
-    // separate tool call (`inv_invoice_show` returns lines). Tracked
-    // for a future iteration; sub-finding from T-0036.
     assert!(
         parsed["subtotal"].is_string() || parsed["subtotal"].is_number(),
         "subtotal field present in invoice json"
+    );
+    // T-0038: the resource read now joins `invoice_lines` into the
+    // body. Shape is a structural superset of what `inv_invoice_show`
+    // returns: all `Invoice` fields flattened at the top level, plus a
+    // `lines` array. Each line carries the bare `InvoiceLine` struct
+    // (id, position, description, quantity, unit_price, tax_category,
+    // tax_amount, line_total, ...).
+    let lines = parsed["lines"]
+        .as_array()
+        .expect("lines array present in resource body");
+    assert_eq!(lines.len(), 1, "seeded one line, got: {lines:?}");
+    let line0 = &lines[0];
+    assert_eq!(line0["description"], "Consulting");
+    assert_eq!(line0["quantity"], "10");
+    assert_eq!(line0["unit_price"], "125.00");
+    assert!(
+        line0["line_total"].is_string(),
+        "line_total decimal-string present, got: {:?}",
+        line0["line_total"]
+    );
+
+    // Sanity: line_totals already include per-line tax, so the sum
+    // matches invoice total (not subtotal). Subtotal is the sum of
+    // (quantity * unit_price) before tax — verify both invariants on the
+    // joined payload to catch any drift between the resource shape and
+    // the underlying repo data.
+    let line_total_sum: rust_decimal::Decimal = lines
+        .iter()
+        .map(|l| {
+            l["line_total"]
+                .as_str()
+                .expect("line_total str")
+                .parse::<rust_decimal::Decimal>()
+                .expect("line_total decimal")
+        })
+        .sum();
+    let invoice_total: rust_decimal::Decimal = parsed["total"]
+        .as_str()
+        .expect("total str")
+        .parse()
+        .expect("total decimal");
+    assert_eq!(
+        line_total_sum, invoice_total,
+        "sum(line_total) must equal invoice.total"
+    );
+    let qty_x_price_sum: rust_decimal::Decimal = lines
+        .iter()
+        .map(|l| {
+            let q: rust_decimal::Decimal = l["quantity"]
+                .as_str()
+                .expect("quantity str")
+                .parse()
+                .expect("quantity decimal");
+            let p: rust_decimal::Decimal = l["unit_price"]
+                .as_str()
+                .expect("unit_price str")
+                .parse()
+                .expect("unit_price decimal");
+            q * p
+        })
+        .sum();
+    let invoice_subtotal: rust_decimal::Decimal = parsed["subtotal"]
+        .as_str()
+        .expect("subtotal str")
+        .parse()
+        .expect("subtotal decimal");
+    assert_eq!(
+        qty_x_price_sum, invoice_subtotal,
+        "sum(quantity * unit_price) must equal invoice.subtotal"
     );
 }
 

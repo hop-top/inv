@@ -17,16 +17,37 @@ use rmcp::model::{
     RawResource, ReadResourceRequestParams, ReadResourceResult, Resource, ResourceContents,
 };
 use rmcp::model::AnnotateAble;
+use serde::Serialize;
 
 use inv_core::domain::ids::{CreditNoteId, CustomerId, InvoiceId, ReminderId, ScheduleId};
+use inv_core::domain::invoice::{Invoice, InvoiceLine};
 use inv_commands::CoreCtx;
 use inv_store::repo::credit_note::CreditNoteRepo;
 use inv_store::repo::customer::CustomerRepo;
-use inv_store::repo::invoice::InvoiceRepo;
+use inv_store::repo::invoice::{InvoiceLineRepo, InvoiceRepo};
 use inv_store::repo::reminder::ReminderRepo;
 use inv_store::repo::schedule::ScheduleRepo;
 
 use crate::error::McpError;
+
+/// Wire-shape of `inv://invoice/<id>` reads.
+///
+/// All `Invoice` fields are flattened to the top level so callers can
+/// access (e.g.) `state`, `total`, `id` directly — matching the bare
+/// `Invoice` JSON returned by the `inv_invoice_show` tool. The resource
+/// is a structural superset: it additionally includes `lines`, the join
+/// onto `invoice_lines` (sorted by `position`). Each line serialises as
+/// the bare [`InvoiceLine`] struct (`id`, `invoice_id`, `position`,
+/// `description`, `quantity`, `unit_price`, `tax_rate_ids`,
+/// `tax_category`, `tax_amount`, `line_total`, `metadata`) — matching
+/// the line shape already used by `inv_invoice_draft` /
+/// `inv_invoice_issue` tool outputs.
+#[derive(Debug, Serialize)]
+struct InvoiceResourceBody<'a> {
+    #[serde(flatten)]
+    invoice: &'a Invoice,
+    lines: &'a [InvoiceLine],
+}
 
 /// URI scheme used by all `inv-mcp` resources.
 pub const URI_SCHEME: &str = "inv";
@@ -74,7 +95,12 @@ pub async fn read(
                 .get(&id)
                 .await?
                 .ok_or_else(|| McpError::NotFound(format!("invoice {id}")))?;
-            serde_json::to_string_pretty(&inv).map_err(|e| McpError::Decode(e.to_string()))?
+            let lines = InvoiceLineRepo::new(&ctx.db).list_for_invoice(&id).await?;
+            let body = InvoiceResourceBody {
+                invoice: &inv,
+                lines: &lines,
+            };
+            serde_json::to_string_pretty(&body).map_err(|e| McpError::Decode(e.to_string()))?
         }
         "creditnote" => {
             let id: CreditNoteId = id_str

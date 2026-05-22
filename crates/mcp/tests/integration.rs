@@ -300,6 +300,160 @@ async fn invalid_tool_input_surfaces_mcp_error() {
 }
 
 #[tokio::test]
+async fn resource_read_includes_lines_single() {
+    // T-0038: `inv://invoice/<id>` joins `invoice_lines` into the
+    // payload. Single-line invoice → `lines` array of length 1.
+    let (ctx, pool) = fresh_ctx().await;
+    let cust_id = seed_customer(&pool).await;
+    let client = spawn_pair(ctx).await;
+
+    let draft = client
+        .peer()
+        .call_tool(
+            CallToolRequestParams::new("inv_invoice_draft").with_arguments(
+                serde_json::json!({
+                    "customer_id": cust_id.to_string(),
+                    "seller_jurisdiction": "CA-QC",
+                    "currency": "CAD",
+                    "lines": [
+                        {
+                            "description": "Consulting",
+                            "quantity": "10",
+                            "unit_price": "100",
+                            "tax_category": "standard"
+                        }
+                    ]
+                })
+                .as_object()
+                .unwrap()
+                .clone(),
+            ),
+        )
+        .await
+        .expect("draft");
+    let invoice_id = draft
+        .structured_content
+        .as_ref()
+        .and_then(|v| v.pointer("/invoice/id"))
+        .and_then(|v| v.as_str())
+        .expect("invoice id")
+        .to_string();
+
+    let resource = client
+        .peer()
+        .read_resource(ReadResourceRequestParams::new(format!(
+            "inv://invoice/{invoice_id}"
+        )))
+        .await
+        .expect("read resource");
+    let body = match &resource.contents[0] {
+        rmcp::model::ResourceContents::TextResourceContents { text, .. } => text.clone(),
+        _ => panic!("text contents"),
+    };
+    let parsed: serde_json::Value = serde_json::from_str(&body).expect("json");
+    // Invoice fields flattened at top level.
+    assert_eq!(parsed["id"], invoice_id);
+    assert_eq!(parsed["state"], "draft");
+    // Lines joined.
+    let lines = parsed["lines"].as_array().expect("lines array");
+    assert_eq!(lines.len(), 1);
+    assert_eq!(lines[0]["description"], "Consulting");
+    assert_eq!(lines[0]["quantity"], "10");
+    assert_eq!(lines[0]["unit_price"], "100");
+    assert_eq!(lines[0]["position"], 0);
+    assert!(lines[0]["line_total"].is_string(), "line_total decimal-str");
+    assert!(lines[0]["tax_amount"].is_string(), "tax_amount decimal-str");
+    // Bare InvoiceLine struct fields — `id` + `invoice_id` present.
+    assert!(lines[0]["id"].is_string(), "line id present");
+    assert_eq!(lines[0]["invoice_id"], invoice_id);
+}
+
+#[tokio::test]
+async fn resource_read_includes_lines_multi_in_position_order() {
+    // T-0038: multi-line invoice — verify `lines` ordering follows
+    // `position ASC` (the repo guarantee) and that every line is
+    // included.
+    let (ctx, pool) = fresh_ctx().await;
+    let cust_id = seed_customer(&pool).await;
+    let client = spawn_pair(ctx).await;
+
+    let draft = client
+        .peer()
+        .call_tool(
+            CallToolRequestParams::new("inv_invoice_draft").with_arguments(
+                serde_json::json!({
+                    "customer_id": cust_id.to_string(),
+                    "seller_jurisdiction": "CA-QC",
+                    "currency": "CAD",
+                    "lines": [
+                        { "description": "Design",      "quantity": "1",  "unit_price": "200", "tax_category": "standard" },
+                        { "description": "Consulting", "quantity": "10", "unit_price": "150", "tax_category": "standard" },
+                        { "description": "Hosting",    "quantity": "12", "unit_price": "25",  "tax_category": "standard" }
+                    ]
+                })
+                .as_object()
+                .unwrap()
+                .clone(),
+            ),
+        )
+        .await
+        .expect("draft");
+    let invoice_id = draft
+        .structured_content
+        .as_ref()
+        .and_then(|v| v.pointer("/invoice/id"))
+        .and_then(|v| v.as_str())
+        .expect("invoice id")
+        .to_string();
+
+    let resource = client
+        .peer()
+        .read_resource(ReadResourceRequestParams::new(format!(
+            "inv://invoice/{invoice_id}"
+        )))
+        .await
+        .expect("read resource");
+    let body = match &resource.contents[0] {
+        rmcp::model::ResourceContents::TextResourceContents { text, .. } => text.clone(),
+        _ => panic!("text contents"),
+    };
+    let parsed: serde_json::Value = serde_json::from_str(&body).expect("json");
+    let lines = parsed["lines"].as_array().expect("lines array");
+    assert_eq!(lines.len(), 3);
+    let descs: Vec<&str> = lines
+        .iter()
+        .map(|l| l["description"].as_str().unwrap())
+        .collect();
+    assert_eq!(descs, vec!["Design", "Consulting", "Hosting"]);
+    let positions: Vec<u64> = lines
+        .iter()
+        .map(|l| l["position"].as_u64().expect("position int"))
+        .collect();
+    assert_eq!(positions, vec![0, 1, 2], "position must be 0-based dense");
+}
+
+#[tokio::test]
+async fn resource_read_unknown_invoice_returns_error() {
+    // T-0038: a well-formed-but-nonexistent id maps to McpError::NotFound
+    // (rmcp invalid_params per error.rs).
+    let (ctx, _pool) = fresh_ctx().await;
+    let client = spawn_pair(ctx).await;
+    let bogus = inv_core::domain::ids::InvoiceId::new();
+    let err = client
+        .peer()
+        .read_resource(ReadResourceRequestParams::new(format!(
+            "inv://invoice/{bogus}"
+        )))
+        .await
+        .expect_err("unknown id must error");
+    let msg = format!("{err}").to_ascii_lowercase();
+    assert!(
+        msg.contains("not") || msg.contains("invoice") || msg.contains("found"),
+        "unhelpful err: {err}"
+    );
+}
+
+#[tokio::test]
 async fn resource_templates_advertise_five_kinds() {
     let (ctx, _pool) = fresh_ctx().await;
     let client = spawn_pair(ctx).await;
