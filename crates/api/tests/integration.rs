@@ -409,10 +409,12 @@ async fn signed_link_view_tampered_404() {
         3600,
         &state.config.link_signing_key,
     );
-    // Drop the last char — invalid base64 or signature mismatch.
+    // Drop the last char and replace with a guaranteed-different char so
+    // tampering is never a no-op (base64url tokens end in 'A' ~3% of the
+    // time, which would flake CI). Invalid base64 or signature mismatch.
     let mut tampered = token;
-    tampered.pop();
-    tampered.push('A');
+    let last = tampered.pop();
+    tampered.push(if last == Some('A') { 'B' } else { 'A' });
     let resp = app
         .oneshot(
             Request::builder()
