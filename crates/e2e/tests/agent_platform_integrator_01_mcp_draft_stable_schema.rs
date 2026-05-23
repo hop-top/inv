@@ -137,6 +137,74 @@ async fn inv_invoice_draft_happy_path_call() {
 }
 
 #[tokio::test]
+async fn inv_invoice_show_returns_lines_matching_resource_shape() {
+    // T-0041: `inv_invoice_show` is now structurally identical to the
+    // `inv://invoice/<id>` resource — bare `Invoice` fields flattened
+    // at the top level plus a `lines` array. An agent that already
+    // knows the resource shape should be able to switch to the tool
+    // without code changes.
+    let (ctx, pool) = fresh_mcp_ctx().await;
+    let cust = common::seed_customer_qc(&pool).await;
+    let client = spawn_pair(ctx).await;
+
+    let drafted = client
+        .peer()
+        .call_tool(
+            CallToolRequestParams::new("inv_invoice_draft").with_arguments(
+                serde_json::json!({
+                    "customer_id": cust.to_string(),
+                    "seller_jurisdiction": "CA-QC",
+                    "currency": "CAD",
+                    "lines": [
+                        { "description": "Consulting", "quantity": "10", "unit_price": "125.00", "tax_category": "standard" },
+                        { "description": "Hosting",    "quantity": "1",  "unit_price": "50.00",  "tax_category": "standard" }
+                    ]
+                })
+                .as_object()
+                .unwrap()
+                .clone(),
+            ),
+        )
+        .await
+        .expect("draft");
+    let inv_id = drafted
+        .structured_content
+        .as_ref()
+        .and_then(|v| v.pointer("/invoice/id"))
+        .and_then(|v| v.as_str())
+        .expect("inv id")
+        .to_string();
+
+    let shown = client
+        .peer()
+        .call_tool(
+            CallToolRequestParams::new("inv_invoice_show").with_arguments(
+                serde_json::json!({ "invoice_id": inv_id })
+                    .as_object()
+                    .unwrap()
+                    .clone(),
+            ),
+        )
+        .await
+        .expect("show");
+    let sc = shown
+        .structured_content
+        .as_ref()
+        .expect("structured content");
+
+    // Top-level invoice fields (flattened).
+    assert_eq!(sc["id"], inv_id);
+    assert_eq!(sc["state"], "draft");
+    // Joined lines.
+    let lines = sc["lines"].as_array().expect("lines array");
+    assert_eq!(lines.len(), 2, "show should return both lines, got: {lines:?}");
+    assert_eq!(lines[0]["description"], "Consulting");
+    assert_eq!(lines[1]["description"], "Hosting");
+    assert_eq!(lines[0]["position"], 0);
+    assert_eq!(lines[1]["position"], 1);
+}
+
+#[tokio::test]
 async fn inv_invoice_draft_validation_error_surfaces_mcp_error() {
     let (ctx, _pool) = fresh_mcp_ctx().await;
     let client = spawn_pair(ctx).await;

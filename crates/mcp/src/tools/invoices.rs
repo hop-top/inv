@@ -30,7 +30,7 @@ use inv_core::domain::invoice::{InvoiceState, TaxCategory};
 use inv_core::domain::jurisdiction::Jurisdiction;
 use inv_core::domain::money::Currency;
 use inv_store::repo::customer::CustomerRepo;
-use inv_store::repo::invoice::{InvoiceFilter, InvoiceRepo};
+use inv_store::repo::invoice::{InvoiceFilter, InvoiceLineRepo, InvoiceRepo};
 use std::collections::BTreeMap;
 
 use inv_commands::CoreCtx;
@@ -340,6 +340,12 @@ pub struct InvoiceShowInput {
 }
 
 /// Show an invoice.
+///
+/// Output matches `inv://invoice/<id>` resource read byte-for-byte
+/// (T-0041): bare `Invoice` fields flattened at the top level, plus a
+/// `lines` array joined from `invoice_lines` (ordered by `position`).
+/// Serialised via [`crate::resources::InvoiceResourceBody`] — the same
+/// wrapper the resource handler uses.
 pub async fn show(ctx: &CoreCtx, input: InvoiceShowInput) -> Result<serde_json::Value, McpError> {
     let id: InvoiceId = input
         .invoice_id
@@ -349,7 +355,12 @@ pub async fn show(ctx: &CoreCtx, input: InvoiceShowInput) -> Result<serde_json::
         .get(&id)
         .await?
         .ok_or_else(|| McpError::NotFound(format!("invoice {id}")))?;
-    crate::tools::common::to_value(&inv)
+    let lines = InvoiceLineRepo::new(&ctx.db).list_for_invoice(&id).await?;
+    let body = crate::resources::InvoiceResourceBody {
+        invoice: &inv,
+        lines: &lines,
+    };
+    crate::tools::common::to_value(&body)
 }
 
 /// Input for `inv_invoice_list`.

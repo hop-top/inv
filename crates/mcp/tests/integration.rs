@@ -454,6 +454,97 @@ async fn resource_read_unknown_invoice_returns_error() {
 }
 
 #[tokio::test]
+async fn show_tool_and_resource_return_identical_shape() {
+    // T-0041: `inv_invoice_show` and `inv://invoice/<id>` MUST produce
+    // byte-for-byte identical JSON (post-parse Value equality — the
+    // resource pretty-prints text whereas the tool returns structured
+    // content, so equality is checked at the parsed `Value` level).
+    let (ctx, pool) = fresh_ctx().await;
+    let cust_id = seed_customer(&pool).await;
+    let client = spawn_pair(ctx).await;
+
+    // Seed a multi-line invoice so `lines` is non-trivial.
+    let draft = client
+        .peer()
+        .call_tool(
+            CallToolRequestParams::new("inv_invoice_draft").with_arguments(
+                serde_json::json!({
+                    "customer_id": cust_id.to_string(),
+                    "seller_jurisdiction": "CA-QC",
+                    "currency": "CAD",
+                    "lines": [
+                        { "description": "Design",     "quantity": "1",  "unit_price": "200", "tax_category": "standard" },
+                        { "description": "Consulting", "quantity": "10", "unit_price": "150", "tax_category": "standard" },
+                        { "description": "Hosting",    "quantity": "12", "unit_price": "25",  "tax_category": "standard" }
+                    ]
+                })
+                .as_object()
+                .unwrap()
+                .clone(),
+            ),
+        )
+        .await
+        .expect("draft");
+    let invoice_id = draft
+        .structured_content
+        .as_ref()
+        .and_then(|v| v.pointer("/invoice/id"))
+        .and_then(|v| v.as_str())
+        .expect("invoice id")
+        .to_string();
+
+    // Tool side: `inv_invoice_show` → structured_content.
+    let shown = client
+        .peer()
+        .call_tool(
+            CallToolRequestParams::new("inv_invoice_show").with_arguments(
+                serde_json::json!({ "invoice_id": invoice_id })
+                    .as_object()
+                    .unwrap()
+                    .clone(),
+            ),
+        )
+        .await
+        .expect("show");
+    let tool_value: serde_json::Value = shown
+        .structured_content
+        .as_ref()
+        .expect("show returns structured content")
+        .clone();
+
+    // Resource side: `inv://invoice/<id>` → pretty JSON text.
+    let resource = client
+        .peer()
+        .read_resource(ReadResourceRequestParams::new(format!(
+            "inv://invoice/{invoice_id}"
+        )))
+        .await
+        .expect("read resource");
+    let body = match &resource.contents[0] {
+        rmcp::model::ResourceContents::TextResourceContents { text, .. } => text.clone(),
+        _ => panic!("text contents"),
+    };
+    let resource_value: serde_json::Value =
+        serde_json::from_str(&body).expect("resource json parse");
+
+    // Byte-for-byte parity post-parse: identical `Value` trees.
+    assert_eq!(
+        tool_value, resource_value,
+        "inv_invoice_show output must equal inv://invoice/{{id}} body\n\
+         tool: {tool_value}\n\
+         resource: {resource_value}"
+    );
+
+    // Cross-check both sides actually carry the joined `lines` (defends
+    // against the case where both happen to be wrong in the same way —
+    // e.g. both regressing to bare Invoice).
+    let tool_lines = tool_value["lines"].as_array().expect("tool lines array");
+    assert_eq!(tool_lines.len(), 3, "tool lines: {tool_lines:?}");
+    assert_eq!(tool_value["id"], invoice_id);
+    assert_eq!(tool_value["state"], "draft");
+}
+
+#[tokio::test]
 async fn resource_templates_advertise_five_kinds() {
     let (ctx, _pool) = fresh_ctx().await;
     let client = spawn_pair(ctx).await;

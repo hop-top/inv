@@ -30,23 +30,28 @@ use inv_store::repo::schedule::ScheduleRepo;
 
 use crate::error::McpError;
 
-/// Wire-shape of `inv://invoice/<id>` reads.
+/// Wire-shape of `inv://invoice/<id>` reads AND `inv_invoice_show` tool
+/// output.
 ///
 /// All `Invoice` fields are flattened to the top level so callers can
-/// access (e.g.) `state`, `total`, `id` directly — matching the bare
-/// `Invoice` JSON returned by the `inv_invoice_show` tool. The resource
-/// is a structural superset: it additionally includes `lines`, the join
-/// onto `invoice_lines` (sorted by `position`). Each line serialises as
-/// the bare [`InvoiceLine`] struct (`id`, `invoice_id`, `position`,
-/// `description`, `quantity`, `unit_price`, `tax_rate_ids`,
-/// `tax_category`, `tax_amount`, `line_total`, `metadata`) — matching
-/// the line shape already used by `inv_invoice_draft` /
-/// `inv_invoice_issue` tool outputs.
+/// access (e.g.) `state`, `total`, `id` directly. The body is a
+/// structural superset of the bare `Invoice`: it additionally includes
+/// `lines`, the join onto `invoice_lines` (sorted by `position`). Each
+/// line serialises as the bare [`InvoiceLine`] struct (`id`,
+/// `invoice_id`, `position`, `description`, `quantity`, `unit_price`,
+/// `tax_rate_ids`, `tax_category`, `tax_amount`, `line_total`,
+/// `metadata`) — matching the line shape already used by
+/// `inv_invoice_draft` / `inv_invoice_issue` tool outputs.
+///
+/// `pub(crate)` so the `inv_invoice_show` tool (see
+/// [`crate::tools::invoices::show`]) can serialise via the same struct
+/// and produce byte-for-byte identical JSON to the resource read
+/// (T-0041).
 #[derive(Debug, Serialize)]
-struct InvoiceResourceBody<'a> {
+pub(crate) struct InvoiceResourceBody<'a> {
     #[serde(flatten)]
-    invoice: &'a Invoice,
-    lines: &'a [InvoiceLine],
+    pub(crate) invoice: &'a Invoice,
+    pub(crate) lines: &'a [InvoiceLine],
 }
 
 /// URI scheme used by all `inv-mcp` resources.
