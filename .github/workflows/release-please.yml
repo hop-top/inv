@@ -1,5 +1,6 @@
 # Release Please — version bump + changelog PRs, driven by Conventional
-# Commits and release-please-config.json (release-type = "rust").
+# Commits and release-please-config.json (release-type = "simple" — the
+# `rust` strategy errors on Cargo workspaces with version.workspace = true).
 #
 # Publishing intent (v1):
 #   We intentionally publish to crates.io MANUALLY at v1. The `release-rs`
@@ -45,7 +46,6 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      # Skip the known-flaky inv-api test (T-0034) — same posture as ci.yml.
-      - run: cargo test --workspace --features inv-store/sqlite -- --skip signed_link_view_tampered_404
+      - run: cargo test --workspace
       - run: cargo publish --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
 

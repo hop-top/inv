@@ -2,14 +2,9 @@
 #
 # Strategy:
 #   - lint          : fmt + clippy --all-features --all-targets, warnings as errors
-#   - test-sqlite   : `cargo test` against default `inv-store/sqlite` backend
-#   - test-postgres : `cargo test` against `inv-store/postgres` (push-only; PRs skip)
+#   - test-sqlite   : `cargo test --workspace` (sqlite is the default backend)
+#   - test-postgres : `cargo test` with `--no-default-features --features inv-store/postgres` (push-only; PRs skip)
 #   - build-release : optimised workspace build; uploads `inv` artifact on push to main
-#
-# Skipped tests:
-#   - `signed_link_view_tampered_404` (inv-api) is flaky (~3% failure rate)
-#     due to a token-tampering bug in the test itself. Tracked by T-0034.
-#     Re-enable in CI when T-0034 lands.
 #
 # Matrix:
 #   - ubuntu-latest only at v1; macOS / Windows in a follow-up.
@@ -46,8 +41,6 @@ permissions:
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
-  # Known-flaky test tracked by T-0034. Centralised here so all test jobs agree.
-  SKIP_TESTS: signed_link_view_tampered_404
 
 jobs:
   lint:
@@ -78,9 +71,8 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
-      - name: cargo test (inv-store/sqlite)
-        # Default features include inv-store/sqlite. Skip the flaky T-0034 test.
-        run: cargo test --workspace --features inv-store/sqlite -- --skip ${SKIP_TESTS}
+      - name: cargo test (sqlite, default)
+        run: cargo test --workspace
 
   test-postgres:
     name: Test (postgres)
@@ -96,8 +88,8 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
-      - name: cargo test (inv-store/postgres)
-        run: cargo test --workspace --no-default-features --features inv-store/postgres -- --skip ${SKIP_TESTS}
+      - name: cargo test (postgres)
+        run: cargo test --workspace --no-default-features --features inv-store/postgres
 
   build-release:
     name: Build (release)
