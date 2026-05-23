@@ -43,7 +43,6 @@ async fn run_schedules(ctx: &CoreCtx, matches: &ArgMatches) -> Result<()> {
             .map(|s| s.to_string())
             .collect::<Vec<_>>(),
         "drafts": output.drafts.iter().map(|d| d.invoice.id.to_string()).collect::<Vec<_>>(),
-        "emitted_events": output.emitted_events.iter().map(|e| e.topic.clone()).collect::<Vec<_>>(),
     });
     render_value(matches, value, &tick_columns())?;
     Ok(())
@@ -57,7 +56,6 @@ async fn run_reminders(ctx: &CoreCtx, matches: &ArgMatches) -> Result<()> {
             .iter()
             .map(|r| r.id.to_string())
             .collect::<Vec<_>>(),
-        "emitted_events": output.emitted_events.iter().map(|e| e.topic.clone()).collect::<Vec<_>>(),
     });
     render_value(matches, value, &tick_columns())?;
     Ok(())
@@ -73,7 +71,6 @@ async fn run_overdue(ctx: &CoreCtx, matches: &ArgMatches) -> Result<()> {
             .iter()
             .map(|i| i.id.to_string())
             .collect::<Vec<_>>(),
-        "emitted_events": output.emitted_events.iter().map(|e| e.topic.clone()).collect::<Vec<_>>(),
     });
     render_value(matches, value, &tick_columns())?;
     Ok(())
@@ -85,6 +82,5 @@ fn tick_columns() -> Vec<ColumnSpec> {
         ColumnSpec::new("sent_reminders", "sent_reminders", 24),
         ColumnSpec::new("overdue_invoices", "overdue_invoices", 24),
         ColumnSpec::new("drafts", "drafts", 16),
-        ColumnSpec::new("emitted_events", "emitted_events", 24),
     ]
 }

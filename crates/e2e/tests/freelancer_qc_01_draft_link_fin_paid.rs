@@ -144,12 +144,8 @@ async fn full_lifecycle_with_fin_payment() {
     .await
     .expect("send stdout");
     assert_eq!(sent.invoice.state, InvoiceState::Sent);
-    let topics: Vec<&str> = sent
-        .emitted_events
-        .iter()
-        .map(|e| e.topic.as_str())
-        .collect();
-    assert!(topics.contains(&"inv.billing.invoice.sent"));
+    let topics = captured.topics();
+    assert!(topics.contains(&"inv.billing.invoice.sent".to_string()));
     // Signed-link minting (mirrors inv-api's POST /v1/invoices/{id}/send
     // for link://): assert the helper produces a stable token round-trip.
     let token = inv_api::signed_link::sign(&issued.invoice.id.to_string(), 3600, b"test-link-key");
@@ -229,12 +225,8 @@ async fn full_lifecycle_with_fin_payment() {
         paid.invoice.amount_paid,
         Decimal::from_str("1667.14").unwrap()
     );
-    let topics: Vec<&str> = paid
-        .emitted_events
-        .iter()
-        .map(|e| e.topic.as_str())
-        .collect();
-    assert!(topics.contains(&"inv.billing.invoice.paid"));
+    let topics = captured.topics();
+    assert!(topics.contains(&"inv.billing.invoice.paid".to_string()));
 
     // Replay of the same event_id: inbox refuses, no double-emit.
     let second = dispatch_inbound_event(

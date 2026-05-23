@@ -22,7 +22,7 @@ use inv_store::repo::invoice::InvoiceRepo;
 use crate::ctx::{Actor, Channel, CoreCtx};
 use crate::draft::history_channel_str;
 use crate::error::CoreError;
-use crate::events::EmittedEvent;
+use crate::publisher::try_publish;
 
 /// Input for [`void_invoice`].
 #[derive(Debug, Clone)]
@@ -51,8 +51,6 @@ impl VoidInvoiceInput {
 pub struct VoidInvoiceOutput {
     /// Voided invoice.
     pub invoice: Invoice,
-    /// Bus events the command would emit.
-    pub emitted_events: Vec<EmittedEvent>,
 }
 
 /// Void an issued/sent/viewed invoice (pre-payment only).
@@ -103,16 +101,17 @@ pub async fn void_invoice(
         tx.commit().await.map_err(inv_store::StoreError::from)?;
     }
 
-    let emitted = build_voided_events(&invoice, &input, from_state, to_state, &event, channel, now);
+    publish_voided_events(
+        ctx, &invoice, &input, from_state, to_state, &event, channel, now,
+    )
+    .await;
 
-    Ok(VoidInvoiceOutput {
-        invoice,
-        emitted_events: emitted,
-    })
+    Ok(VoidInvoiceOutput { invoice })
 }
 
 #[allow(clippy::too_many_arguments)]
-fn build_voided_events(
+async fn publish_voided_events(
+    ctx: &CoreCtx,
     invoice: &Invoice,
     input: &VoidInvoiceInput,
     from: InvoiceState,
@@ -120,7 +119,7 @@ fn build_voided_events(
     event: &InvoiceEvent,
     channel: HistoryChannel,
     now: DateTime<Utc>,
-) -> Vec<EmittedEvent> {
+) {
     let actor_audit = input.actor.audit_string();
     let proposed = InvoiceProposed::new(
         invoice.id.clone(),
@@ -148,31 +147,37 @@ fn build_voided_events(
         now,
     );
 
-    vec![
-        EmittedEvent::new(
-            TOPIC_PROPOSED,
-            serde_json::to_value(&proposed).unwrap_or(json!({})),
-            now,
-        ),
-        EmittedEvent::new(
-            TOPIC_TRANSITIONED,
-            serde_json::to_value(&transitioned).unwrap_or(json!({})),
-            now,
-        ),
-        EmittedEvent::new(
-            TOPIC_ENTERED,
-            serde_json::to_value(&entered).unwrap_or(json!({})),
-            now,
-        ),
-        EmittedEvent::new(
-            "inv.billing.invoice.voided",
-            json!({
-                "invoice_id": invoice.id.to_string(),
-                "reason": input.reason.clone(),
-                "actor": actor_audit,
-                "channel": history_channel_str(channel),
-            }),
-            now,
-        ),
-    ]
+    try_publish(
+        ctx,
+        TOPIC_PROPOSED,
+        serde_json::to_value(&proposed).unwrap_or(json!({})),
+        now,
+    )
+    .await;
+    try_publish(
+        ctx,
+        TOPIC_TRANSITIONED,
+        serde_json::to_value(&transitioned).unwrap_or(json!({})),
+        now,
+    )
+    .await;
+    try_publish(
+        ctx,
+        TOPIC_ENTERED,
+        serde_json::to_value(&entered).unwrap_or(json!({})),
+        now,
+    )
+    .await;
+    try_publish(
+        ctx,
+        "inv.billing.invoice.voided",
+        json!({
+            "invoice_id": invoice.id.to_string(),
+            "reason": input.reason.clone(),
+            "actor": actor_audit,
+            "channel": history_channel_str(channel),
+        }),
+        now,
+    )
+    .await;
 }

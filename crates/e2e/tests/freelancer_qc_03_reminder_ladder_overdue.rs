@@ -26,7 +26,7 @@ use inv_store::repo::invoice::InvoiceRepo;
 
 #[tokio::test]
 async fn reminder_ladder_dispatches_and_overdue_flags() {
-    let (mut ctx, pool, _captured, _blob) = common::fresh_ctx().await;
+    let (mut ctx, pool, captured, _blob) = common::fresh_ctx().await;
     let cust = common::seed_customer_qc(&pool).await;
 
     // Drive draft → issue → send to put the invoice in Sent state with
@@ -106,13 +106,15 @@ async fn reminder_ladder_dispatches_and_overdue_flags() {
 
     // ----- Then: each reminder is scheduled + event emitted. ---------
     assert_eq!(r1.reminder.state, ReminderState::Scheduled);
-    let topics: Vec<&str> = r1.emitted_events.iter().map(|e| e.topic.as_str()).collect();
-    assert!(topics.contains(&"inv.billing.reminder.scheduled"));
+    let topics = captured.topics();
+    assert!(topics.contains(&"inv.billing.reminder.scheduled".to_string()));
 
     // ----- Given today is 2026-07-07T09:01:00Z (past the first). -----
     ctx = ctx.with_clock(Arc::new(common::FrozenClock(
         Utc.with_ymd_and_hms(2026, 7, 7, 9, 1, 0).unwrap(),
     )));
+    // Snapshot publisher pre-tick so we can isolate this tick's emissions.
+    let topics_before_tick = captured.topics();
     let tick = reminders_tick(&ctx).await.expect("tick");
 
     // ----- Then: first reminder dispatched + invoice stays Sent. -----
@@ -124,17 +126,19 @@ async fn reminder_ladder_dispatches_and_overdue_flags() {
         InvoiceState::Sent,
         "FSM stays Sent on reminder self-edge"
     );
-    let topics: Vec<&str> = tick
-        .emitted_events
+    let topics_after_tick = captured.topics();
+    let new_topics: Vec<&str> = topics_after_tick[topics_before_tick.len()..]
         .iter()
-        .map(|e| e.topic.as_str())
+        .map(|s| s.as_str())
         .collect();
-    assert!(topics.contains(&"inv.billing.reminder.sent"));
+    assert!(new_topics.contains(&"inv.billing.reminder.sent"));
     // The invoice's FSM did NOT move → no transitioned/entered events
-    // from this tick.
+    // from this tick (a prior issue/send pair did publish those — that's
+    // why we slice on the pre-tick snapshot rather than the cumulative
+    // capture).
     assert!(
-        !topics.contains(&"inv.billing.invoice.transitioned"),
-        "self-edge must not emit transitioned: {topics:?}"
+        !new_topics.contains(&"inv.billing.invoice.transitioned"),
+        "self-edge must not emit transitioned: {new_topics:?}"
     );
 
     // ----- Given today is 2026-07-01 (one day past due_at=2026-06-30).
@@ -148,12 +152,8 @@ async fn reminder_ladder_dispatches_and_overdue_flags() {
     // ----- Then: invoice.overdue emitted, state still Sent. ----------
     assert_eq!(overdue.overdue_invoices.len(), 1);
     assert_eq!(overdue.overdue_invoices[0].id, inv_id);
-    let topics: Vec<&str> = overdue
-        .emitted_events
-        .iter()
-        .map(|e| e.topic.as_str())
-        .collect();
-    assert!(topics.contains(&"inv.billing.invoice.overdue"));
+    let topics = captured.topics();
+    assert!(topics.contains(&"inv.billing.invoice.overdue".to_string()));
     let back2 = InvoiceRepo::new(&pool).get(&inv_id).await.unwrap().unwrap();
     assert_eq!(
         back2.state,

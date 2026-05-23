@@ -1,10 +1,14 @@
-//! Story agent-platform-integrator-03: every mutating tool surfaces the
-//! emitted bus events in its result, so the agent can summarise side
-//! effects without subscribing to the bus.
+//! Story agent-platform-integrator-03: every mutating command publishes
+//! the matching bus events synchronously, so an agent that wires an
+//! InMemoryPublisher into the CoreCtx can observe the event stream and
+//! summarise side effects without subscribing to the real bus.
 //!
-//! Surfaces: MCP (tools/call), commands (EmittedEvent in output),
-//! outbox relay parity (the agent's view should match what subscribers
-//! see — we drain the relay + cross-check).
+//! Surfaces: MCP (tools/call), commands (`publisher::try_publish` —
+//! T-0043), outbox relay parity (the publisher's view should match what
+//! subscribers see — we drain the relay + cross-check).
+//!
+//! T-0043 dropped the per-tool `emitted_events` field; tools no longer
+//! ferry the event list inline. Capture happens via the publisher.
 //!
 //! xrr: NOT used. In-process duplex.
 
@@ -55,7 +59,7 @@ async fn spawn_pair(ctx: Arc<CoreCtx>) -> rmcp::service::RunningService<rmcp::Ro
 }
 
 #[tokio::test]
-async fn issue_tool_surfaces_emitted_events_and_matches_relay() {
+async fn issue_tool_publishes_events_and_matches_relay() {
     let (ctx, pool, captured) = fresh_mcp_ctx().await;
     let cust = common::seed_customer_qc(&pool).await;
     let client = spawn_pair(ctx).await;
@@ -88,8 +92,14 @@ async fn issue_tool_surfaces_emitted_events_and_matches_relay() {
         .expect("inv id")
         .to_string();
 
-    // 2. Issue — expect mechanic triplet + domain `.issued` in emitted_events.
-    let issued = client
+    // Snapshot publisher state pre-issue so we can isolate the issue
+    // call's emissions from the prior draft.
+    let topics_before_issue = captured.topics();
+
+    // 2. Issue — expect mechanic triplet + domain `.issued` to land on
+    //    the InMemoryPublisher (T-0043; events no longer ride the tool
+    //    response).
+    let _issued = client
         .peer()
         .call_tool(
             CallToolRequestParams::new("inv_invoice_issue").with_arguments(
@@ -101,14 +111,11 @@ async fn issue_tool_surfaces_emitted_events_and_matches_relay() {
         )
         .await
         .expect("issue");
-    let sc = issued.structured_content.as_ref().expect("structured");
-    let emitted = sc
-        .pointer("/emitted_events")
-        .and_then(|v| v.as_array())
-        .expect("emitted_events array");
-    let topics: Vec<&str> = emitted
+
+    let topics_after_issue = captured.topics();
+    let new_topics: Vec<&str> = topics_after_issue[topics_before_issue.len()..]
         .iter()
-        .filter_map(|e| e.pointer("/topic").and_then(|v| v.as_str()))
+        .map(|s| s.as_str())
         .collect();
     for expected in [
         "inv.billing.invoice.proposed",
@@ -117,13 +124,13 @@ async fn issue_tool_surfaces_emitted_events_and_matches_relay() {
         "inv.billing.invoice.issued",
     ] {
         assert!(
-            topics.contains(&expected),
-            "missing `{expected}` in {topics:?}"
+            new_topics.contains(&expected),
+            "missing `{expected}` in {new_topics:?}"
         );
     }
 
     // 3. Drain the outbox relay and confirm subscribers see the same
-    //    domain event the agent saw in-band.
+    //    domain event the publisher captured in-band.
     let _ = run_outbox_relay(&pool, captured.as_ref(), 50)
         .await
         .expect("relay");

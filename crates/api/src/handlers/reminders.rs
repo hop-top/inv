@@ -55,7 +55,6 @@ pub async fn schedule(
         StatusCode::CREATED,
         Json(json!({
             "reminder": out.reminder,
-            "emitted_events": out.emitted_events,
         })),
     ))
 }
@@ -82,7 +81,6 @@ pub async fn cancel(
     let out = reminder_cancel(&state.ctx, input).await?;
     Ok(Json(json!({
         "reminder": out.reminder,
-        "emitted_events": out.emitted_events,
     })))
 }
 

@@ -126,11 +126,13 @@ async fn inv_invoice_draft_happy_path_call() {
         .and_then(|v| v.as_str())
         .expect("id");
     assert!(inv_id.starts_with("invoice_"), "got `{inv_id}`");
-    // emitted_events surfaced — see story-03 for the full triplet check;
-    // here we just confirm the field is present.
+    // T-0043: emitted_events was dropped from tool responses (events
+    // publish on the bus via ctx.publisher instead — see story-03).
+    // Confirm the field is NOT present so agents migrated to bus
+    // subscriptions don't accidentally regress to in-band parsing.
     assert!(
-        sc.pointer("/emitted_events").is_some(),
-        "tool result should include emitted_events: {sc}"
+        sc.pointer("/emitted_events").is_none(),
+        "tool result must NOT include emitted_events (T-0043): {sc}"
     );
 }
 

@@ -65,7 +65,6 @@ pub async fn draft(
         StatusCode::CREATED,
         Json(json!({
             "credit_note": out.credit_note,
-            "emitted_events": out.emitted_events,
         })),
     ))
 }
@@ -93,7 +92,6 @@ pub async fn issue(
     let out = issue_credit_note(&state.ctx, input).await?;
     Ok(Json(json!({
         "credit_note": out.credit_note,
-        "emitted_events": out.emitted_events,
     })))
 }
 

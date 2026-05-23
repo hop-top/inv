@@ -37,7 +37,7 @@ use inv_store::repo::history::InvoiceHistoryRepo;
 #[tokio::test]
 async fn draft_idempotency_key_replays() {
     // Implemented surface: draft.
-    let (ctx, pool, _captured, _blob) = common::fresh_ctx().await;
+    let (ctx, pool, captured, _blob) = common::fresh_ctx().await;
     let cust = common::seed_customer_qc(&pool).await;
     let input = || DraftInvoiceInput {
         customer_id: cust.clone(),
@@ -57,11 +57,16 @@ async fn draft_idempotency_key_replays() {
         schedule_id: None,
     };
     let first = draft_invoice(&ctx, input()).await.expect("first");
+    let topics_after_first = captured.topics();
     let second = draft_invoice(&ctx, input()).await.expect("second");
     assert_eq!(first.invoice.id, second.invoice.id);
     assert!(!first.idempotency_replay);
     assert!(second.idempotency_replay, "second call must replay");
-    assert!(second.emitted_events.is_empty(), "replay must NOT emit");
+    let topics_after_second = captured.topics();
+    assert_eq!(
+        topics_after_second, topics_after_first,
+        "replay must NOT emit; before={topics_after_first:?} after={topics_after_second:?}",
+    );
     // History: only one row (no double-insert on replay).
     let hist = InvoiceHistoryRepo::new(&pool)
         .list_for_invoice(&first.invoice.id)
@@ -137,7 +142,7 @@ async fn send_idempotency_key_replays() {
     //   - does NOT advance the FSM a second time (no extra history row)
     //   - does NOT write to the sink
     //   - does NOT emit any events (incl. `inv.billing.invoice.sent`)
-    let (ctx, pool, _captured, _blob) = common::fresh_ctx().await;
+    let (ctx, pool, captured, _blob) = common::fresh_ctx().await;
     let cust = common::seed_customer_qc(&pool).await;
     let drafted = draft_invoice(
         &ctx,
@@ -200,6 +205,7 @@ async fn send_idempotency_key_replays() {
     drop(s1);
     assert!(!sink1.is_empty(), "first call writes bytes to the sink");
     let sink1_len = sink1.len();
+    let topics_after_first_send = captured.topics();
 
     // Second call with same key: must replay, no new history row, no
     // sink write, no events.
@@ -208,7 +214,11 @@ async fn send_idempotency_key_replays() {
         .await
         .expect("send2 (replay)");
     assert!(s2.idempotency_replay, "second call must replay");
-    assert!(s2.emitted_events.is_empty(), "replay must NOT emit");
+    let topics_after_second_send = captured.topics();
+    assert_eq!(
+        topics_after_second_send, topics_after_first_send,
+        "replay must NOT emit; before={topics_after_first_send:?} after={topics_after_second_send:?}",
+    );
     assert_eq!(s2.delivered_to, s1_delivered, "delivered_to preserved");
     drop(s2);
     assert!(sink2.is_empty(), "replay must NOT write to the sink");

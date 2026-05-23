@@ -26,7 +26,7 @@ use inv_store::repo::invoice::InvoiceRepo;
 
 #[tokio::test]
 async fn void_after_paid_rejected_and_credit_note_lifecycle() {
-    let (ctx, pool, _captured, _blob) = common::fresh_ctx().await;
+    let (ctx, pool, captured, _blob) = common::fresh_ctx().await;
     let cust = common::seed_customer_dz(&pool).await;
 
     // Build a paid DZ-local invoice (subtotal 150000 + 23500 TVA = 173500).
@@ -137,12 +137,8 @@ async fn void_after_paid_rejected_and_credit_note_lifecycle() {
     .await
     .expect("draft cn");
     assert_eq!(cn_draft.credit_note.state, CreditNoteState::Draft);
-    let topics: Vec<&str> = cn_draft
-        .emitted_events
-        .iter()
-        .map(|e| e.topic.as_str())
-        .collect();
-    assert!(topics.contains(&"inv.billing.creditnote.drafted"));
+    let topics = captured.topics();
+    assert!(topics.contains(&"inv.billing.creditnote.drafted".to_string()));
 
     let cn_issued = issue_credit_note(
         &ctx,
@@ -180,11 +176,7 @@ async fn void_after_paid_rejected_and_credit_note_lifecycle() {
         .unwrap();
     assert_eq!(back_inv.state, InvoiceState::Paid);
 
-    let topics: Vec<&str> = cn_issued
-        .emitted_events
-        .iter()
-        .map(|e| e.topic.as_str())
-        .collect();
+    let topics = captured.topics();
     for expected in [
         "inv.billing.creditnote.proposed",
         "inv.billing.creditnote.transitioned",
@@ -192,7 +184,7 @@ async fn void_after_paid_rejected_and_credit_note_lifecycle() {
         "inv.billing.creditnote.issued",
     ] {
         assert!(
-            topics.contains(&expected),
+            topics.iter().any(|t| t == expected),
             "missing `{expected}` in {topics:?}"
         );
     }

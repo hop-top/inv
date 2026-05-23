@@ -3,7 +3,7 @@
 use anyhow::{anyhow, Context, Result};
 use clap::{Arg, ArgMatches, Command};
 use hop_top_kit::output::ColumnSpec;
-use serde_json::{json, Value};
+use serde_json::json;
 
 use inv_commands::{
     reminder_cancel, reminder_schedule, Actor, Channel, CoreCtx, ReminderCancelInput,
@@ -107,7 +107,6 @@ async fn run_schedule(ctx: &CoreCtx, matches: &ArgMatches) -> Result<()> {
         .context("reminder_schedule failed")?;
     let value = json!({
         "reminder": output.reminder,
-        "emitted_events": event_topics(&output.emitted_events),
     });
     render_value(matches, value, &columns())?;
     Ok(())
@@ -128,7 +127,6 @@ async fn run_cancel(ctx: &CoreCtx, matches: &ArgMatches) -> Result<()> {
         .context("reminder_cancel failed")?;
     let value = json!({
         "reminder": output.reminder,
-        "emitted_events": event_topics(&output.emitted_events),
     });
     render_value(matches, value, &columns())?;
     Ok(())
@@ -165,8 +163,4 @@ fn columns() -> Vec<ColumnSpec> {
         ColumnSpec::new("channel", "channel", 10),
         ColumnSpec::new("state", "state", 10),
     ]
-}
-
-fn event_topics(events: &[inv_commands::EmittedEvent]) -> Value {
-    json!(events.iter().map(|e| e.topic.clone()).collect::<Vec<_>>())
 }

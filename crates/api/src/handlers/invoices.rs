@@ -16,8 +16,8 @@ use serde_json::{json, Value};
 use inv_commands::{
     draft_invoice, issue_invoice, mark_overdue_ticker, mark_paid, reminders_tick, schedules_tick,
     send_invoice, send_invoice_render, void_invoice, Actor, Channel, DraftInvoiceInput,
-    DraftLineInput, EmittedEvent, IssueInvoiceInput, MarkPaidInput, SendInvoiceInput,
-    SendInvoiceRenderInput, VoidInvoiceInput,
+    DraftLineInput, IssueInvoiceInput, MarkPaidInput, SendInvoiceInput, SendInvoiceRenderInput,
+    VoidInvoiceInput,
 };
 use inv_core::domain::ids::{CustomerId, InvoiceId};
 use inv_core::domain::invoice::{Invoice, InvoiceLine, InvoiceState, TaxCategory};
@@ -70,14 +70,17 @@ pub struct LineBody {
 }
 
 /// Wire shape for a draft / issued / paid invoice response.
+///
+/// T-0043 dropped the `emitted_events` field: commands publish on the
+/// bus directly via `ctx.publisher`, so the HTTP response doesn't carry
+/// the per-call event list. Bus subscribers (and the outbox relay) are
+/// the source of truth for event history.
 #[derive(Debug, Serialize)]
 pub struct InvoiceResponse {
     /// The invoice record.
     pub invoice: Invoice,
     /// Line items (sorted by position).
     pub lines: Vec<InvoiceLine>,
-    /// Bus events the command would emit (T-0014 wires the real bus).
-    pub emitted_events: Vec<EmittedEvent>,
     /// True if the command short-circuited on an idempotency hit.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub idempotency_replay: Option<bool>,
@@ -181,7 +184,6 @@ pub async fn draft(
         Json(InvoiceResponse {
             invoice: out.invoice,
             lines: out.lines,
-            emitted_events: out.emitted_events,
             idempotency_replay: Some(out.idempotency_replay),
         }),
     ))
@@ -292,7 +294,6 @@ pub async fn issue(
     Ok(Json(InvoiceResponse {
         invoice: out.invoice,
         lines: out.lines,
-        emitted_events: out.emitted_events,
         idempotency_replay: None,
     }))
 }
@@ -395,7 +396,6 @@ pub async fn send(
     Ok(Json(json!({
         "invoice": out.invoice,
         "delivered_to": out.delivered_to,
-        "emitted_events": out.emitted_events,
     })))
 }
 
@@ -432,7 +432,6 @@ async fn send_webhook(
     Ok(Json(json!({
         "invoice": out.invoice,
         "delivered_to": body.destination_uri,
-        "emitted_events": out.emitted_events,
     })))
 }
 
@@ -477,7 +476,6 @@ pub async fn pay(
     Ok(Json(json!({
         "invoice": out.invoice,
         "fully_paid": out.fully_paid,
-        "emitted_events": out.emitted_events,
     })))
 }
 
@@ -514,7 +512,6 @@ pub async fn void(
     let out = void_invoice(&state.ctx, input).await?;
     Ok(Json(json!({
         "invoice": out.invoice,
-        "emitted_events": out.emitted_events,
     })))
 }
 
@@ -528,7 +525,6 @@ pub async fn tick_schedules(State(state): State<Arc<ApiState>>) -> Result<Json<V
     Ok(Json(json!({
         "ran_schedule_ids": out.ran_schedule_ids.iter().map(|id| id.to_string()).collect::<Vec<_>>(),
         "drafts_count": out.drafts.len(),
-        "emitted_events": out.emitted_events,
     })))
 }
 
@@ -537,7 +533,6 @@ pub async fn tick_reminders(State(state): State<Arc<ApiState>>) -> Result<Json<V
     let out = reminders_tick(&state.ctx).await?;
     Ok(Json(json!({
         "sent_reminders": out.sent_reminders,
-        "emitted_events": out.emitted_events,
     })))
 }
 
@@ -546,7 +541,6 @@ pub async fn tick_overdue(State(state): State<Arc<ApiState>>) -> Result<Json<Val
     let out = mark_overdue_ticker(&state.ctx).await?;
     Ok(Json(json!({
         "overdue_invoices": out.overdue_invoices,
-        "emitted_events": out.emitted_events,
     })))
 }
 

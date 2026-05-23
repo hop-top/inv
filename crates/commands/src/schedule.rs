@@ -23,8 +23,8 @@ use crate::draft::{
     draft_invoice, history_channel_str, DraftInvoiceInput, DraftInvoiceOutput, DraftLineInput,
 };
 use crate::error::CoreError;
-use crate::events::EmittedEvent;
 use crate::issue::{issue_invoice, IssueInvoiceInput};
+use crate::publisher::try_publish;
 use inv_core::domain::ids::LineId;
 
 // =============================================================================
@@ -103,8 +103,6 @@ impl ScheduleCreateInput {
 pub struct ScheduleCreateOutput {
     /// The newly-created schedule.
     pub schedule: Schedule,
-    /// Bus events the command would emit.
-    pub emitted_events: Vec<EmittedEvent>,
 }
 
 /// Create an active recurring schedule.
@@ -147,7 +145,8 @@ pub async fn schedule_create(
 
     ScheduleRepo::new(&ctx.db).save(&schedule).await?;
 
-    let emitted = vec![EmittedEvent::new(
+    try_publish(
+        ctx,
         "inv.billing.schedule.created",
         json!({
             "schedule_id": schedule.id.to_string(),
@@ -160,12 +159,10 @@ pub async fn schedule_create(
             "channel": history_channel_str(input.channel.into()),
         }),
         now,
-    )];
+    )
+    .await;
 
-    Ok(ScheduleCreateOutput {
-        schedule,
-        emitted_events: emitted,
-    })
+    Ok(ScheduleCreateOutput { schedule })
 }
 
 // =============================================================================
@@ -188,8 +185,6 @@ pub struct ScheduleStateChangeInput {
 pub struct ScheduleStateChangeOutput {
     /// Updated schedule.
     pub schedule: Schedule,
-    /// Bus events.
-    pub emitted_events: Vec<EmittedEvent>,
 }
 
 /// Pause an active schedule. Idempotent: pausing a paused schedule succeeds.
@@ -237,8 +232,9 @@ async fn transition_schedule(
     repo.save(&schedule).await?;
 
     let topic = format!("inv.billing.schedule.{event_tag}");
-    let emitted = vec![EmittedEvent::new(
-        topic,
+    try_publish(
+        ctx,
+        &topic,
         json!({
             "schedule_id": schedule.id.to_string(),
             "state": format!("{:?}", schedule.state).to_lowercase(),
@@ -246,12 +242,10 @@ async fn transition_schedule(
             "channel": history_channel_str(input.channel.into()),
         }),
         now,
-    )];
+    )
+    .await;
 
-    Ok(ScheduleStateChangeOutput {
-        schedule,
-        emitted_events: emitted,
-    })
+    Ok(ScheduleStateChangeOutput { schedule })
 }
 
 // =============================================================================
@@ -265,8 +259,6 @@ pub struct SchedulesTickOutput {
     pub ran_schedule_ids: Vec<ScheduleId>,
     /// Outputs of every draft (and issue, when auto_issue) call made.
     pub drafts: Vec<DraftInvoiceOutput>,
-    /// All bus events emitted across the tick.
-    pub emitted_events: Vec<EmittedEvent>,
 }
 
 /// Materialise invoices for every active schedule with `next_run <= today`.
@@ -288,7 +280,6 @@ pub async fn schedules_tick(ctx: &CoreCtx) -> Result<SchedulesTickOutput, CoreEr
 
     let mut ran = Vec::new();
     let mut drafts = Vec::new();
-    let mut events = Vec::new();
 
     for mut schedule in due {
         if !matches!(schedule.state, ScheduleState::Active) {
@@ -327,11 +318,13 @@ pub async fn schedules_tick(ctx: &CoreCtx) -> Result<SchedulesTickOutput, CoreEr
             template_path: None,
             schedule_id: Some(schedule.id.clone()),
         };
+        // draft_invoice publishes `inv.billing.invoice.drafted` itself
+        // (T-0043), so no fan-out needed here.
         let drafted = draft_invoice(ctx, draft_input).await?;
-        events.extend(drafted.emitted_events.iter().cloned());
 
         if schedule.auto_issue {
-            let issued = issue_invoice(
+            // issue_invoice publishes the mechanic triplet + `.issued`.
+            let _issued = issue_invoice(
                 ctx,
                 IssueInvoiceInput {
                     invoice_id: drafted.invoice.id.clone(),
@@ -343,7 +336,6 @@ pub async fn schedules_tick(ctx: &CoreCtx) -> Result<SchedulesTickOutput, CoreEr
                 },
             )
             .await?;
-            events.extend(issued.emitted_events);
         }
 
         // Advance schedule.
@@ -354,7 +346,8 @@ pub async fn schedules_tick(ctx: &CoreCtx) -> Result<SchedulesTickOutput, CoreEr
         if let Some(end) = schedule.end_date {
             if next > end {
                 schedule.state = ScheduleState::Cancelled;
-                events.push(EmittedEvent::new(
+                try_publish(
+                    ctx,
                     "inv.billing.schedule.cancelled",
                     json!({
                         "schedule_id": schedule.id.to_string(),
@@ -362,7 +355,8 @@ pub async fn schedules_tick(ctx: &CoreCtx) -> Result<SchedulesTickOutput, CoreEr
                         "reason": "end_date_reached",
                     }),
                     now,
-                ));
+                )
+                .await;
             }
         }
         repo.save(&schedule).await?;
@@ -374,7 +368,6 @@ pub async fn schedules_tick(ctx: &CoreCtx) -> Result<SchedulesTickOutput, CoreEr
     Ok(SchedulesTickOutput {
         ran_schedule_ids: ran,
         drafts,
-        emitted_events: events,
     })
 }
 

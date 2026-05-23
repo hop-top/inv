@@ -119,28 +119,26 @@ fn server_starts_and_serves_healthz() {
     let deadline = Instant::now() + Duration::from_secs(5);
     let mut ok = false;
     while Instant::now() < deadline {
-        match std::net::TcpStream::connect_timeout(
+        if std::net::TcpStream::connect_timeout(
             &format!("127.0.0.1:{port}").parse().unwrap(),
             Duration::from_millis(200),
-        ) {
-            Ok(_) => {
-                // Port open; try an HTTP GET via std-only.
-                if let Ok(mut stream) = std::net::TcpStream::connect(format!("127.0.0.1:{port}")) {
-                    use std::io::{Read, Write};
-                    let req = format!(
-                        "GET /healthz HTTP/1.1\r\nHost: {listen}\r\nConnection: close\r\n\r\n"
-                    );
-                    if stream.write_all(req.as_bytes()).is_ok() {
-                        let mut buf = String::new();
-                        let _ = stream.read_to_string(&mut buf);
-                        if buf.starts_with("HTTP/1.1 200") {
-                            ok = true;
-                            break;
-                        }
+        )
+        .is_ok()
+        {
+            // Port open; try an HTTP GET via std-only.
+            if let Ok(mut stream) = std::net::TcpStream::connect(format!("127.0.0.1:{port}")) {
+                use std::io::{Read, Write};
+                let req =
+                    format!("GET /healthz HTTP/1.1\r\nHost: {listen}\r\nConnection: close\r\n\r\n");
+                if stream.write_all(req.as_bytes()).is_ok() {
+                    let mut buf = String::new();
+                    let _ = stream.read_to_string(&mut buf);
+                    if buf.starts_with("HTTP/1.1 200") {
+                        ok = true;
+                        break;
                     }
                 }
             }
-            Err(_) => {}
         }
         thread::sleep(Duration::from_millis(100));
     }

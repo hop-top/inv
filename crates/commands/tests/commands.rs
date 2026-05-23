@@ -22,12 +22,13 @@ use inv_core::domain::money::Currency;
 use inv_core::state::TransitionError;
 use inv_core::tax::TaxTable;
 
+use inv_bus::InMemoryPublisher;
 use inv_commands::{
     create_credit_note, draft_invoice, issue_credit_note, issue_invoice, mark_overdue_ticker,
     mark_paid, reminder_cancel, reminder_schedule, reminders_tick, schedule_cancel,
     schedule_create, schedule_pause, schedules_tick, send_invoice, void_invoice, Actor, Channel,
     Clock, CoreCtx, CoreError, CreateCreditNoteInput, DraftInvoiceInput, DraftLineInput,
-    IssueCreditNoteInput, IssueInvoiceInput, MarkPaidInput, ReminderCancelInput,
+    IssueCreditNoteInput, IssueInvoiceInput, MarkPaidInput, Publisher, ReminderCancelInput,
     ReminderScheduleInput, ScheduleCreateInput, ScheduleLineInput, ScheduleStateChangeInput,
     SendInvoiceInput, VoidInvoiceInput,
 };
@@ -75,28 +76,38 @@ fn frozen_now() -> DateTime<Utc> {
     Utc.with_ymd_and_hms(2026, 5, 19, 12, 0, 0).unwrap()
 }
 
-async fn fresh_ctx() -> (CoreCtx, Pool, tempfile::TempDir) {
-    let (ctx, pool, blob_dir) = fresh_ctx_inner(true).await;
+async fn fresh_ctx() -> (CoreCtx, Pool, Arc<InMemoryPublisher>, tempfile::TempDir) {
+    let (ctx, pool, publisher, blob_dir) = fresh_ctx_inner(true).await;
     (
         ctx,
         pool,
+        publisher,
         blob_dir.expect("blob dir present when blob store wired"),
     )
 }
 
 /// Variant that returns a ctx with `blob_store = None`. Used by the
 /// test that asserts the no-blob-store path leaves `pdf_blob_ref` unset.
-async fn fresh_ctx_no_blob() -> (CoreCtx, Pool) {
-    let (ctx, pool, _) = fresh_ctx_inner(false).await;
-    (ctx, pool)
+async fn fresh_ctx_no_blob() -> (CoreCtx, Pool, Arc<InMemoryPublisher>) {
+    let (ctx, pool, publisher, _) = fresh_ctx_inner(false).await;
+    (ctx, pool, publisher)
 }
 
-async fn fresh_ctx_inner(with_blob: bool) -> (CoreCtx, Pool, Option<tempfile::TempDir>) {
+async fn fresh_ctx_inner(
+    with_blob: bool,
+) -> (
+    CoreCtx,
+    Pool,
+    Arc<InMemoryPublisher>,
+    Option<tempfile::TempDir>,
+) {
     let pool = connect("sqlite::memory:").await.expect("connect");
     run_migrations(&pool).await.expect("migrate");
     let (table, nexus) = TaxTable::load_from_str(FIXTURE_TOML).expect("tax fixture");
-    let mut ctx =
-        CoreCtx::new(pool.clone(), table, nexus).with_clock(Arc::new(FrozenClock(frozen_now())));
+    let publisher: Arc<InMemoryPublisher> = Arc::new(InMemoryPublisher::new());
+    let mut ctx = CoreCtx::new(pool.clone(), table, nexus)
+        .with_clock(Arc::new(FrozenClock(frozen_now())))
+        .with_publisher(publisher.clone() as Arc<dyn Publisher>);
     let blob_dir = if with_blob {
         let dir = tempfile::tempdir().expect("tempdir");
         let store = LocalBlobStore::new(dir.path(), b"test-signing-key".to_vec())
@@ -106,7 +117,7 @@ async fn fresh_ctx_inner(with_blob: bool) -> (CoreCtx, Pool, Option<tempfile::Te
     } else {
         None
     };
-    (ctx, pool, blob_dir)
+    (ctx, pool, publisher, blob_dir)
 }
 
 async fn seed_customer(pool: &Pool) -> CustomerId {
@@ -156,7 +167,7 @@ fn draft_input(customer_id: &CustomerId, idempotency: Option<&str>) -> DraftInvo
 
 #[tokio::test]
 async fn draft_happy_path_creates_draft_with_computed_totals() {
-    let (ctx, pool, _blob_dir) = fresh_ctx().await;
+    let (ctx, pool, publisher, _blob_dir) = fresh_ctx().await;
     let cust = seed_customer(&pool).await;
 
     let out = draft_invoice(&ctx, draft_input(&cust, None))
@@ -175,9 +186,11 @@ async fn draft_happy_path_creates_draft_with_computed_totals() {
     assert_eq!(out.lines.len(), 1);
     assert!(!out.idempotency_replay);
 
-    // emitted: inv.billing.invoice.drafted.
-    assert_eq!(out.emitted_events.len(), 1);
-    assert_eq!(out.emitted_events[0].topic, "inv.billing.invoice.drafted");
+    // emitted: inv.billing.invoice.drafted via the InMemoryPublisher
+    // captured into ctx (T-0043).
+    let captured = publisher.captured();
+    assert_eq!(captured.len(), 1);
+    assert_eq!(captured[0].topic, "inv.billing.invoice.drafted");
 
     // A history row was written (audit + outbox).
     let hist = InvoiceHistoryRepo::new(&pool)
@@ -192,7 +205,7 @@ async fn draft_happy_path_creates_draft_with_computed_totals() {
 
 #[tokio::test]
 async fn draft_idempotency_returns_existing_invoice() {
-    let (ctx, pool, _blob_dir) = fresh_ctx().await;
+    let (ctx, pool, publisher, _blob_dir) = fresh_ctx().await;
     let cust = seed_customer(&pool).await;
 
     let first = draft_invoice(&ctx, draft_input(&cust, Some("key-1")))
@@ -205,7 +218,17 @@ async fn draft_idempotency_returns_existing_invoice() {
     assert_eq!(first.invoice.id, second.invoice.id);
     assert!(!first.idempotency_replay);
     assert!(second.idempotency_replay);
-    assert!(second.emitted_events.is_empty(), "replay must not emit");
+    // Replay must NOT publish a second drafted event — only the first
+    // call should have hit the publisher.
+    let topics = publisher.topics();
+    assert_eq!(
+        topics
+            .iter()
+            .filter(|t| *t == "inv.billing.invoice.drafted")
+            .count(),
+        1,
+        "replay must not emit; captured: {topics:?}"
+    );
 
     // Still only one history row.
     let hist = InvoiceHistoryRepo::new(&pool)
@@ -217,7 +240,7 @@ async fn draft_idempotency_returns_existing_invoice() {
 
 #[tokio::test]
 async fn draft_validation_rejects_empty_lines() {
-    let (ctx, pool, _blob_dir) = fresh_ctx().await;
+    let (ctx, pool, _publisher, _blob_dir) = fresh_ctx().await;
     let cust = seed_customer(&pool).await;
     let mut input = draft_input(&cust, None);
     input.lines.clear();
@@ -231,7 +254,7 @@ async fn draft_validation_rejects_empty_lines() {
 
 #[tokio::test]
 async fn draft_validation_rejects_unsupported_currency() {
-    let (ctx, pool, _blob_dir) = fresh_ctx().await;
+    let (ctx, pool, _publisher, _blob_dir) = fresh_ctx().await;
     let cust = seed_customer(&pool).await;
     let mut input = draft_input(&cust, None);
     input.currency = Currency::new("EUR").unwrap();
@@ -245,7 +268,7 @@ async fn draft_validation_rejects_unsupported_currency() {
 
 #[tokio::test]
 async fn draft_validation_rejects_zero_quantity() {
-    let (ctx, pool, _blob_dir) = fresh_ctx().await;
+    let (ctx, pool, _publisher, _blob_dir) = fresh_ctx().await;
     let cust = seed_customer(&pool).await;
     let mut input = draft_input(&cust, None);
     input.lines[0].quantity = Decimal::ZERO;
@@ -263,7 +286,7 @@ async fn draft_validation_rejects_zero_quantity() {
 
 #[tokio::test]
 async fn issue_happy_path_freezes_tax_and_assigns_number() {
-    let (ctx, pool, _blob_dir) = fresh_ctx().await;
+    let (ctx, pool, publisher, _blob_dir) = fresh_ctx().await;
     let cust = seed_customer(&pool).await;
     let drafted = draft_invoice(&ctx, draft_input(&cust, None)).await.unwrap();
 
@@ -303,16 +326,14 @@ async fn issue_happy_path_freezes_tax_and_assigns_number() {
         "expected blob://local/... uri, got {blob_uri}"
     );
 
-    // Mechanic-triplet + domain `.issued`.
-    let topics: Vec<&str> = out
-        .emitted_events
-        .iter()
-        .map(|e| e.topic.as_str())
-        .collect();
-    assert!(topics.contains(&"inv.billing.invoice.proposed"));
-    assert!(topics.contains(&"inv.billing.invoice.transitioned"));
-    assert!(topics.contains(&"inv.billing.invoice.entered"));
-    assert!(topics.contains(&"inv.billing.invoice.issued"));
+    // Mechanic-triplet + domain `.issued` published synchronously
+    // (T-0043). The drafted event from the prior call also lives in
+    // the same publisher's capture buffer.
+    let topics = publisher.topics();
+    assert!(topics.contains(&"inv.billing.invoice.proposed".to_string()));
+    assert!(topics.contains(&"inv.billing.invoice.transitioned".to_string()));
+    assert!(topics.contains(&"inv.billing.invoice.entered".to_string()));
+    assert!(topics.contains(&"inv.billing.invoice.issued".to_string()));
 
     // history row written.
     let hist = InvoiceHistoryRepo::new(&pool)
@@ -328,7 +349,7 @@ async fn issue_happy_path_freezes_tax_and_assigns_number() {
 
 #[tokio::test]
 async fn issue_on_already_issued_returns_fsm_error() {
-    let (ctx, pool, _blob_dir) = fresh_ctx().await;
+    let (ctx, pool, _publisher, _blob_dir) = fresh_ctx().await;
     let cust = seed_customer(&pool).await;
     let drafted = draft_invoice(&ctx, draft_input(&cust, None)).await.unwrap();
     issue_invoice(
@@ -368,7 +389,7 @@ async fn issue_without_blob_store_leaves_pdf_blob_ref_unset() {
     // untouched (`None`). This documents the graceful-degradation path
     // used by lightweight harnesses / adapters that don't wire a blob
     // backend.
-    let (ctx, pool) = fresh_ctx_no_blob().await;
+    let (ctx, pool, _publisher) = fresh_ctx_no_blob().await;
     assert!(ctx.blob_store.is_none(), "precondition: no blob store");
     let cust = seed_customer(&pool).await;
     let drafted = draft_invoice(&ctx, draft_input(&cust, None)).await.unwrap();
@@ -399,7 +420,7 @@ async fn issue_without_blob_store_leaves_pdf_blob_ref_unset() {
 
 #[tokio::test]
 async fn send_file_writes_bytes_and_transitions_to_sent() {
-    let (ctx, pool, _blob_dir) = fresh_ctx().await;
+    let (ctx, pool, publisher, _blob_dir) = fresh_ctx().await;
     let cust = seed_customer(&pool).await;
     let drafted = draft_invoice(&ctx, draft_input(&cust, None)).await.unwrap();
     let issued = issue_invoice(
@@ -447,14 +468,10 @@ async fn send_file_writes_bytes_and_transitions_to_sent() {
     let _ = std::fs::remove_file(&target);
     let _ = std::fs::remove_dir(&dir);
 
-    // Topics fired.
-    let topics: Vec<&str> = out
-        .emitted_events
-        .iter()
-        .map(|e| e.topic.as_str())
-        .collect();
-    assert!(topics.contains(&"inv.billing.invoice.sent"));
-    assert!(topics.contains(&"inv.billing.invoice.transitioned"));
+    // Topics fired via the InMemoryPublisher captured into ctx.
+    let topics = publisher.topics();
+    assert!(topics.contains(&"inv.billing.invoice.sent".to_string()));
+    assert!(topics.contains(&"inv.billing.invoice.transitioned".to_string()));
 
     // history row for "send".
     let hist = InvoiceHistoryRepo::new(&pool)
@@ -466,7 +483,7 @@ async fn send_file_writes_bytes_and_transitions_to_sent() {
 
 #[tokio::test]
 async fn send_stdout_writes_to_injected_sink() {
-    let (ctx, pool, _blob_dir) = fresh_ctx().await;
+    let (ctx, pool, _publisher, _blob_dir) = fresh_ctx().await;
     let cust = seed_customer(&pool).await;
     let drafted = draft_invoice(&ctx, draft_input(&cust, None)).await.unwrap();
     let issued = issue_invoice(
@@ -504,7 +521,7 @@ async fn send_stdout_writes_to_injected_sink() {
 
 #[tokio::test]
 async fn send_unsupported_scheme_returns_not_implemented() {
-    let (ctx, pool, _blob_dir) = fresh_ctx().await;
+    let (ctx, pool, _publisher, _blob_dir) = fresh_ctx().await;
     let cust = seed_customer(&pool).await;
     let drafted = draft_invoice(&ctx, draft_input(&cust, None)).await.unwrap();
     let issued = issue_invoice(
@@ -564,7 +581,7 @@ async fn send_idempotency_same_key_replays_no_mutation() {
     // returns the same shape with `idempotency_replay: true`, does NOT
     // write a second history row, does NOT emit events, does NOT push
     // bytes to the sink.
-    let (ctx, pool, _blob_dir) = fresh_ctx().await;
+    let (ctx, pool, publisher, _blob_dir) = fresh_ctx().await;
     let invoice_id = drafted_then_issued(&ctx, &pool).await;
 
     let mut sink1: Vec<u8> = Vec::new();
@@ -584,11 +601,12 @@ async fn send_idempotency_same_key_replays_no_mutation() {
     assert_eq!(out1.invoice.state, InvoiceState::Sent);
     assert!(!out1.idempotency_replay);
     assert!(!sink1.is_empty(), "first send writes the rendered bytes");
+    // Capture the topics published so far so we can assert the second
+    // (replay) call doesn't add more.
+    let topics_after_first = publisher.topics();
     assert!(
-        out1.emitted_events
-            .iter()
-            .any(|e| e.topic == "inv.billing.invoice.sent"),
-        "first send emits invoice.sent",
+        topics_after_first.contains(&"inv.billing.invoice.sent".to_string()),
+        "first send emits invoice.sent (captured: {topics_after_first:?})",
     );
     let first_delivered = out1.delivered_to.clone();
 
@@ -611,7 +629,11 @@ async fn send_idempotency_same_key_replays_no_mutation() {
         out2.idempotency_replay,
         "replay flag is set on the second call"
     );
-    assert!(out2.emitted_events.is_empty(), "replay must not emit");
+    let topics_after_second = publisher.topics();
+    assert_eq!(
+        topics_after_second, topics_after_first,
+        "replay must not emit additional events; before={topics_after_first:?} after={topics_after_second:?}",
+    );
     assert_eq!(out2.delivered_to, first_delivered);
     assert_eq!(out2.invoice.state, InvoiceState::Sent);
     assert!(sink2.is_empty(), "replay must not push bytes to the sink");
@@ -628,7 +650,7 @@ async fn send_idempotency_same_key_replays_no_mutation() {
 async fn send_idempotency_different_key_proceeds() {
     // Different key on same invoice: NOT a replay. The Sent → Sent
     // self-edge runs, a second `send` history row + event set lands.
-    let (ctx, pool, _blob_dir) = fresh_ctx().await;
+    let (ctx, pool, _publisher, _blob_dir) = fresh_ctx().await;
     let invoice_id = drafted_then_issued(&ctx, &pool).await;
 
     let mut sink1: Vec<u8> = Vec::new();
@@ -679,7 +701,7 @@ async fn send_idempotency_different_key_proceeds() {
 async fn send_idempotency_key_scoped_per_invoice() {
     // Same key, different invoices: NOT a collision. Each invoice has
     // its own idempotency surface.
-    let (ctx, pool, _blob_dir) = fresh_ctx().await;
+    let (ctx, pool, _publisher, _blob_dir) = fresh_ctx().await;
     let invoice_a = drafted_then_issued(&ctx, &pool).await;
     let invoice_b = drafted_then_issued(&ctx, &pool).await;
     assert_ne!(invoice_a, invoice_b, "precondition: two distinct invoices");
@@ -737,7 +759,7 @@ async fn send_idempotency_key_scoped_per_invoice() {
 
 #[tokio::test]
 async fn mark_paid_full_settles_invoice() {
-    let (ctx, pool, _blob_dir) = fresh_ctx().await;
+    let (ctx, pool, publisher, _blob_dir) = fresh_ctx().await;
     let cust = seed_customer(&pool).await;
     let drafted = draft_invoice(&ctx, draft_input(&cust, None)).await.unwrap();
     let issued = issue_invoice(
@@ -772,12 +794,8 @@ async fn mark_paid_full_settles_invoice() {
     assert_eq!(out.invoice.amount_paid, issued.invoice.total);
     assert!(out.invoice.paid_at.is_some());
 
-    let topics: Vec<&str> = out
-        .emitted_events
-        .iter()
-        .map(|e| e.topic.as_str())
-        .collect();
-    assert!(topics.contains(&"inv.billing.invoice.paid"));
+    let topics = publisher.topics();
+    assert!(topics.contains(&"inv.billing.invoice.paid".to_string()));
 
     // history grew: draft + issue + paid
     let hist = InvoiceHistoryRepo::new(&pool)
@@ -790,7 +808,7 @@ async fn mark_paid_full_settles_invoice() {
 
 #[tokio::test]
 async fn mark_paid_partial_then_remainder_reaches_paid() {
-    let (ctx, pool, _blob_dir) = fresh_ctx().await;
+    let (ctx, pool, _publisher, _blob_dir) = fresh_ctx().await;
     let cust = seed_customer(&pool).await;
     let drafted = draft_invoice(&ctx, draft_input(&cust, None)).await.unwrap();
     let issued = issue_invoice(
@@ -857,7 +875,7 @@ async fn mark_paid_partial_then_remainder_reaches_paid() {
 
 #[tokio::test]
 async fn mark_paid_rejects_non_positive_amount() {
-    let (ctx, _pool, _blob_dir) = fresh_ctx().await;
+    let (ctx, _pool, _publisher, _blob_dir) = fresh_ctx().await;
     let err = mark_paid(
         &ctx,
         MarkPaidInput {
@@ -881,7 +899,7 @@ async fn mark_paid_rejects_non_positive_amount() {
 
 #[tokio::test]
 async fn void_pre_payment_succeeds() {
-    let (ctx, pool, _blob_dir) = fresh_ctx().await;
+    let (ctx, pool, publisher, _blob_dir) = fresh_ctx().await;
     let cust = seed_customer(&pool).await;
     let drafted = draft_invoice(&ctx, draft_input(&cust, None)).await.unwrap();
     let issued = issue_invoice(
@@ -912,17 +930,13 @@ async fn void_pre_payment_succeeds() {
     assert_eq!(out.invoice.state, InvoiceState::Voided);
     assert!(out.invoice.voided_at.is_some());
 
-    let topics: Vec<&str> = out
-        .emitted_events
-        .iter()
-        .map(|e| e.topic.as_str())
-        .collect();
-    assert!(topics.contains(&"inv.billing.invoice.voided"));
+    let topics = publisher.topics();
+    assert!(topics.contains(&"inv.billing.invoice.voided".to_string()));
 }
 
 #[tokio::test]
 async fn void_after_payment_rejected_by_fsm() {
-    let (ctx, pool, _blob_dir) = fresh_ctx().await;
+    let (ctx, pool, _publisher, _blob_dir) = fresh_ctx().await;
     let cust = seed_customer(&pool).await;
     let drafted = draft_invoice(&ctx, draft_input(&cust, None)).await.unwrap();
     let issued = issue_invoice(
@@ -972,7 +986,7 @@ async fn void_after_payment_rejected_by_fsm() {
 
 #[tokio::test]
 async fn credit_note_draft_then_issue() {
-    let (ctx, pool, _blob_dir) = fresh_ctx().await;
+    let (ctx, pool, publisher, _blob_dir) = fresh_ctx().await;
     let cust = seed_customer(&pool).await;
     let drafted = draft_invoice(&ctx, draft_input(&cust, None)).await.unwrap();
     let issued = issue_invoice(
@@ -1012,12 +1026,8 @@ async fn credit_note_draft_then_issue() {
         cn_draft.credit_note.refund_ref.as_deref(),
         Some("refund-evt-1")
     );
-    let topics: Vec<&str> = cn_draft
-        .emitted_events
-        .iter()
-        .map(|e| e.topic.as_str())
-        .collect();
-    assert!(topics.contains(&"inv.billing.creditnote.drafted"));
+    let topics_after_draft = publisher.topics();
+    assert!(topics_after_draft.contains(&"inv.billing.creditnote.drafted".to_string()));
 
     // 2. Issue credit note.
     let cn_issued = issue_credit_note(
@@ -1049,20 +1059,16 @@ async fn credit_note_draft_then_issue() {
         .unwrap();
     assert_eq!(back.state, CreditNoteState::Issued);
 
-    let topics: Vec<&str> = cn_issued
-        .emitted_events
-        .iter()
-        .map(|e| e.topic.as_str())
-        .collect();
-    assert!(topics.contains(&"inv.billing.creditnote.proposed"));
-    assert!(topics.contains(&"inv.billing.creditnote.transitioned"));
-    assert!(topics.contains(&"inv.billing.creditnote.entered"));
-    assert!(topics.contains(&"inv.billing.creditnote.issued"));
+    let topics = publisher.topics();
+    assert!(topics.contains(&"inv.billing.creditnote.proposed".to_string()));
+    assert!(topics.contains(&"inv.billing.creditnote.transitioned".to_string()));
+    assert!(topics.contains(&"inv.billing.creditnote.entered".to_string()));
+    assert!(topics.contains(&"inv.billing.creditnote.issued".to_string()));
 }
 
 #[tokio::test]
 async fn credit_note_rejects_non_positive_amount() {
-    let (ctx, pool, _blob_dir) = fresh_ctx().await;
+    let (ctx, pool, _publisher, _blob_dir) = fresh_ctx().await;
     let cust = seed_customer(&pool).await;
     let drafted = draft_invoice(&ctx, draft_input(&cust, None)).await.unwrap();
     let issued = issue_invoice(
@@ -1100,7 +1106,7 @@ async fn credit_note_rejects_non_positive_amount() {
 
 #[tokio::test]
 async fn overdue_ticker_flags_past_due_invoices() {
-    let (ctx, pool, _blob_dir) = fresh_ctx().await;
+    let (ctx, pool, publisher, _blob_dir) = fresh_ctx().await;
     let cust = seed_customer(&pool).await;
     let drafted = draft_invoice(&ctx, draft_input(&cust, None)).await.unwrap();
     let issued = issue_invoice(
@@ -1122,16 +1128,19 @@ async fn overdue_ticker_flags_past_due_invoices() {
     inv.updated_at = inv.due_at.unwrap();
     InvoiceRepo::new(&pool).save(&inv).await.unwrap();
 
+    // Snapshot publisher state pre-tick so we can filter the overdue
+    // event out of any noise from prior draft/issue calls.
+    let topics_before = publisher.topics();
     let out = mark_overdue_ticker(&ctx).await.expect("tick ok");
     assert_eq!(out.overdue_invoices.len(), 1);
     assert_eq!(out.overdue_invoices[0].id, issued.invoice.id);
 
-    let topics: Vec<&str> = out
-        .emitted_events
+    let topics_after = publisher.topics();
+    let new_topics: Vec<&str> = topics_after[topics_before.len()..]
         .iter()
-        .map(|e| e.topic.as_str())
+        .map(|s| s.as_str())
         .collect();
-    assert_eq!(topics, vec!["inv.billing.invoice.overdue"]);
+    assert_eq!(new_topics, vec!["inv.billing.invoice.overdue"]);
 
     // State unchanged — overdue is a flag, not an FSM state.
     let back = InvoiceRepo::new(&pool)
@@ -1144,14 +1153,20 @@ async fn overdue_ticker_flags_past_due_invoices() {
 
 #[tokio::test]
 async fn overdue_ticker_ignores_unset_due_at() {
-    let (ctx, pool, _blob_dir) = fresh_ctx().await;
+    let (ctx, pool, publisher, _blob_dir) = fresh_ctx().await;
     let cust = seed_customer(&pool).await;
     let drafted = draft_invoice(&ctx, draft_input(&cust, None)).await.unwrap();
     // Don't issue — Draft is not in the overdue-eligible set anyway.
     let _ = drafted;
+    // Snapshot publisher pre-tick (the draft above emits `.drafted`).
+    let topics_before = publisher.topics();
     let out = mark_overdue_ticker(&ctx).await.unwrap();
     assert!(out.overdue_invoices.is_empty());
-    assert!(out.emitted_events.is_empty());
+    assert_eq!(
+        publisher.topics(),
+        topics_before,
+        "overdue tick with no candidates must not publish",
+    );
 }
 
 // ---------------------------------------------------------------------
@@ -1179,7 +1194,7 @@ fn schedule_input(cust: &CustomerId, auto_issue: bool) -> ScheduleCreateInput {
 
 #[tokio::test]
 async fn schedule_create_happy_path() {
-    let (ctx, pool, _blob_dir) = fresh_ctx().await;
+    let (ctx, pool, publisher, _blob_dir) = fresh_ctx().await;
     let cust = seed_customer(&pool).await;
 
     let out = schedule_create(&ctx, schedule_input(&cust, false))
@@ -1190,12 +1205,13 @@ async fn schedule_create_happy_path() {
     assert!(!out.schedule.auto_issue);
     assert_eq!(out.schedule.next_run, out.schedule.start_date);
     assert_eq!(out.schedule.template_lines.len(), 1);
-    assert_eq!(out.emitted_events[0].topic, "inv.billing.schedule.created");
+    let topics = publisher.topics();
+    assert_eq!(topics, vec!["inv.billing.schedule.created".to_string()]);
 }
 
 #[tokio::test]
 async fn schedule_validation_rejects_empty_lines() {
-    let (ctx, pool, _blob_dir) = fresh_ctx().await;
+    let (ctx, pool, _publisher, _blob_dir) = fresh_ctx().await;
     let cust = seed_customer(&pool).await;
     let mut input = schedule_input(&cust, false);
     input.template_lines.clear();
@@ -1205,7 +1221,7 @@ async fn schedule_validation_rejects_empty_lines() {
 
 #[tokio::test]
 async fn schedule_validation_rejects_end_before_start() {
-    let (ctx, pool, _blob_dir) = fresh_ctx().await;
+    let (ctx, pool, _publisher, _blob_dir) = fresh_ctx().await;
     let cust = seed_customer(&pool).await;
     let mut input = schedule_input(&cust, false);
     input.end_date = Some(chrono::NaiveDate::from_ymd_opt(2026, 5, 1).unwrap());
@@ -1215,7 +1231,7 @@ async fn schedule_validation_rejects_end_before_start() {
 
 #[tokio::test]
 async fn schedule_pause_then_cancel() {
-    let (ctx, pool, _blob_dir) = fresh_ctx().await;
+    let (ctx, pool, _publisher, _blob_dir) = fresh_ctx().await;
     let cust = seed_customer(&pool).await;
     let created = schedule_create(&ctx, schedule_input(&cust, false))
         .await
@@ -1262,7 +1278,7 @@ async fn schedule_pause_then_cancel() {
 #[tokio::test]
 async fn schedules_tick_materialises_drafts_for_due_schedules() {
     // Use a clock past the schedule's start_date so it is due.
-    let (mut ctx, pool, _blob_dir) = fresh_ctx().await;
+    let (mut ctx, pool, _publisher, _blob_dir) = fresh_ctx().await;
     let cust = seed_customer(&pool).await;
 
     // start_date = 2026-06-01; default frozen_now is 2026-05-19, so the
@@ -1290,7 +1306,7 @@ async fn schedules_tick_materialises_drafts_for_due_schedules() {
 
 #[tokio::test]
 async fn schedules_tick_auto_issue_promotes_to_issued() {
-    let (mut ctx, pool, _blob_dir) = fresh_ctx().await;
+    let (mut ctx, pool, _publisher, _blob_dir) = fresh_ctx().await;
     let cust = seed_customer(&pool).await;
     ctx = ctx.with_clock(Arc::new(FrozenClock(
         Utc.with_ymd_and_hms(2026, 6, 5, 0, 0, 0).unwrap(),
@@ -1318,7 +1334,7 @@ async fn schedules_tick_stamps_invoice_schedule_id_provenance() {
     // originating schedule's id on `invoice.schedule_id`. Direct drafts
     // (via draft_invoice) keep it None. The bus event payload is
     // unchanged — it also still carries schedule_id.
-    let (mut ctx, pool, _blob_dir) = fresh_ctx().await;
+    let (mut ctx, pool, _publisher, _blob_dir) = fresh_ctx().await;
     let cust = seed_customer(&pool).await;
     ctx = ctx.with_clock(Arc::new(FrozenClock(
         Utc.with_ymd_and_hms(2026, 6, 5, 0, 0, 0).unwrap(),
@@ -1371,7 +1387,7 @@ async fn schedules_tick_stamps_invoice_schedule_id_provenance() {
 
 #[tokio::test]
 async fn reminder_schedule_then_cancel() {
-    let (ctx, pool, _blob_dir) = fresh_ctx().await;
+    let (ctx, pool, _publisher, _blob_dir) = fresh_ctx().await;
     let cust = seed_customer(&pool).await;
     let drafted = draft_invoice(&ctx, draft_input(&cust, None)).await.unwrap();
 
@@ -1407,7 +1423,7 @@ async fn reminder_schedule_then_cancel() {
 
 #[tokio::test]
 async fn reminder_schedule_rejects_past_datetime() {
-    let (ctx, pool, _blob_dir) = fresh_ctx().await;
+    let (ctx, pool, _publisher, _blob_dir) = fresh_ctx().await;
     let cust = seed_customer(&pool).await;
     let drafted = draft_invoice(&ctx, draft_input(&cust, None)).await.unwrap();
     let err = reminder_schedule(
@@ -1427,7 +1443,7 @@ async fn reminder_schedule_rejects_past_datetime() {
 
 #[tokio::test]
 async fn reminders_tick_dispatches_due_reminders() {
-    let (mut ctx, pool, _blob_dir) = fresh_ctx().await;
+    let (mut ctx, pool, _publisher, _blob_dir) = fresh_ctx().await;
     let cust = seed_customer(&pool).await;
     let drafted = draft_invoice(&ctx, draft_input(&cust, None)).await.unwrap();
 

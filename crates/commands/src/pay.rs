@@ -28,7 +28,7 @@ use inv_store::repo::invoice::InvoiceRepo;
 use crate::ctx::{Actor, Channel, CoreCtx};
 use crate::draft::history_channel_str;
 use crate::error::CoreError;
-use crate::events::EmittedEvent;
+use crate::publisher::try_publish;
 
 /// Input for [`mark_paid`].
 #[derive(Debug, Clone)]
@@ -72,8 +72,6 @@ pub struct MarkPaidOutput {
     pub invoice: Invoice,
     /// Whether this payment fully settled the invoice.
     pub fully_paid: bool,
-    /// Bus events the command would emit.
-    pub emitted_events: Vec<EmittedEvent>,
 }
 
 /// Record a payment against an invoice.
@@ -135,20 +133,21 @@ pub async fn mark_paid(ctx: &CoreCtx, input: MarkPaidInput) -> Result<MarkPaidOu
         tx.commit().await.map_err(inv_store::StoreError::from)?;
     }
 
-    // 6. Emit events.
-    let emitted = build_paid_events(
-        &invoice, &input, from_state, to_state, &event, channel, now, fully_paid,
-    );
+    // 6. Synchronously publish (T-0043).
+    publish_paid_events(
+        ctx, &invoice, &input, from_state, to_state, &event, channel, now, fully_paid,
+    )
+    .await;
 
     Ok(MarkPaidOutput {
         invoice,
         fully_paid,
-        emitted_events: emitted,
     })
 }
 
 #[allow(clippy::too_many_arguments)]
-fn build_paid_events(
+async fn publish_paid_events(
+    ctx: &CoreCtx,
     invoice: &Invoice,
     input: &MarkPaidInput,
     from: InvoiceState,
@@ -157,7 +156,7 @@ fn build_paid_events(
     channel: HistoryChannel,
     now: DateTime<Utc>,
     fully_paid: bool,
-) -> Vec<EmittedEvent> {
+) {
     let actor_audit = input.actor.audit_string();
 
     let proposed = InvoiceProposed::new(
@@ -192,35 +191,41 @@ fn build_paid_events(
         "inv.billing.invoice.partially_paid"
     };
 
-    vec![
-        EmittedEvent::new(
-            TOPIC_PROPOSED,
-            serde_json::to_value(&proposed).unwrap_or(json!({})),
-            now,
-        ),
-        EmittedEvent::new(
-            TOPIC_TRANSITIONED,
-            serde_json::to_value(&transitioned).unwrap_or(json!({})),
-            now,
-        ),
-        EmittedEvent::new(
-            TOPIC_ENTERED,
-            serde_json::to_value(&entered).unwrap_or(json!({})),
-            now,
-        ),
-        EmittedEvent::new(
-            domain_topic,
-            json!({
-                "invoice_id": invoice.id.to_string(),
-                "amount": input.amount.to_string(),
-                "amount_paid": invoice.amount_paid.to_string(),
-                "total": invoice.total.to_string(),
-                "currency": invoice.currency.to_string(),
-                "actor": actor_audit,
-                "channel": history_channel_str(channel),
-                "bus_event_id": input.bus_event_id.clone(),
-            }),
-            now,
-        ),
-    ]
+    try_publish(
+        ctx,
+        TOPIC_PROPOSED,
+        serde_json::to_value(&proposed).unwrap_or(json!({})),
+        now,
+    )
+    .await;
+    try_publish(
+        ctx,
+        TOPIC_TRANSITIONED,
+        serde_json::to_value(&transitioned).unwrap_or(json!({})),
+        now,
+    )
+    .await;
+    try_publish(
+        ctx,
+        TOPIC_ENTERED,
+        serde_json::to_value(&entered).unwrap_or(json!({})),
+        now,
+    )
+    .await;
+    try_publish(
+        ctx,
+        domain_topic,
+        json!({
+            "invoice_id": invoice.id.to_string(),
+            "amount": input.amount.to_string(),
+            "amount_paid": invoice.amount_paid.to_string(),
+            "total": invoice.total.to_string(),
+            "currency": invoice.currency.to_string(),
+            "actor": actor_audit,
+            "channel": history_channel_str(channel),
+            "bus_event_id": input.bus_event_id.clone(),
+        }),
+        now,
+    )
+    .await;
 }

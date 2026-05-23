@@ -283,7 +283,6 @@ async fn run_draft(ctx: &CoreCtx, matches: &ArgMatches) -> Result<()> {
         "invoice": output.invoice,
         "lines": output.lines,
         "idempotency_replay": output.idempotency_replay,
-        "emitted_events": event_topics(&output.emitted_events),
     });
     render_value(matches, value, &invoice_columns())?;
     Ok(())
@@ -313,7 +312,6 @@ async fn run_issue(ctx: &CoreCtx, matches: &ArgMatches) -> Result<()> {
         "lines": output.lines,
         "html_len": output.html.len(),
         "pdf_len": output.pdf.len(),
-        "emitted_events": event_topics(&output.emitted_events),
     });
     render_value(matches, value, &invoice_columns())?;
     Ok(())
@@ -346,7 +344,6 @@ async fn run_send(ctx: &CoreCtx, matches: &ArgMatches) -> Result<()> {
         "delivered_to": output.delivered_to,
         "html_len": output.html.len(),
         "pdf_len": output.pdf.len(),
-        "emitted_events": event_topics(&output.emitted_events),
     });
     render_value(matches, value, &invoice_columns())?;
     Ok(())
@@ -379,7 +376,6 @@ async fn run_pay(ctx: &CoreCtx, matches: &ArgMatches) -> Result<()> {
     let value = json!({
         "invoice": output.invoice,
         "fully_paid": output.fully_paid,
-        "emitted_events": event_topics(&output.emitted_events),
     });
     render_value(matches, value, &invoice_columns())?;
     Ok(())
@@ -403,7 +399,6 @@ async fn run_void(ctx: &CoreCtx, matches: &ArgMatches) -> Result<()> {
         .context("void_invoice failed")?;
     let value = json!({
         "invoice": output.invoice,
-        "emitted_events": event_topics(&output.emitted_events),
     });
     render_value(matches, value, &invoice_columns())?;
     Ok(())
@@ -523,10 +518,6 @@ fn invoice_columns() -> Vec<ColumnSpec> {
         ColumnSpec::new("total", "total", 12),
         ColumnSpec::new("currency", "currency", 8),
     ]
-}
-
-fn event_topics(events: &[inv_commands::EmittedEvent]) -> Value {
-    json!(events.iter().map(|e| e.topic.clone()).collect::<Vec<_>>())
 }
 
 #[cfg(test)]

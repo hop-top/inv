@@ -42,7 +42,7 @@ use inv_store::repo::invoice::{InvoiceLineRepo, InvoiceRepo};
 use crate::ctx::{Actor, Channel, CoreCtx};
 use crate::draft::history_channel_str;
 use crate::error::CoreError;
-use crate::events::EmittedEvent;
+use crate::publisher::try_publish;
 
 /// Input for [`issue_invoice`].
 #[derive(Debug, Clone)]
@@ -81,8 +81,6 @@ pub struct IssueInvoiceOutput {
     pub html: String,
     /// PDF bytes (stub engine returns HTML verbatim at v1).
     pub pdf: Vec<u8>,
-    /// Bus events the command would emit (T-0014 wires the real bus).
-    pub emitted_events: Vec<EmittedEvent>,
 }
 
 /// Transition a draft to issued.
@@ -206,8 +204,11 @@ pub async fn issue_invoice(
         tx.commit().await.map_err(inv_store::StoreError::from)?;
     }
 
-    // 9. Build emitted events: mechanic-triplet + domain `.issued`.
-    let emitted = build_issued_events(
+    // 9. Synchronously publish the mechanic triplet + domain `.issued`
+    //    when ctx.publisher is wired (T-0043). The history-row outbox
+    //    remains the canonical record.
+    publish_issued_events(
+        ctx,
         &invoice,
         from_state,
         to_state,
@@ -215,14 +216,14 @@ pub async fn issue_invoice(
         &input.actor,
         history.channel,
         now,
-    );
+    )
+    .await;
 
     Ok(IssueInvoiceOutput {
         invoice,
         lines,
         html,
         pdf,
-        emitted_events: emitted,
     })
 }
 
@@ -247,7 +248,8 @@ async fn count_invoices_issued_in_year(ctx: &CoreCtx, year: i32) -> Result<u32, 
 }
 
 #[allow(clippy::too_many_arguments)]
-fn build_issued_events(
+async fn publish_issued_events(
+    ctx: &CoreCtx,
     invoice: &Invoice,
     from: InvoiceState,
     to: InvoiceState,
@@ -255,7 +257,7 @@ fn build_issued_events(
     actor: &Actor,
     channel: HistoryChannel,
     now: DateTime<Utc>,
-) -> Vec<EmittedEvent> {
+) {
     let actor_audit = actor.audit_string();
 
     let proposed = InvoiceProposed::new(
@@ -284,37 +286,43 @@ fn build_issued_events(
         now,
     );
 
-    vec![
-        EmittedEvent::new(
-            TOPIC_PROPOSED,
-            serde_json::to_value(&proposed).unwrap_or(json!({})),
-            now,
-        ),
-        EmittedEvent::new(
-            TOPIC_TRANSITIONED,
-            serde_json::to_value(&transitioned).unwrap_or(json!({})),
-            now,
-        ),
-        EmittedEvent::new(
-            TOPIC_ENTERED,
-            serde_json::to_value(&entered).unwrap_or(json!({})),
-            now,
-        ),
-        EmittedEvent::new(
-            "inv.billing.invoice.issued",
-            json!({
-                "invoice_id": invoice.id.to_string(),
-                "number": invoice.number,
-                "customer_id": invoice.customer_id.to_string(),
-                "currency": invoice.currency.to_string(),
-                "subtotal": invoice.subtotal.to_string(),
-                "tax_total": invoice.tax_total.to_string(),
-                "total": invoice.total.to_string(),
-                "nexus_review": invoice.nexus_review,
-                "actor": actor_audit,
-                "channel": history_channel_str(channel),
-            }),
-            now,
-        ),
-    ]
+    try_publish(
+        ctx,
+        TOPIC_PROPOSED,
+        serde_json::to_value(&proposed).unwrap_or(json!({})),
+        now,
+    )
+    .await;
+    try_publish(
+        ctx,
+        TOPIC_TRANSITIONED,
+        serde_json::to_value(&transitioned).unwrap_or(json!({})),
+        now,
+    )
+    .await;
+    try_publish(
+        ctx,
+        TOPIC_ENTERED,
+        serde_json::to_value(&entered).unwrap_or(json!({})),
+        now,
+    )
+    .await;
+    try_publish(
+        ctx,
+        "inv.billing.invoice.issued",
+        json!({
+            "invoice_id": invoice.id.to_string(),
+            "number": invoice.number,
+            "customer_id": invoice.customer_id.to_string(),
+            "currency": invoice.currency.to_string(),
+            "subtotal": invoice.subtotal.to_string(),
+            "tax_total": invoice.tax_total.to_string(),
+            "total": invoice.total.to_string(),
+            "nexus_review": invoice.nexus_review,
+            "actor": actor_audit,
+            "channel": history_channel_str(channel),
+        }),
+        now,
+    )
+    .await;
 }

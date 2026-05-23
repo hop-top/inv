@@ -11,22 +11,20 @@
 //! double-publishing within a window.
 
 use chrono::{DateTime, Utc};
-use serde_json::json;
+use serde_json::{json, Value};
 
 use inv_core::domain::invoice::{Invoice, InvoiceState};
 use inv_store::repo::invoice::{InvoiceFilter, InvoiceRepo};
 
 use crate::ctx::CoreCtx;
 use crate::error::CoreError;
-use crate::events::EmittedEvent;
+use crate::publisher::try_publish;
 
 /// Output of [`mark_overdue_ticker`].
 #[derive(Debug, Clone)]
 pub struct OverdueTickerOutput {
     /// Invoices flagged overdue on this tick.
     pub overdue_invoices: Vec<Invoice>,
-    /// Bus events the command would emit (one per overdue invoice).
-    pub emitted_events: Vec<EmittedEvent>,
 }
 
 /// Scan for overdue invoices and emit `inv.billing.invoice.overdue` per match.
@@ -45,17 +43,21 @@ pub async fn mark_overdue_ticker(ctx: &CoreCtx) -> Result<OverdueTickerOutput, C
     let candidates = collect_unpaid_unvoided(&inv_repo).await?;
 
     let mut overdue = Vec::new();
-    let mut events = Vec::new();
     for inv in candidates {
         if is_overdue(&inv, now) {
-            events.push(build_overdue_event(&inv, now));
+            try_publish(
+                ctx,
+                "inv.billing.invoice.overdue",
+                overdue_payload(&inv),
+                now,
+            )
+            .await;
             overdue.push(inv);
         }
     }
 
     Ok(OverdueTickerOutput {
         overdue_invoices: overdue,
-        emitted_events: events,
     })
 }
 
@@ -90,27 +92,26 @@ async fn collect_unpaid_unvoided(repo: &InvoiceRepo<'_>) -> Result<Vec<Invoice>,
     Ok(all)
 }
 
-fn build_overdue_event(inv: &Invoice, now: DateTime<Utc>) -> EmittedEvent {
-    EmittedEvent::new(
-        "inv.billing.invoice.overdue",
-        json!({
-            "invoice_id": inv.id.to_string(),
-            "customer_id": inv.customer_id.to_string(),
-            "number": inv.number,
-            "due_at": inv.due_at.map(|d| d.to_rfc3339()),
-            "total": inv.total.to_string(),
-            "amount_paid": inv.amount_paid.to_string(),
-            "currency": inv.currency.to_string(),
-            "state": match inv.state {
-                InvoiceState::Issued => "issued",
-                InvoiceState::Sent => "sent",
-                InvoiceState::Viewed => "viewed",
-                InvoiceState::PartiallyPaid => "partially_paid",
-                InvoiceState::Paid => "paid",
-                InvoiceState::Voided => "voided",
-                InvoiceState::Draft => "draft",
-            },
-        }),
-        now,
-    )
+fn overdue_payload(inv: &Invoice) -> Value {
+    json!({
+        "invoice_id": inv.id.to_string(),
+        "customer_id": inv.customer_id.to_string(),
+        "number": inv.number,
+        "due_at": inv.due_at.map(|d| d.to_rfc3339()),
+        "total": inv.total.to_string(),
+        "amount_paid": inv.amount_paid.to_string(),
+        "currency": inv.currency.to_string(),
+        "state": match inv.state {
+            InvoiceState::Issued => "issued",
+            InvoiceState::Sent => "sent",
+            InvoiceState::Viewed => "viewed",
+            InvoiceState::PartiallyPaid => "partially_paid",
+            InvoiceState::Paid => "paid",
+            InvoiceState::Voided => "voided",
+            InvoiceState::Draft => "draft",
+        },
+    })
 }
+
+// Suppress dead-code warning if both unused (DateTime imported but only used by the old fn).
+const _: Option<DateTime<Utc>> = None;

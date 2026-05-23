@@ -3,7 +3,7 @@
 use anyhow::{anyhow, Context, Result};
 use clap::{Arg, ArgMatches, Command};
 use hop_top_kit::output::ColumnSpec;
-use serde_json::{json, Value};
+use serde_json::json;
 
 use inv_commands::{
     create_credit_note, issue_credit_note, Actor, Channel, CoreCtx, CreateCreditNoteInput,
@@ -118,7 +118,6 @@ async fn run_draft(ctx: &CoreCtx, matches: &ArgMatches) -> Result<()> {
         .context("create_credit_note failed")?;
     let value = json!({
         "credit_note": output.credit_note,
-        "emitted_events": event_topics(&output.emitted_events),
     });
     render_value(matches, value, &columns())?;
     Ok(())
@@ -140,7 +139,6 @@ async fn run_issue(ctx: &CoreCtx, matches: &ArgMatches) -> Result<()> {
         .context("issue_credit_note failed")?;
     let value = json!({
         "credit_note": output.credit_note,
-        "emitted_events": event_topics(&output.emitted_events),
     });
     render_value(matches, value, &columns())?;
     Ok(())
@@ -209,8 +207,4 @@ fn columns() -> Vec<ColumnSpec> {
         ColumnSpec::new("amount", "amount", 12),
         ColumnSpec::new("currency", "currency", 8),
     ]
-}
-
-fn event_topics(events: &[inv_commands::EmittedEvent]) -> Value {
-    json!(events.iter().map(|e| e.topic.clone()).collect::<Vec<_>>())
 }

@@ -36,7 +36,7 @@ const TEST_NAME: &str = "saas_biller_de_03_fin_stripe_payment_paid";
 
 #[tokio::test]
 async fn fin_payment_received_advances_invoice_to_paid() {
-    let (ctx, pool, _captured, _blob) = common::fresh_ctx().await;
+    let (ctx, pool, captured, _blob) = common::fresh_ctx().await;
     let cust = common::seed_customer_qc(&pool).await;
     let session = common::xrr_session(TEST_NAME);
 
@@ -164,12 +164,8 @@ async fn fin_payment_received_advances_invoice_to_paid() {
         paid.invoice.amount_paid,
         Decimal::from_str("1667.14").unwrap()
     );
-    let topics: Vec<&str> = paid
-        .emitted_events
-        .iter()
-        .map(|e| e.topic.as_str())
-        .collect();
-    assert!(topics.contains(&"inv.billing.invoice.paid"));
+    let topics = captured.topics();
+    assert!(topics.contains(&"inv.billing.invoice.paid".to_string()));
 
     // ----- Given the same event_id re-delivered. ---------------------
     let second = dispatch_inbound_event(

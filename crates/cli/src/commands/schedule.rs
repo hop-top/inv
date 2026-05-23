@@ -3,7 +3,7 @@
 use anyhow::{anyhow, Context, Result};
 use clap::{Arg, ArgAction, ArgMatches, Command};
 use hop_top_kit::output::ColumnSpec;
-use serde_json::{json, Value};
+use serde_json::json;
 
 use inv_commands::{
     schedule_cancel, schedule_create, schedule_pause, Actor, Channel, CoreCtx, ScheduleCreateInput,
@@ -198,7 +198,6 @@ async fn run_create(ctx: &CoreCtx, matches: &ArgMatches) -> Result<()> {
         .context("schedule_create failed")?;
     let value = json!({
         "schedule": output.schedule,
-        "emitted_events": event_topics(&output.emitted_events),
     });
     render_value(matches, value, &columns())?;
     Ok(())
@@ -238,7 +237,6 @@ fn render_transition(
 ) -> Result<()> {
     let value = json!({
         "schedule": output.schedule,
-        "emitted_events": event_topics(&output.emitted_events),
     });
     render_value(matches, value, &columns())
 }
@@ -309,8 +307,4 @@ fn columns() -> Vec<ColumnSpec> {
         ColumnSpec::new("currency", "currency", 8),
         ColumnSpec::new("next_run", "next_run", 12),
     ]
-}
-
-fn event_topics(events: &[inv_commands::EmittedEvent]) -> Value {
-    json!(events.iter().map(|e| e.topic.clone()).collect::<Vec<_>>())
 }

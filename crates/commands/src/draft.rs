@@ -31,7 +31,7 @@ use inv_store::repo::invoice::{InvoiceLineRepo, InvoiceRepo};
 
 use crate::ctx::{Actor, Channel, CoreCtx};
 use crate::error::CoreError;
-use crate::events::EmittedEvent;
+use crate::publisher::try_publish;
 
 /// A single line on a draft.
 ///
@@ -127,8 +127,6 @@ pub struct DraftInvoiceOutput {
     pub invoice: Invoice,
     /// The persisted lines (sorted by position).
     pub lines: Vec<InvoiceLine>,
-    /// Bus events the command would emit (T-0014 wires the real bus).
-    pub emitted_events: Vec<EmittedEvent>,
     /// True if the command short-circuited on an idempotency-key hit
     /// (no mutation, no new history row, no events).
     pub idempotency_replay: bool,
@@ -157,7 +155,6 @@ pub async fn draft_invoice(
             return Ok(DraftInvoiceOutput {
                 invoice: existing,
                 lines,
-                emitted_events: Vec::new(),
                 idempotency_replay: true,
             });
         }
@@ -243,8 +240,11 @@ pub async fn draft_invoice(
         tx.commit().await.map_err(inv_store::StoreError::from)?;
     }
 
-    // 5. Construct the emitted-events list.
-    let drafted_event = EmittedEvent::new(
+    // 5. Best-effort synchronous publish (T-0043). The history-row
+    //    outbox is the canonical record; this just shortens latency
+    //    for in-process subscribers when `ctx.publisher` is wired.
+    try_publish(
+        ctx,
         "inv.billing.invoice.drafted",
         json!({
             "invoice_id": invoice_id.to_string(),
@@ -256,12 +256,12 @@ pub async fn draft_invoice(
             "channel": history_channel_str(history.channel),
         }),
         now,
-    );
+    )
+    .await;
 
     Ok(DraftInvoiceOutput {
         invoice,
         lines,
-        emitted_events: vec![drafted_event],
         idempotency_replay: false,
     })
 }

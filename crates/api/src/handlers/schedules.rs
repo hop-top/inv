@@ -106,7 +106,6 @@ pub async fn create(
         StatusCode::CREATED,
         Json(json!({
             "schedule": out.schedule,
-            "emitted_events": out.emitted_events,
         })),
     ))
 }
@@ -133,7 +132,6 @@ pub async fn pause(
     let out = schedule_pause(&state.ctx, input).await?;
     Ok(Json(json!({
         "schedule": out.schedule,
-        "emitted_events": out.emitted_events,
     })))
 }
 
@@ -155,7 +153,6 @@ pub async fn cancel(
     let out = schedule_cancel(&state.ctx, input).await?;
     Ok(Json(json!({
         "schedule": out.schedule,
-        "emitted_events": out.emitted_events,
     })))
 }
 

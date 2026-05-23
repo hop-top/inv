@@ -13,7 +13,7 @@ use inv_store::repo::reminder::ReminderRepo;
 use crate::ctx::{Actor, Channel, CoreCtx};
 use crate::draft::history_channel_str;
 use crate::error::CoreError;
-use crate::events::EmittedEvent;
+use crate::publisher::try_publish;
 
 // =============================================================================
 // reminder_schedule
@@ -52,8 +52,6 @@ impl ReminderScheduleInput {
 pub struct ReminderScheduleOutput {
     /// The newly-enqueued reminder.
     pub reminder: Reminder,
-    /// Bus events.
-    pub emitted_events: Vec<EmittedEvent>,
 }
 
 /// Enqueue a reminder against an invoice.
@@ -76,7 +74,8 @@ pub async fn reminder_schedule(
 
     ReminderRepo::new(&ctx.db).save(&reminder).await?;
 
-    let emitted = vec![EmittedEvent::new(
+    try_publish(
+        ctx,
         "inv.billing.reminder.scheduled",
         json!({
             "reminder_id": reminder.id.to_string(),
@@ -87,12 +86,10 @@ pub async fn reminder_schedule(
             "history_channel": history_channel_str(input.channel.into()),
         }),
         now,
-    )];
+    )
+    .await;
 
-    Ok(ReminderScheduleOutput {
-        reminder,
-        emitted_events: emitted,
-    })
+    Ok(ReminderScheduleOutput { reminder })
 }
 
 // =============================================================================
@@ -115,8 +112,6 @@ pub struct ReminderCancelInput {
 pub struct ReminderCancelOutput {
     /// The cancelled reminder.
     pub reminder: Reminder,
-    /// Bus events.
-    pub emitted_events: Vec<EmittedEvent>,
 }
 
 /// Cancel a scheduled reminder. No-op if already sent or cancelled.
@@ -137,7 +132,8 @@ pub async fn reminder_cancel(
     }
 
     let now = ctx.clock.now();
-    let emitted = vec![EmittedEvent::new(
+    try_publish(
+        ctx,
         "inv.billing.reminder.cancelled",
         json!({
             "reminder_id": reminder.id.to_string(),
@@ -146,12 +142,10 @@ pub async fn reminder_cancel(
             "channel": history_channel_str(input.channel.into()),
         }),
         now,
-    )];
+    )
+    .await;
 
-    Ok(ReminderCancelOutput {
-        reminder,
-        emitted_events: emitted,
-    })
+    Ok(ReminderCancelOutput { reminder })
 }
 
 // =============================================================================
@@ -163,8 +157,6 @@ pub async fn reminder_cancel(
 pub struct RemindersTickOutput {
     /// Reminders that were dispatched on this tick.
     pub sent_reminders: Vec<Reminder>,
-    /// Bus events emitted across the tick.
-    pub emitted_events: Vec<EmittedEvent>,
 }
 
 /// Dispatch every reminder whose `scheduled_at <= now` and is still in
@@ -183,7 +175,6 @@ pub async fn reminders_tick(ctx: &CoreCtx) -> Result<RemindersTickOutput, CoreEr
     let due = repo.due(now).await?;
 
     let mut sent = Vec::new();
-    let mut events = Vec::new();
     for mut reminder in due {
         if !matches!(reminder.state, ReminderState::Scheduled) {
             continue;
@@ -192,7 +183,8 @@ pub async fn reminders_tick(ctx: &CoreCtx) -> Result<RemindersTickOutput, CoreEr
         reminder.sent_at = Some(now);
         repo.save(&reminder).await?;
 
-        events.push(EmittedEvent::new(
+        try_publish(
+            ctx,
             "inv.billing.reminder.sent",
             json!({
                 "reminder_id": reminder.id.to_string(),
@@ -201,12 +193,12 @@ pub async fn reminders_tick(ctx: &CoreCtx) -> Result<RemindersTickOutput, CoreEr
                 "sent_at": now.to_rfc3339(),
             }),
             now,
-        ));
+        )
+        .await;
         sent.push(reminder);
     }
 
     Ok(RemindersTickOutput {
         sent_reminders: sent,
-        emitted_events: events,
     })
 }

@@ -34,23 +34,21 @@ pub enum PdfError {
 /// `pdf-stub` (the default) returns the HTML bytes verbatim, which is
 /// enough to let callers exercise the contract (write a blob, hand it
 /// to a channel, etc.) without committing to a real engine.
-// `return` keywords below are load-bearing across cfg arms — only one
-// arm compiles in at a time, so clippy sees a single arm and flags the
-// return as unneeded. Allow at the function level.
-#[allow(clippy::needless_return)]
 pub async fn render_pdf(html: &str) -> Result<Vec<u8>, PdfError> {
     // Engine selection is mutually exclusive in intent; we pick the
     // first one that's compiled in. `pdf-stub` is the default so a
-    // bare `cargo build` yields a working pipeline.
+    // bare `cargo build` yields a working pipeline. Each cfg-gated
+    // branch is a tail expression so clippy's `needless_return` lint
+    // stays happy when only one arm is alive at a time.
     #[cfg(feature = "pdf-stub")]
     {
-        return Ok(html.as_bytes().to_vec());
+        Ok(html.as_bytes().to_vec())
     }
 
     #[cfg(all(feature = "pdf-typst", not(feature = "pdf-stub")))]
     {
         let _ = html;
-        return Err(PdfError::EngineNotImplemented("pdf-typst"));
+        Err(PdfError::EngineNotImplemented("pdf-typst"))
     }
 
     #[cfg(all(
@@ -60,7 +58,7 @@ pub async fn render_pdf(html: &str) -> Result<Vec<u8>, PdfError> {
     ))]
     {
         let _ = html;
-        return Err(PdfError::EngineNotImplemented("pdf-wkhtmltopdf"));
+        Err(PdfError::EngineNotImplemented("pdf-wkhtmltopdf"))
     }
 
     #[cfg(all(
@@ -71,7 +69,7 @@ pub async fn render_pdf(html: &str) -> Result<Vec<u8>, PdfError> {
     ))]
     {
         let _ = html;
-        return Err(PdfError::EngineNotImplemented("pdf-weasyprint"));
+        Err(PdfError::EngineNotImplemented("pdf-weasyprint"))
     }
 
     #[cfg(not(any(
@@ -82,6 +80,6 @@ pub async fn render_pdf(html: &str) -> Result<Vec<u8>, PdfError> {
     )))]
     {
         let _ = html;
-        return Err(PdfError::NoEngine);
+        Err(PdfError::NoEngine)
     }
 }

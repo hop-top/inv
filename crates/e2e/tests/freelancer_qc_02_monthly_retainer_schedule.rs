@@ -25,7 +25,7 @@ use inv_store::repo::invoice::InvoiceRepo;
 
 #[tokio::test]
 async fn schedule_create_then_tick_materialises_and_auto_issues() {
-    let (mut ctx, pool, _captured, _blob) = common::fresh_ctx().await;
+    let (mut ctx, pool, captured, _blob) = common::fresh_ctx().await;
     let cust = common::seed_customer_qc(&pool).await;
 
     // ----- When: create schedule with auto-issue. --------------------
@@ -66,12 +66,8 @@ async fn schedule_create_then_tick_materialises_and_auto_issues() {
         created.schedule.next_run,
         NaiveDate::from_ymd_opt(2026, 6, 1).unwrap()
     );
-    let topics: Vec<&str> = created
-        .emitted_events
-        .iter()
-        .map(|e| e.topic.as_str())
-        .collect();
-    assert!(topics.contains(&"inv.billing.schedule.created"));
+    let topics = captured.topics();
+    assert!(topics.contains(&"inv.billing.schedule.created".to_string()));
 
     // ----- Given today is 2026-06-01 + ticker fires. -----------------
     // Bump frozen clock past start_date so the schedule is due.
@@ -129,12 +125,8 @@ async fn schedule_create_then_tick_materialises_and_auto_issues() {
 
     // ----- Then: terminal cancelled state + bus event. ---------------
     assert_eq!(cancelled.schedule.state, ScheduleState::Cancelled);
-    let topics: Vec<&str> = cancelled
-        .emitted_events
-        .iter()
-        .map(|e| e.topic.as_str())
-        .collect();
-    assert!(topics.contains(&"inv.billing.schedule.cancelled"));
+    let topics = captured.topics();
+    assert!(topics.contains(&"inv.billing.schedule.cancelled".to_string()));
 
     // Subsequent tick skips cancelled schedule.
     let tick3 = schedules_tick(&ctx).await.unwrap();

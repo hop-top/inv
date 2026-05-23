@@ -36,6 +36,10 @@ tokio = { workspace = true }
 inv-store = { workspace = true, features = ["sqlite"] }
 # Tempdir used as the LocalBlobStore root for the blob-wiring tests.
 tempfile = { workspace = true }
+# `InMemoryPublisher` for capturing bus emissions in tests (T-0043
+# replaces the per-command emitted_events list with synchronous
+# publisher calls). Dev-only — production callers wire their own.
+inv-bus = { workspace = true }
 
 [lints]
 workspace = true

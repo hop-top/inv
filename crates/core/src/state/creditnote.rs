@@ -722,19 +722,21 @@ mod tests {
 
     #[test]
     fn parity_illegal_events_match_on_both_machines() {
-        for (initial, ev) in [(CreditNoteState::Issued, CreditNoteEvent::Issue)] {
-            let mut bare = CreditNoteAdapter::new(initial);
-            let mut sta = StatigAdapter::new(initial);
-            let bare_err = bare.apply_event(&ev).unwrap_err();
-            let stat_err = sta.apply_event(&ev).unwrap_err();
-            assert_eq!(
-                bare_err, stat_err,
-                "bare/statig should reject {ev:?} identically from {initial:?}"
-            );
-            // Neither machine advanced.
-            assert_eq!(bare.current_state(), initial);
-            assert_eq!(sta.current_state(), initial);
-        }
+        // Single (initial, event) tuple at v1; kept as bindings so adding
+        // more illegal pairs later is a one-line list extension. Clippy
+        // dislikes a `for` over a singleton, so destructure directly.
+        let (initial, ev) = (CreditNoteState::Issued, CreditNoteEvent::Issue);
+        let mut bare = CreditNoteAdapter::new(initial);
+        let mut sta = StatigAdapter::new(initial);
+        let bare_err = bare.apply_event(&ev).unwrap_err();
+        let stat_err = sta.apply_event(&ev).unwrap_err();
+        assert_eq!(
+            bare_err, stat_err,
+            "bare/statig should reject {ev:?} identically from {initial:?}"
+        );
+        // Neither machine advanced.
+        assert_eq!(bare.current_state(), initial);
+        assert_eq!(sta.current_state(), initial);
     }
 
     /// Runs the same event sequence on both machines, asserts each step

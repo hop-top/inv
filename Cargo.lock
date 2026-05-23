@@ -1526,6 +1526,7 @@ version = "0.1.0-alpha.0"
 dependencies = [
  "async-trait",
  "chrono",
+ "inv-bus",
  "inv-core",
  "inv-store",
  "rust_decimal",

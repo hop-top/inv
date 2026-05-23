@@ -61,7 +61,7 @@ use inv_store::repo::send_idempotency::{SendIdempotencyRecord, SendIdempotencyRe
 use crate::ctx::{Actor, Channel, CoreCtx};
 use crate::draft::history_channel_str;
 use crate::error::CoreError;
-use crate::events::EmittedEvent;
+use crate::publisher::try_publish;
 
 /// Pluggable sink for `stdout` / in-memory delivery.
 ///
@@ -137,8 +137,6 @@ pub struct SendInvoiceOutput {
     pub html: String,
     /// PDF bytes delivered (stub engine returns HTML).
     pub pdf: Vec<u8>,
-    /// Bus events the command would emit. Empty on idempotency replay.
-    pub emitted_events: Vec<EmittedEvent>,
     /// Resolved destination (`file:///tmp/x.html`, `stdout`, …) for
     /// audit / display.
     pub delivered_to: String,
@@ -452,7 +450,8 @@ async fn finalize_send(
         tx.commit().await.map_err(inv_store::StoreError::from)?;
     }
 
-    let emitted = build_sent_events(
+    publish_sent_events(
+        ctx,
         &invoice,
         from_state,
         to_state,
@@ -460,14 +459,14 @@ async fn finalize_send(
         history_channel,
         now,
         &delivered_to,
-    );
+    )
+    .await;
 
     Ok(SendInvoiceOutput {
         invoice,
         lines,
         html,
         pdf,
-        emitted_events: emitted,
         delivered_to,
         idempotency_replay: false,
     })
@@ -516,7 +515,6 @@ async fn try_replay(
         lines,
         html,
         pdf,
-        emitted_events: Vec::new(),
         delivered_to: record.delivered_to,
         idempotency_replay: true,
     }))
@@ -543,7 +541,8 @@ fn file_path_from_uri(uri: &str) -> Result<PathBuf, CoreError> {
 }
 
 #[allow(clippy::too_many_arguments)]
-fn build_sent_events(
+async fn publish_sent_events(
+    ctx: &CoreCtx,
     invoice: &Invoice,
     from: InvoiceState,
     to: InvoiceState,
@@ -551,7 +550,7 @@ fn build_sent_events(
     channel: HistoryChannel,
     now: DateTime<Utc>,
     destination: &str,
-) -> Vec<EmittedEvent> {
+) {
     let actor_audit = actor.audit_string();
     let event = InvoiceEvent::Send;
 
@@ -581,32 +580,38 @@ fn build_sent_events(
         now,
     );
 
-    vec![
-        EmittedEvent::new(
-            TOPIC_PROPOSED,
-            serde_json::to_value(&proposed).unwrap_or(json!({})),
-            now,
-        ),
-        EmittedEvent::new(
-            TOPIC_TRANSITIONED,
-            serde_json::to_value(&transitioned).unwrap_or(json!({})),
-            now,
-        ),
-        EmittedEvent::new(
-            TOPIC_ENTERED,
-            serde_json::to_value(&entered).unwrap_or(json!({})),
-            now,
-        ),
-        EmittedEvent::new(
-            "inv.billing.invoice.sent",
-            json!({
-                "invoice_id": invoice.id.to_string(),
-                "number": invoice.number,
-                "destination": destination,
-                "actor": actor_audit,
-                "channel": history_channel_str(channel),
-            }),
-            now,
-        ),
-    ]
+    try_publish(
+        ctx,
+        TOPIC_PROPOSED,
+        serde_json::to_value(&proposed).unwrap_or(json!({})),
+        now,
+    )
+    .await;
+    try_publish(
+        ctx,
+        TOPIC_TRANSITIONED,
+        serde_json::to_value(&transitioned).unwrap_or(json!({})),
+        now,
+    )
+    .await;
+    try_publish(
+        ctx,
+        TOPIC_ENTERED,
+        serde_json::to_value(&entered).unwrap_or(json!({})),
+        now,
+    )
+    .await;
+    try_publish(
+        ctx,
+        "inv.billing.invoice.sent",
+        json!({
+            "invoice_id": invoice.id.to_string(),
+            "number": invoice.number,
+            "destination": destination,
+            "actor": actor_audit,
+            "channel": history_channel_str(channel),
+        }),
+        now,
+    )
+    .await;
 }

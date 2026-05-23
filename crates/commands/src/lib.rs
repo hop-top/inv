@@ -24,15 +24,18 @@
 //! - opens a single sqlx transaction encompassing the mutation +
 //!   `invoice_state_history` insert (the history row doubles as the
 //!   outbox, `published_at = NULL` signals pending);
-//! - returns the list of bus events it WOULD emit, in
-//!   `EmittedEvent` form. T-0014 will wire those onto the real bus.
+//! - calls `publisher::try_publish` (T-0043) when `ctx.publisher` is
+//!   wired so subscribers see the event synchronously. The
+//!   history-row outbox remains the canonical record — the relay in
+//!   `crates/bus/src/outbox.rs` replays anything the sync publish
+//!   missed.
 //!
 //! ## Module layout
 //!
 //! - [`ctx`] — [`CoreCtx`] + [`Actor`] + [`Channel`] (channel mirror of
 //!   `inv_core::domain::invoice::HistoryChannel`).
 //! - [`error`] — [`CoreError`] variants surfaced to every channel.
-//! - [`events`] — [`EmittedEvent`] envelope returned in command outputs.
+//! - [`publisher`] — [`Publisher`] trait + `try_publish` helper.
 //! - [`draft`] — `draft_invoice`.
 //! - [`issue`] — `issue_invoice`.
 //! - [`send`] — `send_invoice`.
@@ -43,7 +46,6 @@ pub mod credit;
 pub mod ctx;
 pub mod draft;
 pub mod error;
-pub mod events;
 pub mod issue;
 pub mod overdue;
 pub mod pay;
@@ -60,7 +62,6 @@ pub use credit::{
 pub use ctx::{Actor, Channel, Clock, CoreCtx, SystemClock};
 pub use draft::{draft_invoice, DraftInvoiceInput, DraftInvoiceOutput, DraftLineInput};
 pub use error::CoreError;
-pub use events::EmittedEvent;
 pub use issue::{issue_invoice, IssueInvoiceInput, IssueInvoiceOutput};
 pub use overdue::{mark_overdue_ticker, OverdueTickerOutput};
 pub use pay::{mark_paid, MarkPaidInput, MarkPaidOutput};

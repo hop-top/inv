@@ -29,7 +29,7 @@ use inv_store::repo::invoice::InvoiceRepo;
 use crate::ctx::{Actor, Channel, CoreCtx};
 use crate::draft::history_channel_str;
 use crate::error::CoreError;
-use crate::events::EmittedEvent;
+use crate::publisher::try_publish;
 
 // =============================================================================
 // create_credit_note
@@ -72,8 +72,6 @@ impl CreateCreditNoteInput {
 pub struct CreateCreditNoteOutput {
     /// The newly-created (draft) credit note.
     pub credit_note: CreditNote,
-    /// Bus events the command would emit.
-    pub emitted_events: Vec<EmittedEvent>,
 }
 
 /// Create a draft credit note against an invoice.
@@ -129,7 +127,8 @@ pub async fn create_credit_note(
         tx.commit().await.map_err(inv_store::StoreError::from)?;
     }
 
-    let emitted = vec![EmittedEvent::new(
+    try_publish(
+        ctx,
         "inv.billing.creditnote.drafted",
         json!({
             "credit_note_id": cn.id.to_string(),
@@ -141,12 +140,10 @@ pub async fn create_credit_note(
             "channel": history_channel_str(channel),
         }),
         now,
-    )];
+    )
+    .await;
 
-    Ok(CreateCreditNoteOutput {
-        credit_note: cn,
-        emitted_events: emitted,
-    })
+    Ok(CreateCreditNoteOutput { credit_note: cn })
 }
 
 // =============================================================================
@@ -178,8 +175,6 @@ impl IssueCreditNoteInput {
 pub struct IssueCreditNoteOutput {
     /// The newly-issued credit note (number assigned).
     pub credit_note: CreditNote,
-    /// Bus events the command would emit.
-    pub emitted_events: Vec<EmittedEvent>,
 }
 
 /// Transition a draft credit note to issued.
@@ -234,7 +229,8 @@ pub async fn issue_credit_note(
         tx.commit().await.map_err(inv_store::StoreError::from)?;
     }
 
-    let emitted = build_creditnote_issued_events(
+    publish_creditnote_issued_events(
+        ctx,
         &cn,
         from_state,
         to_state,
@@ -242,12 +238,10 @@ pub async fn issue_credit_note(
         &input.actor,
         channel,
         now,
-    );
+    )
+    .await;
 
-    Ok(IssueCreditNoteOutput {
-        credit_note: cn,
-        emitted_events: emitted,
-    })
+    Ok(IssueCreditNoteOutput { credit_note: cn })
 }
 
 async fn count_credit_notes_issued_in_year(ctx: &CoreCtx, year: i32) -> Result<u32, CoreError> {
@@ -267,7 +261,8 @@ async fn count_credit_notes_issued_in_year(ctx: &CoreCtx, year: i32) -> Result<u
 }
 
 #[allow(clippy::too_many_arguments)]
-fn build_creditnote_issued_events(
+async fn publish_creditnote_issued_events(
+    ctx: &CoreCtx,
     cn: &CreditNote,
     from: CreditNoteState,
     to: CreditNoteState,
@@ -275,7 +270,7 @@ fn build_creditnote_issued_events(
     actor: &Actor,
     channel: HistoryChannel,
     now: DateTime<Utc>,
-) -> Vec<EmittedEvent> {
+) {
     let actor_audit = actor.audit_string();
     let proposed = CreditNoteProposed::new(
         cn.id.clone(),
@@ -298,36 +293,42 @@ fn build_creditnote_issued_events(
     let entered =
         CreditNoteEntered::new(cn.id.clone(), to, channel, Some(actor_audit.clone()), now);
 
-    vec![
-        EmittedEvent::new(
-            TOPIC_PROPOSED,
-            serde_json::to_value(&proposed).unwrap_or(json!({})),
-            now,
-        ),
-        EmittedEvent::new(
-            TOPIC_TRANSITIONED,
-            serde_json::to_value(&transitioned).unwrap_or(json!({})),
-            now,
-        ),
-        EmittedEvent::new(
-            TOPIC_ENTERED,
-            serde_json::to_value(&entered).unwrap_or(json!({})),
-            now,
-        ),
-        EmittedEvent::new(
-            "inv.billing.creditnote.issued",
-            json!({
-                "credit_note_id": cn.id.to_string(),
-                "number": cn.number,
-                "invoice_id": cn.invoice_id.to_string(),
-                "amount": cn.amount.to_string(),
-                "currency": cn.currency.to_string(),
-                "actor": actor_audit,
-                "channel": history_channel_str(channel),
-            }),
-            now,
-        ),
-    ]
+    try_publish(
+        ctx,
+        TOPIC_PROPOSED,
+        serde_json::to_value(&proposed).unwrap_or(json!({})),
+        now,
+    )
+    .await;
+    try_publish(
+        ctx,
+        TOPIC_TRANSITIONED,
+        serde_json::to_value(&transitioned).unwrap_or(json!({})),
+        now,
+    )
+    .await;
+    try_publish(
+        ctx,
+        TOPIC_ENTERED,
+        serde_json::to_value(&entered).unwrap_or(json!({})),
+        now,
+    )
+    .await;
+    try_publish(
+        ctx,
+        "inv.billing.creditnote.issued",
+        json!({
+            "credit_note_id": cn.id.to_string(),
+            "number": cn.number,
+            "invoice_id": cn.invoice_id.to_string(),
+            "amount": cn.amount.to_string(),
+            "currency": cn.currency.to_string(),
+            "actor": actor_audit,
+            "channel": history_channel_str(channel),
+        }),
+        now,
+    )
+    .await;
 }
 
 // Currency is imported but currently unused outside the round() call we use indirectly.

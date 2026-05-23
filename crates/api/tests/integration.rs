@@ -276,7 +276,7 @@ async fn issue_invoice_200() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri(&format!("/v1/invoices/{inv_id}/issue"))
+                .uri(format!("/v1/invoices/{inv_id}/issue"))
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -304,7 +304,7 @@ async fn pay_invoice_200() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri(&format!("/v1/invoices/{inv_id}/pay"))
+                .uri(format!("/v1/invoices/{inv_id}/pay"))
                 .header("content-type", "application/json")
                 .body(Body::from(json!({ "amount": "9999.99" }).to_string()))
                 .unwrap(),
@@ -332,7 +332,7 @@ async fn unknown_id_404() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri(&format!("/v1/invoices/{fake_id}/issue"))
+                .uri(format!("/v1/invoices/{fake_id}/issue"))
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -355,7 +355,7 @@ async fn issue_twice_409() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri(&format!("/v1/invoices/{inv_id}/issue"))
+                .uri(format!("/v1/invoices/{inv_id}/issue"))
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -384,7 +384,7 @@ async fn signed_link_view_serves_html_for_valid_token() {
     let resp = app
         .oneshot(
             Request::builder()
-                .uri(&format!("/v/{token}"))
+                .uri(format!("/v/{token}"))
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -412,7 +412,7 @@ async fn signed_link_view_expired_404() {
     let resp = app
         .oneshot(
             Request::builder()
-                .uri(&format!("/v/{token}"))
+                .uri(format!("/v/{token}"))
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -441,7 +441,7 @@ async fn signed_link_view_publishes_invoice_viewed_event() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri(&format!("/v1/invoices/{inv_id}/send"))
+                .uri(format!("/v1/invoices/{inv_id}/send"))
                 .header("content-type", "application/json")
                 .body(Body::from(json!({ "destination_uri": dest }).to_string()))
                 .unwrap(),
@@ -470,7 +470,7 @@ async fn signed_link_view_publishes_invoice_viewed_event() {
     let resp = app
         .oneshot(
             Request::builder()
-                .uri(&format!("/v/{token}"))
+                .uri(format!("/v/{token}"))
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -516,7 +516,7 @@ async fn signed_link_view_tampered_404() {
     let resp = app
         .oneshot(
             Request::builder()
-                .uri(&format!("/v/{tampered}"))
+                .uri(format!("/v/{tampered}"))
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -563,7 +563,7 @@ async fn webhook_send_signs_outbound_body() {
             if let Some(v) = line.to_ascii_lowercase().strip_prefix("x-inv-signature: ") {
                 // The original (case-preserved) value sits after the colon
                 // in the unaltered line; find it.
-                if let Some(rest) = line.splitn(2, ':').nth(1) {
+                if let Some((_, rest)) = line.split_once(':') {
                     sig = Some(rest.trim().to_string());
                 }
                 let _ = v;
@@ -605,7 +605,7 @@ async fn webhook_send_signs_outbound_body() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri(&format!("/v1/invoices/{inv_id}/send"))
+                .uri(format!("/v1/invoices/{inv_id}/send"))
                 .header("content-type", "application/json")
                 .body(Body::from(
                     json!({ "destination_uri": webhook_uri.clone() }).to_string(),
@@ -748,7 +748,7 @@ async fn list_schedules_returns_all_seeded() {
         .clone()
         .oneshot(
             Request::builder()
-                .uri(&format!("/v1/schedules?customer_id={c1}"))
+                .uri(format!("/v1/schedules?customer_id={c1}"))
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -902,7 +902,7 @@ async fn list_credit_notes_returns_all_seeded() {
         .clone()
         .oneshot(
             Request::builder()
-                .uri(&format!("/v1/credit-notes?invoice_id={}", inv1.id))
+                .uri(format!("/v1/credit-notes?invoice_id={}", inv1.id))
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -966,7 +966,7 @@ async fn draft_and_issue(app: &axum::Router, cust: &CustomerId) -> String {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri(&format!("/v1/invoices/{inv_id}/issue"))
+                .uri(format!("/v1/invoices/{inv_id}/issue"))
                 .body(Body::empty())
                 .unwrap(),
         )
