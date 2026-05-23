@@ -439,9 +439,56 @@ async fn run_list(ctx: &CoreCtx, matches: &ArgMatches) -> Result<()> {
         offset: matches.get_one::<i64>("offset").copied(),
     };
     let rows = InvoiceRepo::new(&ctx.db).list(&filter).await?;
-    let value = serde_json::to_value(rows)?;
+    let mut value = serde_json::to_value(rows)?;
+    decorate_schedule_column(&mut value);
     render_list(matches, value, &invoice_columns())?;
     Ok(())
+}
+
+/// Em-dash rendered when a nullable column has no value (matches the
+/// conventional "unset" glyph used elsewhere in CLI table output).
+const NULL_GLYPH: &str = "—";
+
+/// Inject a derived `schedule` field on every row in the list payload.
+///
+/// The raw `schedule_id` (full typeid `schedule_01J...`) is too wide to
+/// fit comfortably in a table column. The `schedule` field surfaces just
+/// the random suffix (last 8 chars of the typeid) so operators can spot
+/// "originated from a schedule" at a glance and still cross-reference the
+/// full id via `inv invoice show <id>` or the `--cols schedule_id`
+/// projection on JSON output.
+///
+/// Rows without a `schedule_id` (i.e. direct drafts) get [`NULL_GLYPH`].
+fn decorate_schedule_column(value: &mut Value) {
+    let Some(rows) = value.as_array_mut() else {
+        return;
+    };
+    for row in rows {
+        let suffix = row
+            .get("schedule_id")
+            .and_then(Value::as_str)
+            .map(schedule_id_suffix)
+            .unwrap_or_else(|| NULL_GLYPH.to_string());
+        if let Some(map) = row.as_object_mut() {
+            map.insert("schedule".to_string(), Value::String(suffix));
+        }
+    }
+}
+
+/// Render the trailing 8 chars of a typeid as its short form.
+///
+/// Typeids have shape `<prefix>_<26-char-base32>`. The base32 suffix is
+/// the random component; the last 8 chars are sufficient for visual
+/// disambiguation in a table view (collision risk is negligible at any
+/// realistic operator-visible list size). Inputs shorter than 8 chars
+/// (defensive — typeids are fixed-width in practice) are passed through
+/// untouched.
+fn schedule_id_suffix(id: &str) -> String {
+    let len = id.chars().count();
+    if len <= 8 {
+        return id.to_string();
+    }
+    id.chars().skip(len - 8).collect()
 }
 
 fn parse_invoice_state(raw: &str) -> Result<InvoiceState> {
@@ -462,6 +509,11 @@ fn invoice_columns() -> Vec<ColumnSpec> {
         ColumnSpec::new("id", "id", 26),
         ColumnSpec::new("number", "number", 14),
         ColumnSpec::new("state", "state", 14),
+        // `schedule` is a CLI-only derived field — see
+        // [`decorate_schedule_column`]: it surfaces the short suffix of
+        // `invoice.schedule_id` (or `—` for direct drafts). The raw
+        // `schedule_id` stays available on JSON output.
+        ColumnSpec::new("schedule", "schedule", 10),
         ColumnSpec::new("total", "total", 12),
         ColumnSpec::new("currency", "currency", 8),
     ]
@@ -472,4 +524,92 @@ fn event_topics(events: &[inv_commands::EmittedEvent]) -> Value {
         .iter()
         .map(|e| e.topic.clone())
         .collect::<Vec<_>>())
+}
+
+#[cfg(test)]
+mod schedule_column_tests {
+    //! Tests for the derived `schedule` column injected into `inv invoice
+    //! list` table rows. These exercise the pure JSON-shaping helpers
+    //! WITHOUT booting a CoreCtx / DB.
+
+    use super::{
+        decorate_schedule_column, invoice_columns, schedule_id_suffix, NULL_GLYPH,
+    };
+    use serde_json::json;
+
+    #[test]
+    fn suffix_takes_last_eight_chars_of_typeid() {
+        // Typeid shape: <prefix>_<26-char-base32>. Suffix is the random
+        // tail — last 8 chars uniquely identify the row in any realistic
+        // list view.
+        let id = "schedule_01k6abcdef0123456789xyzwvu";
+        let s = schedule_id_suffix(id);
+        assert_eq!(s, "89xyzwvu");
+        assert_eq!(s.len(), 8);
+        assert!(id.ends_with(&s), "{s} must be the trailing slice of {id}");
+    }
+
+    #[test]
+    fn suffix_passes_through_short_inputs() {
+        // Defensive: shouldn't panic on inputs shorter than the suffix
+        // width even though typeids are fixed-width in practice.
+        assert_eq!(schedule_id_suffix("abc"), "abc");
+        assert_eq!(schedule_id_suffix(""), "");
+        assert_eq!(schedule_id_suffix("12345678"), "12345678");
+    }
+
+    #[test]
+    fn decorate_injects_suffix_for_scheduled_invoices() {
+        let mut rows = json!([
+            { "id": "invoice_01k6aaa", "schedule_id": "schedule_01k6abcdef0123456789xyzwvu" },
+        ]);
+        decorate_schedule_column(&mut rows);
+        let row = &rows[0];
+        let schedule = row.get("schedule").and_then(|v| v.as_str()).unwrap();
+        assert_eq!(schedule.len(), 8);
+        let raw = row.get("schedule_id").and_then(|v| v.as_str()).unwrap();
+        assert!(raw.ends_with(schedule));
+    }
+
+    #[test]
+    fn decorate_uses_null_glyph_for_direct_drafts() {
+        let mut rows = json!([
+            { "id": "invoice_01k6aaa" },  // no schedule_id (skip_serializing_if)
+        ]);
+        decorate_schedule_column(&mut rows);
+        assert_eq!(rows[0].get("schedule").and_then(|v| v.as_str()), Some(NULL_GLYPH));
+    }
+
+    #[test]
+    fn decorate_handles_mixed_list() {
+        let mut rows = json!([
+            { "id": "invoice_01k6aaa", "schedule_id": "schedule_01k6abcdef0123456789xyzwvu" },
+            { "id": "invoice_01k6bbb" },
+        ]);
+        decorate_schedule_column(&mut rows);
+        // First row gets the suffix; second gets the em-dash.
+        let s0 = rows[0].get("schedule").and_then(|v| v.as_str()).unwrap();
+        assert_eq!(s0.len(), 8);
+        assert_eq!(rows[1].get("schedule").and_then(|v| v.as_str()), Some(NULL_GLYPH));
+    }
+
+    #[test]
+    fn decorate_is_a_noop_on_non_arrays() {
+        // Defensive: single-row payloads (e.g. `inv invoice show`) flow
+        // through other code paths; helper must not corrupt non-array
+        // inputs if ever miswired.
+        let mut value = json!({ "id": "invoice_01k6aaa" });
+        decorate_schedule_column(&mut value);
+        assert!(value.get("schedule").is_none());
+    }
+
+    #[test]
+    fn columns_include_schedule_between_state_and_total() {
+        let cols = invoice_columns();
+        let headers: Vec<&str> = cols.iter().map(|c| c.header.as_str()).collect();
+        let pos = headers.iter().position(|h| *h == "schedule").expect("schedule column");
+        let state_pos = headers.iter().position(|h| *h == "state").expect("state column");
+        let total_pos = headers.iter().position(|h| *h == "total").expect("total column");
+        assert!(state_pos < pos && pos < total_pos, "schedule must sit between state and total: {headers:?}");
+    }
 }
