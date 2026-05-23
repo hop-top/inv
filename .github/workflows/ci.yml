@@ -77,10 +77,31 @@ jobs:
   test-postgres:
     name: Test (postgres)
     # Postgres backend tests run on push to main only — keeps PR feedback
-    # under the SQLite job's runtime. Promote to PR coverage once we have
-    # a real Postgres service in CI.
+    # under the SQLite job's runtime.
+    #
+    # Tests today still hardcode `sqlite::memory:` for fixtures, so this
+    # job catches build / type errors but doesn't exercise live postgres
+    # queries. Parameterising fixtures on DATABASE_URL is a separate
+    # follow-up; the postgres service is already wired here so that work
+    # can flip to it without further CI changes.
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: inv
+          POSTGRES_PASSWORD: inv
+          POSTGRES_DB: inv_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U inv -d inv_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://inv:inv@localhost:5432/inv_test
     steps:
       - uses: actions/checkout@v4
 
