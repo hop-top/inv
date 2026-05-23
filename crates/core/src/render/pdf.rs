@@ -34,6 +34,10 @@ pub enum PdfError {
 /// `pdf-stub` (the default) returns the HTML bytes verbatim, which is
 /// enough to let callers exercise the contract (write a blob, hand it
 /// to a channel, etc.) without committing to a real engine.
+// `return` keywords below are load-bearing across cfg arms — only one
+// arm compiles in at a time, so clippy sees a single arm and flags the
+// return as unneeded. Allow at the function level.
+#[allow(clippy::needless_return)]
 pub async fn render_pdf(html: &str) -> Result<Vec<u8>, PdfError> {
     // Engine selection is mutually exclusive in intent; we pick the
     // first one that's compiled in. `pdf-stub` is the default so a
