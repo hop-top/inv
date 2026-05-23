@@ -41,6 +41,16 @@ make test     # cargo test --workspace
 make lint     # cargo fmt --check + clippy
 ```
 
+## Local setup
+
+Opt into repo-local git hooks (pre-push runs `cargo fmt --check`):
+
+```sh
+git config core.hooksPath .githooks
+```
+
+See [`.githooks/README.md`](.githooks/README.md) for details and bypass options.
+
 ## Design
 
 [`docs/`](docs/) is organised by reader intent — pick the doc that matches

@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# Block push if `cargo fmt --all -- --check` would change anything.
+#
+# Why pre-push (not pre-commit):
+#   - pre-commit fires on every commit — too noisy when iterating.
+#   - pre-push catches drift right before it leaves the local repo, exactly
+#     where CI would catch it next.
+#
+# Bypass options (use sparingly):
+#   INV_SKIP_FMT_HOOK=1 git push   # documented escape hatch
+#   git push --no-verify           # git-native, skips all hooks
+#
+# Future: clippy is intentionally NOT here. It's slow (30s+ cold cache) and
+# would punish every push. If we want it, add it as a separate opt-in hook.
+set -euo pipefail
+
+if [[ "${INV_SKIP_FMT_HOOK:-}" == "1" ]]; then
+  exit 0
+fi
+
+if ! command -v cargo >/dev/null 2>&1; then
+  echo "pre-push: cargo not on PATH; skipping fmt check" >&2
+  exit 0
+fi
+
+if ! cargo fmt --all -- --check; then
+  echo
+  echo "pre-push: cargo fmt --check failed."
+  echo "  Run 'cargo fmt --all' to fix, then re-push."
+  echo "  Override: INV_SKIP_FMT_HOOK=1 git push  (use sparingly)"
+  exit 1
+fi
