@@ -1099,7 +1099,9 @@ dependencies = [
 
 [[package]]
 name = "hop-top-kit"
-version = "0.4.0-experimental.2"
+version = "0.4.0-experimental.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "effaa25acf73203e7f3455b2837b480ce5e771ec3d8a6b6381fa4bf3aa4668c3"
 dependencies = [
  "clap",
  "comfy-table",
@@ -1112,6 +1114,8 @@ dependencies = [
 [[package]]
 name = "hop-top-uri"
 version = "0.2.0-alpha.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a7d6f4f21528e5d91e8a682eb0374ed83f8e7d8770a9ebcb949f2c36d97bacc4"
 dependencies = [
  "serde",
  "serde_json",

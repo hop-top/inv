@@ -94,10 +94,8 @@ futures-util = "0.3"
 clap = { version = "4", features = ["derive", "string"] }
 
 # --- hop-top primitives --------------------------------------------------
-# Pinned to local paths until both crates cut releases that include the
-# features we use. Swap to crates.io versions when available.
-hop-top-kit = { path = "../kit/hops/main/sdk/experimental/rs", features = ["cli"] }
-hop-top-uri = { path = "../uri-poly/rs" }
+hop-top-kit = { version = "0.4.0-experimental.3", features = ["cli"] }
+hop-top-uri = "0.2.0-alpha.1"
 
 # --- Workspace-internal crates (path deps) -------------------------------
 inv-api      = { path = "crates/api" }
