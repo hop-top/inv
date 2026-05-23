@@ -16,9 +16,7 @@ use rust_decimal::Decimal;
 use serde_json::json;
 
 use inv_core::domain::ids::{HistoryId, InvoiceId};
-use inv_core::domain::invoice::{
-    HistoryChannel, Invoice, InvoiceState, InvoiceStateHistory,
-};
+use inv_core::domain::invoice::{HistoryChannel, Invoice, InvoiceState, InvoiceStateHistory};
 use inv_core::state::transitions::{next_state, InvoiceEvent};
 use inv_core::state::{
     InvoiceEntered, InvoiceProposed, InvoiceTransitioned, TOPIC_ENTERED, TOPIC_PROPOSED,
@@ -80,10 +78,7 @@ pub struct MarkPaidOutput {
 
 /// Record a payment against an invoice.
 #[tracing::instrument(skip_all, fields(invoice_id = %input.invoice_id, amount = %input.amount))]
-pub async fn mark_paid(
-    ctx: &CoreCtx,
-    input: MarkPaidInput,
-) -> Result<MarkPaidOutput, CoreError> {
+pub async fn mark_paid(ctx: &CoreCtx, input: MarkPaidInput) -> Result<MarkPaidOutput, CoreError> {
     input.validate()?;
 
     let inv_repo = InvoiceRepo::new(&ctx.db);
@@ -142,14 +137,7 @@ pub async fn mark_paid(
 
     // 6. Emit events.
     let emitted = build_paid_events(
-        &invoice,
-        &input,
-        from_state,
-        to_state,
-        &event,
-        channel,
-        now,
-        fully_paid,
+        &invoice, &input, from_state, to_state, &event, channel, now, fully_paid,
     );
 
     Ok(MarkPaidOutput {
@@ -190,8 +178,13 @@ fn build_paid_events(
         channel,
         now,
     );
-    let entered =
-        InvoiceEntered::new(invoice.id.clone(), to, channel, Some(actor_audit.clone()), now);
+    let entered = InvoiceEntered::new(
+        invoice.id.clone(),
+        to,
+        channel,
+        Some(actor_audit.clone()),
+        now,
+    );
 
     let domain_topic = if fully_paid {
         "inv.billing.invoice.paid"

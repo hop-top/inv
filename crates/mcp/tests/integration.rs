@@ -60,8 +60,8 @@ async fn fresh_ctx() -> (Arc<CoreCtx>, Pool) {
     let pool = connect("sqlite::memory:").await.expect("connect");
     run_migrations(&pool).await.expect("migrate");
     let (table, nexus) = TaxTable::load_from_str(FIXTURE_TOML).expect("tax fixture");
-    let ctx = CoreCtx::new(pool.clone(), table, nexus)
-        .with_clock(Arc::new(FrozenClock(frozen_now())));
+    let ctx =
+        CoreCtx::new(pool.clone(), table, nexus).with_clock(Arc::new(FrozenClock(frozen_now())));
     (Arc::new(ctx), pool)
 }
 
@@ -82,15 +82,16 @@ async fn seed_customer(pool: &Pool) -> CustomerId {
         created_at: frozen_now(),
         updated_at: frozen_now(),
     };
-    CustomerRepo::new(pool).save(&c).await.expect("seed customer");
+    CustomerRepo::new(pool)
+        .save(&c)
+        .await
+        .expect("seed customer");
     c.id
 }
 
 /// Spawn the server side on a duplex transport. Returns the connected
 /// client peer.
-async fn spawn_pair(
-    ctx: Arc<CoreCtx>,
-) -> rmcp::service::RunningService<rmcp::RoleClient, ()> {
+async fn spawn_pair(ctx: Arc<CoreCtx>) -> rmcp::service::RunningService<rmcp::RoleClient, ()> {
     let (server_transport, client_transport) = tokio::io::duplex(64 * 1024);
 
     // Drive the server on a background task. We deliberately don't
@@ -115,16 +116,16 @@ async fn lists_at_least_18_tools() {
     let (ctx, _pool) = fresh_ctx().await;
     let client = spawn_pair(ctx).await;
 
-    let tools = client
-        .peer()
-        .list_tools(None)
-        .await
-        .expect("list_tools");
+    let tools = client.peer().list_tools(None).await.expect("list_tools");
     assert!(
         tools.tools.len() >= 18,
         "expected ≥18 tools, got {}: {:?}",
         tools.tools.len(),
-        tools.tools.iter().map(|t| t.name.as_ref()).collect::<Vec<_>>()
+        tools
+            .tools
+            .iter()
+            .map(|t| t.name.as_ref())
+            .collect::<Vec<_>>()
     );
 
     // Spot-check a few names from the design §10 column.
@@ -292,9 +293,7 @@ async fn invalid_tool_input_surfaces_mcp_error() {
     let err = err.expect_err("expected MCP error on bad input");
     let msg = format!("{err}");
     assert!(
-        msg.contains("customer_id")
-            || msg.contains("invalid")
-            || msg.contains("validation"),
+        msg.contains("customer_id") || msg.contains("invalid") || msg.contains("validation"),
         "unhelpful err: {msg}"
     );
 }

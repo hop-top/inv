@@ -116,7 +116,10 @@ async fn issue_tool_surfaces_emitted_events_and_matches_relay() {
         "inv.billing.invoice.entered",
         "inv.billing.invoice.issued",
     ] {
-        assert!(topics.contains(&expected), "missing `{expected}` in {topics:?}");
+        assert!(
+            topics.contains(&expected),
+            "missing `{expected}` in {topics:?}"
+        );
     }
 
     // 3. Drain the outbox relay and confirm subscribers see the same

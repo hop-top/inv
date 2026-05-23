@@ -51,7 +51,9 @@ async fn dz_local_invoice_resolves_standard_and_reduced_tva() {
                 },
             ],
             idempotency_key: None,
-            actor: Actor::Cli { name: "agency".into() },
+            actor: Actor::Cli {
+                name: "agency".into(),
+            },
             channel: Channel::Cli,
             due_at: None,
             template_path: None,
@@ -62,7 +64,10 @@ async fn dz_local_invoice_resolves_standard_and_reduced_tva() {
     .expect("draft");
 
     // ----- Then: subtotal = 150000 DZD, tax frozen at issue. ---------
-    assert_eq!(drafted.invoice.subtotal, Decimal::from_str("150000").unwrap());
+    assert_eq!(
+        drafted.invoice.subtotal,
+        Decimal::from_str("150000").unwrap()
+    );
     assert_eq!(drafted.invoice.tax_total, Decimal::ZERO);
 
     // ----- When: issue. ----------------------------------------------
@@ -71,7 +76,9 @@ async fn dz_local_invoice_resolves_standard_and_reduced_tva() {
         IssueInvoiceInput {
             invoice_id: drafted.invoice.id.clone(),
             idempotency_key: None,
-            actor: Actor::Cli { name: "agency".into() },
+            actor: Actor::Cli {
+                name: "agency".into(),
+            },
             channel: Channel::Cli,
         },
     )
@@ -82,7 +89,10 @@ async fn dz_local_invoice_resolves_standard_and_reduced_tva() {
     // Line 1: 100000 * 0.19 = 19000.
     // Line 2:  50000 * 0.09 =  4500.
     // total tax = 23500, total = 173500, DZD scale 0.
-    assert_eq!(issued.invoice.tax_total, Decimal::from_str("23500").unwrap());
+    assert_eq!(
+        issued.invoice.tax_total,
+        Decimal::from_str("23500").unwrap()
+    );
     assert_eq!(issued.invoice.total, Decimal::from_str("173500").unwrap());
 
     // Per-line audit: each line records the rate id that was applied.

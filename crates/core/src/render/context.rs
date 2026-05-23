@@ -49,7 +49,11 @@ struct TemplateView<'a> {
 impl RenderContext {
     /// Construct from the three primary inputs.
     pub fn new(invoice: Invoice, customer: Customer, lines: Vec<InvoiceLine>) -> Self {
-        Self { invoice, customer, lines }
+        Self {
+            invoice,
+            customer,
+            lines,
+        }
     }
 
     /// Build the Tera [`Context`] this render uses.

@@ -55,7 +55,9 @@ pub async fn draft(
         reason: body.reason,
         refund_ref: body.refund_ref,
         idempotency_key: body.idempotency_key,
-        actor: Actor::Api { name: "http".into() },
+        actor: Actor::Api {
+            name: "http".into(),
+        },
         channel: Channel::Api,
     };
     let out = create_credit_note(&state.ctx, input).await?;
@@ -83,7 +85,9 @@ pub async fn issue(
     let input = IssueCreditNoteInput {
         credit_note_id: id,
         idempotency_key: None,
-        actor: Actor::Api { name: "http".into() },
+        actor: Actor::Api {
+            name: "http".into(),
+        },
         channel: Channel::Api,
     };
     let out = issue_credit_note(&state.ctx, input).await?;

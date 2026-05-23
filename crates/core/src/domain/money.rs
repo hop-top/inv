@@ -156,13 +156,28 @@ mod tests {
         // 2.345 at scale 2 → 2.34 (5 rounds to even)
         // 2.355 at scale 2 → 2.36
         let usd = Currency::USD;
-        assert_eq!(usd.round(Decimal::from_str("2.5").unwrap()), Decimal::from_str("2.5").unwrap()); // scale=2 keeps it
-        assert_eq!(usd.round(Decimal::from_str("2.345").unwrap()), Decimal::from_str("2.34").unwrap());
-        assert_eq!(usd.round(Decimal::from_str("2.355").unwrap()), Decimal::from_str("2.36").unwrap());
+        assert_eq!(
+            usd.round(Decimal::from_str("2.5").unwrap()),
+            Decimal::from_str("2.5").unwrap()
+        ); // scale=2 keeps it
+        assert_eq!(
+            usd.round(Decimal::from_str("2.345").unwrap()),
+            Decimal::from_str("2.34").unwrap()
+        );
+        assert_eq!(
+            usd.round(Decimal::from_str("2.355").unwrap()),
+            Decimal::from_str("2.36").unwrap()
+        );
 
         let dzd = Currency::DZD;
-        assert_eq!(dzd.round(Decimal::from_str("2.5").unwrap()), Decimal::from_str("2").unwrap()); // round to even
-        assert_eq!(dzd.round(Decimal::from_str("3.5").unwrap()), Decimal::from_str("4").unwrap());
+        assert_eq!(
+            dzd.round(Decimal::from_str("2.5").unwrap()),
+            Decimal::from_str("2").unwrap()
+        ); // round to even
+        assert_eq!(
+            dzd.round(Decimal::from_str("3.5").unwrap()),
+            Decimal::from_str("4").unwrap()
+        );
     }
 
     #[test]

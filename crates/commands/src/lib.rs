@@ -58,9 +58,7 @@ pub use credit::{
     IssueCreditNoteInput, IssueCreditNoteOutput,
 };
 pub use ctx::{Actor, Channel, Clock, CoreCtx, SystemClock};
-pub use draft::{
-    draft_invoice, DraftInvoiceInput, DraftInvoiceOutput, DraftLineInput,
-};
+pub use draft::{draft_invoice, DraftInvoiceInput, DraftInvoiceOutput, DraftLineInput};
 pub use error::CoreError;
 pub use events::EmittedEvent;
 pub use issue::{issue_invoice, IssueInvoiceInput, IssueInvoiceOutput};
@@ -68,17 +66,16 @@ pub use overdue::{mark_overdue_ticker, OverdueTickerOutput};
 pub use pay::{mark_paid, MarkPaidInput, MarkPaidOutput};
 pub use publisher::{PublishError, Publisher};
 pub use reminder::{
-    reminder_cancel, reminder_schedule, reminders_tick, ReminderCancelInput,
-    ReminderCancelOutput, ReminderScheduleInput, ReminderScheduleOutput,
-    RemindersTickOutput,
+    reminder_cancel, reminder_schedule, reminders_tick, ReminderCancelInput, ReminderCancelOutput,
+    ReminderScheduleInput, ReminderScheduleOutput, RemindersTickOutput,
 };
 pub use schedule::{
-    schedule_cancel, schedule_create, schedule_pause, schedules_tick,
-    ScheduleCreateInput, ScheduleCreateOutput, ScheduleLineInput,
-    ScheduleStateChangeInput, ScheduleStateChangeOutput, SchedulesTickOutput,
+    schedule_cancel, schedule_create, schedule_pause, schedules_tick, ScheduleCreateInput,
+    ScheduleCreateOutput, ScheduleLineInput, ScheduleStateChangeInput, ScheduleStateChangeOutput,
+    SchedulesTickOutput,
 };
 pub use send::{
-    send_invoice, send_invoice_render, SendInvoiceInput, SendInvoiceOutput,
-    SendInvoiceRenderInput, SendSink,
+    send_invoice, send_invoice_render, SendInvoiceInput, SendInvoiceOutput, SendInvoiceRenderInput,
+    SendSink,
 };
 pub use void::{void_invoice, VoidInvoiceInput, VoidInvoiceOutput};

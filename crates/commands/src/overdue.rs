@@ -62,13 +62,14 @@ pub async fn mark_overdue_ticker(ctx: &CoreCtx) -> Result<OverdueTickerOutput, C
 fn is_overdue(inv: &Invoice, now: DateTime<Utc>) -> bool {
     matches!(
         inv.state,
-        InvoiceState::Issued | InvoiceState::Sent | InvoiceState::Viewed | InvoiceState::PartiallyPaid
+        InvoiceState::Issued
+            | InvoiceState::Sent
+            | InvoiceState::Viewed
+            | InvoiceState::PartiallyPaid
     ) && inv.due_at.map(|d| d < now).unwrap_or(false)
 }
 
-async fn collect_unpaid_unvoided(
-    repo: &InvoiceRepo<'_>,
-) -> Result<Vec<Invoice>, CoreError> {
+async fn collect_unpaid_unvoided(repo: &InvoiceRepo<'_>) -> Result<Vec<Invoice>, CoreError> {
     // Pull each unpaid-unvoided state separately; merge.
     let mut all = Vec::new();
     for state in [

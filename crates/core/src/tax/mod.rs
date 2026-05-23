@@ -14,7 +14,5 @@ pub mod table;
 
 pub use nexus::{NexusConfig, NexusThreshold};
 pub use rate::{AppliesToBuyer, TaxRate};
-pub use resolver::{
-    resolve_tax, BuyerScope, NexusFigures, ResolvedTax, TaxError,
-};
+pub use resolver::{resolve_tax, BuyerScope, NexusFigures, ResolvedTax, TaxError};
 pub use table::{TaxFile, TaxTable, TaxTableError};

@@ -52,7 +52,12 @@ pub fn command() -> Command {
         .subcommand(
             Command::new("cancel")
                 .about("Cancel a scheduled reminder")
-                .arg(Arg::new("id").help("Reminder typeid").required(true).index(1)),
+                .arg(
+                    Arg::new("id")
+                        .help("Reminder typeid")
+                        .required(true)
+                        .index(1),
+                ),
         )
         .subcommand(
             Command::new("list")
@@ -163,8 +168,5 @@ fn columns() -> Vec<ColumnSpec> {
 }
 
 fn event_topics(events: &[inv_commands::EmittedEvent]) -> Value {
-    json!(events
-        .iter()
-        .map(|e| e.topic.clone())
-        .collect::<Vec<_>>())
+    json!(events.iter().map(|e| e.topic.clone()).collect::<Vec<_>>())
 }

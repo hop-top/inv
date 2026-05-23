@@ -67,8 +67,8 @@ async fn fresh_ctx() -> (Arc<CoreCtx>, Pool) {
     let pool = connect("sqlite::memory:").await.expect("connect");
     run_migrations(&pool).await.expect("migrate");
     let (table, nexus) = TaxTable::load_from_str(FIXTURE_TOML).expect("tax fixture");
-    let ctx = CoreCtx::new(pool.clone(), table, nexus)
-        .with_clock(Arc::new(FrozenClock(frozen_now())));
+    let ctx =
+        CoreCtx::new(pool.clone(), table, nexus).with_clock(Arc::new(FrozenClock(frozen_now())));
     (Arc::new(ctx), pool)
 }
 
@@ -104,12 +104,13 @@ async fn start_server(ctx: Arc<CoreCtx>, publisher: SharedPublisher) -> String {
     format!("ws://{}/ws", addr)
 }
 
-type WsClient = tokio_tungstenite::WebSocketStream<
-    tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>,
->;
+type WsClient =
+    tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>;
 
 async fn connect_client(url: &str) -> WsClient {
-    let (ws, _resp) = tokio_tungstenite::connect_async(url).await.expect("ws connect");
+    let (ws, _resp) = tokio_tungstenite::connect_async(url)
+        .await
+        .expect("ws connect");
     ws
 }
 

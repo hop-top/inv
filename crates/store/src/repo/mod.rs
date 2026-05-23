@@ -63,9 +63,7 @@ pub(crate) fn ts_to_string(dt: &DateTime<Utc>) -> String {
 }
 
 /// Encode metadata (BTreeMap<String,String>) to JSON.
-pub(crate) fn metadata_to_json(
-    m: &std::collections::BTreeMap<String, String>,
-) -> Result<String> {
+pub(crate) fn metadata_to_json(m: &std::collections::BTreeMap<String, String>) -> Result<String> {
     serde_json::to_string(m).map_err(StoreError::from)
 }
 

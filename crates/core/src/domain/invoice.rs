@@ -243,7 +243,10 @@ mod tests {
     #[test]
     fn tax_category_default_is_standard() {
         assert_eq!(TaxCategory::default(), TaxCategory::Standard);
-        assert_eq!(serde_json::to_string(&TaxCategory::ZeroRated).unwrap(), r#""zero_rated""#);
+        assert_eq!(
+            serde_json::to_string(&TaxCategory::ZeroRated).unwrap(),
+            r#""zero_rated""#
+        );
     }
 
     #[test]
@@ -302,8 +305,14 @@ mod tests {
 
     #[test]
     fn history_channel_serde() {
-        assert_eq!(serde_json::to_string(&HistoryChannel::Cli).unwrap(), r#""cli""#);
-        assert_eq!(serde_json::to_string(&HistoryChannel::Bus).unwrap(), r#""bus""#);
+        assert_eq!(
+            serde_json::to_string(&HistoryChannel::Cli).unwrap(),
+            r#""cli""#
+        );
+        assert_eq!(
+            serde_json::to_string(&HistoryChannel::Bus).unwrap(),
+            r#""bus""#
+        );
     }
 
     #[test]

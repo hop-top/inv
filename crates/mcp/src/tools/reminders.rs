@@ -32,12 +32,13 @@ pub async fn schedule(
     ctx: &CoreCtx,
     input: ReminderScheduleWire,
 ) -> Result<serde_json::Value, McpError> {
-    let invoice_id: InvoiceId = input
-        .invoice_id
-        .parse()
-        .map_err(|e: inv_core::domain::ids::IdError| {
-            McpError::Decode(format!("invoice_id: {e}"))
-        })?;
+    let invoice_id: InvoiceId =
+        input
+            .invoice_id
+            .parse()
+            .map_err(|e: inv_core::domain::ids::IdError| {
+                McpError::Decode(format!("invoice_id: {e}"))
+            })?;
     let req = ReminderScheduleInput {
         invoice_id,
         scheduled_at: input.scheduled_at,
@@ -61,12 +62,13 @@ pub async fn cancel(
     ctx: &CoreCtx,
     input: ReminderCancelWire,
 ) -> Result<serde_json::Value, McpError> {
-    let reminder_id: ReminderId = input
-        .reminder_id
-        .parse()
-        .map_err(|e: inv_core::domain::ids::IdError| {
-            McpError::Decode(format!("reminder_id: {e}"))
-        })?;
+    let reminder_id: ReminderId =
+        input
+            .reminder_id
+            .parse()
+            .map_err(|e: inv_core::domain::ids::IdError| {
+                McpError::Decode(format!("reminder_id: {e}"))
+            })?;
     let req = ReminderCancelInput {
         reminder_id,
         actor: mcp_actor(),

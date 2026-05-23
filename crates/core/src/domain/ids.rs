@@ -265,6 +265,9 @@ mod tests {
         let a = InvoiceId::new();
         std::thread::sleep(std::time::Duration::from_millis(2));
         let b = InvoiceId::new();
-        assert!(a.to_string() < b.to_string(), "v7 must be sortable: {a} vs {b}");
+        assert!(
+            a.to_string() < b.to_string(),
+            "v7 must be sortable: {a} vs {b}"
+        );
     }
 }

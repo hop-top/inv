@@ -89,7 +89,10 @@ fn fixture_full() -> (Invoice, Customer, Vec<InvoiceLine>) {
     ];
 
     let mut metadata = BTreeMap::new();
-    metadata.insert("notes".to_string(), "Net 30. Late fee 1.5% / month.".to_string());
+    metadata.insert(
+        "notes".to_string(),
+        "Net 30. Late fee 1.5% / month.".to_string(),
+    );
     metadata.insert("po_number".to_string(), "PO-2026-0042".to_string());
 
     let invoice = Invoice {
@@ -200,8 +203,10 @@ async fn renders_invoice_with_credit_note_metadata() {
     let (mut inv, cust, lines) = fixture_full();
     inv.metadata
         .insert("credit_note_for".to_string(), "INV-2025-0099".to_string());
-    inv.metadata
-        .insert("notes".to_string(), "This invoice supersedes INV-2025-0099.".to_string());
+    inv.metadata.insert(
+        "notes".to_string(),
+        "This invoice supersedes INV-2025-0099.".to_string(),
+    );
     let ctx = RenderContext::new(inv, cust, lines);
     let html = render_html(None, &ctx).await.expect("render ok");
     insta::assert_snapshot!("credit_note_metadata_bundled", html);

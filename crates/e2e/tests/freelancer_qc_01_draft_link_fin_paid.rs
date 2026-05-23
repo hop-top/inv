@@ -26,8 +26,8 @@ use hop_top_xrr::adapters::exec::{ExecAdapter, ExecRequest, ExecResponse};
 
 use inv_bus::{dispatch_inbound_event, Consumer, DispatchOutput};
 use inv_commands::{
-    draft_invoice, issue_invoice, send_invoice, Actor, Channel, DraftInvoiceInput,
-    DraftLineInput, IssueInvoiceInput, SendInvoiceInput,
+    draft_invoice, issue_invoice, send_invoice, Actor, Channel, DraftInvoiceInput, DraftLineInput,
+    IssueInvoiceInput, SendInvoiceInput,
 };
 use inv_core::domain::invoice::{InvoiceState, TaxCategory};
 use inv_core::domain::jurisdiction::Jurisdiction;
@@ -79,7 +79,10 @@ async fn full_lifecycle_with_fin_payment() {
 
     // ----- Then: state=draft, subtotal=1450, tax=0, history pending. --
     assert_eq!(drafted.invoice.state, InvoiceState::Draft);
-    assert_eq!(drafted.invoice.subtotal, Decimal::from_str("1450.00").unwrap());
+    assert_eq!(
+        drafted.invoice.subtotal,
+        Decimal::from_str("1450.00").unwrap()
+    );
     assert_eq!(drafted.invoice.tax_total, Decimal::ZERO);
     let hist = InvoiceHistoryRepo::new(&pool)
         .list_for_invoice(&drafted.invoice.id)
@@ -108,10 +111,18 @@ async fn full_lifecycle_with_fin_payment() {
     assert_eq!(issued.invoice.state, InvoiceState::Issued);
     let num = issued.invoice.number.as_deref().expect("number");
     assert!(num.starts_with("INV-2026-"), "got {num}");
-    assert_eq!(issued.invoice.tax_total, Decimal::from_str("217.14").unwrap());
+    assert_eq!(
+        issued.invoice.tax_total,
+        Decimal::from_str("217.14").unwrap()
+    );
     assert_eq!(issued.invoice.total, Decimal::from_str("1667.14").unwrap());
     // PDF rendered + blob stored.
-    assert!(issued.invoice.pdf_blob_ref.as_deref().unwrap_or("").starts_with("blob://local/"));
+    assert!(issued
+        .invoice
+        .pdf_blob_ref
+        .as_deref()
+        .unwrap_or("")
+        .starts_with("blob://local/"));
 
     // ----- When: send via link://. -----------------------------------
     // The command itself returns NotImplemented for link:// (channel
@@ -133,15 +144,15 @@ async fn full_lifecycle_with_fin_payment() {
     .await
     .expect("send stdout");
     assert_eq!(sent.invoice.state, InvoiceState::Sent);
-    let topics: Vec<&str> = sent.emitted_events.iter().map(|e| e.topic.as_str()).collect();
+    let topics: Vec<&str> = sent
+        .emitted_events
+        .iter()
+        .map(|e| e.topic.as_str())
+        .collect();
     assert!(topics.contains(&"inv.billing.invoice.sent"));
     // Signed-link minting (mirrors inv-api's POST /v1/invoices/{id}/send
     // for link://): assert the helper produces a stable token round-trip.
-    let token = inv_api::signed_link::sign(
-        &issued.invoice.id.to_string(),
-        3600,
-        b"test-link-key",
-    );
+    let token = inv_api::signed_link::sign(&issued.invoice.id.to_string(), 3600, b"test-link-key");
     let url = format!("http://localhost:7400/v/{token}");
     assert!(url.contains("/v/"));
     assert!(!token.is_empty());
@@ -163,10 +174,7 @@ async fn full_lifecycle_with_fin_payment() {
     })
     .to_string();
     let req = ExecRequest {
-        argv: vec![
-            "fin-bus-emit".into(),
-            "fin.billing.payment.received".into(),
-        ],
+        argv: vec!["fin-bus-emit".into(), "fin.billing.payment.received".into()],
         stdin: recorded_payload.clone(),
         env: HashMap::new(),
     };
@@ -182,7 +190,9 @@ async fn full_lifecycle_with_fin_payment() {
         .expect("xrr session");
     assert_eq!(resp.exit_code, 0, "fin emit should succeed");
     // Substitute the real invoice id into the recorded payload.
-    let event_payload = resp.stdout.replace(PLACEHOLDER_ID, &issued.invoice.id.to_string());
+    let event_payload = resp
+        .stdout
+        .replace(PLACEHOLDER_ID, &issued.invoice.id.to_string());
 
     // ----- When: inv's bus consumer processes the event. -------------
     // Inbox dedup + dispatch.
@@ -199,7 +209,12 @@ async fn full_lifecycle_with_fin_payment() {
     assert!(first, "first delivery must accept");
     let consumer = Consumer::new();
     let out = consumer
-        .dispatch(&ctx, "fin.billing.payment.received", "fin-evt-1", &event_payload)
+        .dispatch(
+            &ctx,
+            "fin.billing.payment.received",
+            "fin-evt-1",
+            &event_payload,
+        )
         .await
         .expect("dispatch");
     let paid = match out {
@@ -210,8 +225,15 @@ async fn full_lifecycle_with_fin_payment() {
     // ----- Then: invoice paid, emitted invoice.paid, cumulative_paid.
     assert!(paid.fully_paid);
     assert_eq!(paid.invoice.state, InvoiceState::Paid);
-    assert_eq!(paid.invoice.amount_paid, Decimal::from_str("1667.14").unwrap());
-    let topics: Vec<&str> = paid.emitted_events.iter().map(|e| e.topic.as_str()).collect();
+    assert_eq!(
+        paid.invoice.amount_paid,
+        Decimal::from_str("1667.14").unwrap()
+    );
+    let topics: Vec<&str> = paid
+        .emitted_events
+        .iter()
+        .map(|e| e.topic.as_str())
+        .collect();
     assert!(topics.contains(&"inv.billing.invoice.paid"));
 
     // Replay of the same event_id: inbox refuses, no double-emit.
@@ -247,7 +269,9 @@ async fn full_lifecycle_with_fin_payment() {
     assert!(stats.rows_processed > 0, "relay should drain pending rows");
     let captured_topics = captured.topics();
     assert!(
-        captured_topics.iter().any(|t| t == "inv.billing.invoice.paid"),
+        captured_topics
+            .iter()
+            .any(|t| t == "inv.billing.invoice.paid"),
         "publisher topics: {captured_topics:?}"
     );
 

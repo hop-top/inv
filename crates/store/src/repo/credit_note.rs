@@ -9,8 +9,7 @@ use inv_core::domain::invoice::HistoryChannel;
 use inv_core::domain::money::Currency;
 
 use super::{
-    decimal_to_string, metadata_from_json, metadata_to_json, parse_decimal, parse_ts,
-    ts_to_string,
+    decimal_to_string, metadata_from_json, metadata_to_json, parse_decimal, parse_ts, ts_to_string,
 };
 use crate::error::{Result, StoreError};
 use crate::pool::Pool;

@@ -39,12 +39,13 @@ pub async fn draft(
     ctx: &CoreCtx,
     input: CreditNoteDraftInput,
 ) -> Result<serde_json::Value, McpError> {
-    let invoice_id: InvoiceId = input
-        .invoice_id
-        .parse()
-        .map_err(|e: inv_core::domain::ids::IdError| {
-            McpError::Decode(format!("invoice_id: {e}"))
-        })?;
+    let invoice_id: InvoiceId =
+        input
+            .invoice_id
+            .parse()
+            .map_err(|e: inv_core::domain::ids::IdError| {
+                McpError::Decode(format!("invoice_id: {e}"))
+            })?;
     let req = CreateCreditNoteInput {
         invoice_id,
         amount: input.amount,
@@ -73,12 +74,13 @@ pub async fn issue(
     ctx: &CoreCtx,
     input: CreditNoteIssueInput,
 ) -> Result<serde_json::Value, McpError> {
-    let credit_note_id: CreditNoteId = input
-        .credit_note_id
-        .parse()
-        .map_err(|e: inv_core::domain::ids::IdError| {
-            McpError::Decode(format!("credit_note_id: {e}"))
-        })?;
+    let credit_note_id: CreditNoteId =
+        input
+            .credit_note_id
+            .parse()
+            .map_err(|e: inv_core::domain::ids::IdError| {
+                McpError::Decode(format!("credit_note_id: {e}"))
+            })?;
     let req = IssueCreditNoteInput {
         credit_note_id,
         idempotency_key: input.idempotency_key,

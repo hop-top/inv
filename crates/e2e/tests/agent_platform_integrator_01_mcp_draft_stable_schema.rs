@@ -34,8 +34,8 @@ fn frozen_now() -> DateTime<Utc> {
 async fn fresh_mcp_ctx() -> (Arc<CoreCtx>, Pool) {
     let pool = common::fresh_pool().await;
     let (table, nexus) = TaxTable::load_from_str(common::FIXTURE_TOML).expect("tax");
-    let ctx = CoreCtx::new(pool.clone(), table, nexus)
-        .with_clock(Arc::new(FrozenClock(frozen_now())));
+    let ctx =
+        CoreCtx::new(pool.clone(), table, nexus).with_clock(Arc::new(FrozenClock(frozen_now())));
     (Arc::new(ctx), pool)
 }
 
@@ -71,17 +71,12 @@ async fn inv_invoice_draft_advertises_stable_input_schema() {
     // The inputSchema is a `Map<String, Value>` (rmcp wraps it). Round-trip
     // it through serde_json::Value to validate the shape documented in
     // reference/mcp.md.
-    let schema_json =
-        serde_json::to_value(&draft_tool.input_schema).expect("schema → json");
+    let schema_json = serde_json::to_value(&draft_tool.input_schema).expect("schema → json");
     // Two valid shapes: a top-level $ref into definitions, or an inline
     // schema with a `properties` map. Either way, the required fields
     // should be derivable; assert by re-rendering + searching.
     let s = serde_json::to_string(&schema_json).expect("re-render");
-    for field in [
-        "customer_id",
-        "currency",
-        "lines",
-    ] {
+    for field in ["customer_id", "currency", "lines"] {
         assert!(
             s.contains(&format!("\"{field}\"")),
             "schema missing field `{field}`: {s}"
@@ -126,7 +121,10 @@ async fn inv_invoice_draft_happy_path_call() {
         .await
         .expect("call_tool");
     let sc = out.structured_content.as_ref().expect("structured content");
-    let inv_id = sc.pointer("/invoice/id").and_then(|v| v.as_str()).expect("id");
+    let inv_id = sc
+        .pointer("/invoice/id")
+        .and_then(|v| v.as_str())
+        .expect("id");
     assert!(inv_id.starts_with("invoice_"), "got `{inv_id}`");
     // emitted_events surfaced — see story-03 for the full triplet check;
     // here we just confirm the field is present.
@@ -197,7 +195,11 @@ async fn inv_invoice_show_returns_lines_matching_resource_shape() {
     assert_eq!(sc["state"], "draft");
     // Joined lines.
     let lines = sc["lines"].as_array().expect("lines array");
-    assert_eq!(lines.len(), 2, "show should return both lines, got: {lines:?}");
+    assert_eq!(
+        lines.len(),
+        2,
+        "show should return both lines, got: {lines:?}"
+    );
     assert_eq!(lines[0]["description"], "Consulting");
     assert_eq!(lines[1]["description"], "Hosting");
     assert_eq!(lines[0]["position"], 0);

@@ -101,12 +101,14 @@ async fn webhook_send_records_realised_url_and_signs_body() {
     assert_eq!(resp_body["delivered_to"].as_str().unwrap(), webhook_uri);
 
     // Wait for the receiver to finish capturing.
-    server
-        .await
-        .expect("receiver exited");
+    server.await.expect("receiver exited");
 
     // Validate signature.
-    let sig = captured_sig.lock().await.clone().expect("X-Inv-Signature missing");
+    let sig = captured_sig
+        .lock()
+        .await
+        .clone()
+        .expect("X-Inv-Signature missing");
     let body = captured_body.lock().await.clone();
     let expected = inv_api::webhook::signature_header(&body, &state.config.webhook_signing_key);
     assert_eq!(sig, expected, "signature header mismatch");

@@ -10,8 +10,7 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 
 use inv_commands::{
-    reminder_cancel, reminder_schedule, Actor, Channel, ReminderCancelInput,
-    ReminderScheduleInput,
+    reminder_cancel, reminder_schedule, Actor, Channel, ReminderCancelInput, ReminderScheduleInput,
 };
 use inv_core::domain::ids::{InvoiceId, ReminderId};
 use inv_core::domain::reminder::ReminderChannel;
@@ -46,7 +45,9 @@ pub async fn schedule(
         invoice_id,
         scheduled_at: body.scheduled_at,
         channel_scheme: body.channel,
-        actor: Actor::Api { name: "http".into() },
+        actor: Actor::Api {
+            name: "http".into(),
+        },
         channel: Channel::Api,
     };
     let out = reminder_schedule(&state.ctx, input).await?;
@@ -73,7 +74,9 @@ pub async fn cancel(
         .map_err(|e| ApiError::BadRequest(format!("invalid reminder id: {e}")))?;
     let input = ReminderCancelInput {
         reminder_id: id,
-        actor: Actor::Api { name: "http".into() },
+        actor: Actor::Api {
+            name: "http".into(),
+        },
         channel: Channel::Api,
     };
     let out = reminder_cancel(&state.ctx, input).await?;

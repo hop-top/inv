@@ -32,8 +32,8 @@ fn frozen_now() -> DateTime<Utc> {
 async fn fresh_mcp_ctx() -> (Arc<CoreCtx>, Pool) {
     let pool = common::fresh_pool().await;
     let (table, nexus) = TaxTable::load_from_str(common::FIXTURE_TOML).expect("tax");
-    let ctx = CoreCtx::new(pool.clone(), table, nexus)
-        .with_clock(Arc::new(FrozenClock(frozen_now())));
+    let ctx =
+        CoreCtx::new(pool.clone(), table, nexus).with_clock(Arc::new(FrozenClock(frozen_now())));
     (Arc::new(ctx), pool)
 }
 
@@ -212,7 +212,9 @@ async fn resource_read_unknown_id_errors() {
     let id = inv_core::domain::ids::InvoiceId::new();
     let err = client
         .peer()
-        .read_resource(ReadResourceRequestParams::new(format!("inv://invoice/{id}")))
+        .read_resource(ReadResourceRequestParams::new(format!(
+            "inv://invoice/{id}"
+        )))
         .await
         .expect_err("unknown id should error");
     let msg = format!("{err}").to_ascii_lowercase();

@@ -13,15 +13,15 @@
 
 use std::sync::Arc;
 
+use rmcp::model::AnnotateAble;
 use rmcp::model::{
     RawResource, ReadResourceRequestParams, ReadResourceResult, Resource, ResourceContents,
 };
-use rmcp::model::AnnotateAble;
 use serde::Serialize;
 
+use inv_commands::CoreCtx;
 use inv_core::domain::ids::{CreditNoteId, CustomerId, InvoiceId, ReminderId, ScheduleId};
 use inv_core::domain::invoice::{Invoice, InvoiceLine};
-use inv_commands::CoreCtx;
 use inv_store::repo::credit_note::CreditNoteRepo;
 use inv_store::repo::customer::CustomerRepo;
 use inv_store::repo::invoice::{InvoiceLineRepo, InvoiceRepo};
@@ -154,9 +154,11 @@ pub async fn read(
         }
     };
 
-    Ok(ReadResourceResult::new(vec![
-        ResourceContents::text(body, request.uri).with_mime_type(MIME_JSON),
-    ]))
+    Ok(ReadResourceResult::new(vec![ResourceContents::text(
+        body,
+        request.uri,
+    )
+    .with_mime_type(MIME_JSON)]))
 }
 
 /// Parse `inv://<kind>/<id>` into `(kind, id)`. Bare `inv://kind/id` is
@@ -167,9 +169,7 @@ fn parse_uri(uri: &str) -> Result<(&str, &str), McpError> {
         .strip_prefix(URI_SCHEME)
         .and_then(|s| s.strip_prefix("://"))
         .ok_or_else(|| {
-            McpError::InvalidUri(format!(
-                "expected `inv://<kind>/<id>`, got `{uri}`"
-            ))
+            McpError::InvalidUri(format!("expected `inv://<kind>/<id>`, got `{uri}`"))
         })?;
     let mut parts = rest.splitn(2, '/');
     let kind = parts

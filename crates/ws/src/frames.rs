@@ -169,7 +169,11 @@ impl ResponseFrame {
     }
 
     /// Build an error response frame.
-    pub fn error(id: impl Into<String>, code: impl Into<String>, message: impl Into<String>) -> Self {
+    pub fn error(
+        id: impl Into<String>,
+        code: impl Into<String>,
+        message: impl Into<String>,
+    ) -> Self {
         Self {
             id: id.into(),
             body: ResponseBody::Error {

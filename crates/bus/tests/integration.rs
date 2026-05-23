@@ -66,8 +66,8 @@ async fn fresh_ctx() -> (CoreCtx, Pool) {
     let pool = connect("sqlite::memory:").await.expect("connect");
     run_migrations(&pool).await.expect("migrate");
     let (table, nexus) = TaxTable::load_from_str(FIXTURE_TOML).expect("tax fixture");
-    let ctx = CoreCtx::new(pool.clone(), table, nexus)
-        .with_clock(Arc::new(FrozenClock(frozen_now())));
+    let ctx =
+        CoreCtx::new(pool.clone(), table, nexus).with_clock(Arc::new(FrozenClock(frozen_now())));
     (ctx, pool)
 }
 
@@ -169,7 +169,9 @@ async fn outbox_relay_publishes_pending_draft_row_then_marks_published() {
     let customer_id = seed_customer(&pool).await;
 
     // 1. draft_invoice writes one history row (the initial "draft" row).
-    let drafted = draft_invoice(&ctx, draft_input(&customer_id)).await.unwrap();
+    let drafted = draft_invoice(&ctx, draft_input(&customer_id))
+        .await
+        .unwrap();
     assert!(!drafted.idempotency_replay);
 
     // The history repo should report one pending outbox row.
@@ -241,10 +243,7 @@ async fn inbox_dispatch_returns_true_then_false_on_replay() {
 
 #[test]
 fn topic_remap_returns_canonical_when_configured() {
-    let map = TopicMap::from_pairs([(
-        "fin.finance.charge.created",
-        "fin.billing.charge.created",
-    )]);
+    let map = TopicMap::from_pairs([("fin.finance.charge.created", "fin.billing.charge.created")]);
     assert_eq!(
         remap_topic(&map, "fin.finance.charge.created"),
         "fin.billing.charge.created"
@@ -253,10 +252,7 @@ fn topic_remap_returns_canonical_when_configured() {
 
 #[test]
 fn topic_remap_passes_through_unmapped() {
-    let map = TopicMap::from_pairs([(
-        "fin.finance.charge.created",
-        "fin.billing.charge.created",
-    )]);
+    let map = TopicMap::from_pairs([("fin.finance.charge.created", "fin.billing.charge.created")]);
     assert_eq!(
         remap_topic(&map, "fin.billing.payment.received"),
         "fin.billing.payment.received"
@@ -413,7 +409,10 @@ async fn consumer_payment_refunded_creates_credit_note() {
     match out {
         DispatchOutput::Refunded(o) => {
             assert_eq!(o.credit_note.amount, Decimal::from_str("50.00").unwrap());
-            assert_eq!(o.credit_note.refund_ref.as_deref(), Some("stripe-refund-abc"));
+            assert_eq!(
+                o.credit_note.refund_ref.as_deref(),
+                Some("stripe-refund-abc")
+            );
             assert_eq!(o.credit_note.invoice_id, issued.invoice.id);
         }
         other => panic!("expected Refunded, got {other:?}"),
@@ -461,10 +460,7 @@ async fn consumer_invalid_payload_rejected() {
 async fn consumer_applies_topic_remap() {
     let (ctx, pool) = fresh_ctx().await;
     let cust = seed_customer(&pool).await;
-    let map = TopicMap::from_pairs([(
-        "fin.finance.charge.created",
-        "fin.billing.charge.created",
-    )]);
+    let map = TopicMap::from_pairs([("fin.finance.charge.created", "fin.billing.charge.created")]);
     let consumer = Consumer::with_remap(map);
     let payload = json!({
         "customer_id": cust.to_string(),

@@ -50,9 +50,7 @@ impl McpError {
             | McpError::Core(CoreError::FsmTransition(_)) => {
                 RmcpErrorData::invalid_params(msg, None)
             }
-            McpError::Core(_) | McpError::Store(_) => {
-                RmcpErrorData::internal_error(msg, None)
-            }
+            McpError::Core(_) | McpError::Store(_) => RmcpErrorData::internal_error(msg, None),
         }
     }
 }

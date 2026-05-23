@@ -45,10 +45,7 @@ impl<'p> ScheduleRepo<'p> {
     }
 
     /// Upsert inside a caller-owned transaction (see [`InvoiceRepo::save_in_tx`]).
-    pub async fn save_in_tx(
-        tx: &mut sqlx::Transaction<'_, sqlx::Any>,
-        s: &Schedule,
-    ) -> Result<()> {
+    pub async fn save_in_tx(tx: &mut sqlx::Transaction<'_, sqlx::Any>, s: &Schedule) -> Result<()> {
         let metadata = metadata_to_json(&s.metadata)?;
         let template_lines = serde_json::to_string(&s.template_lines)?;
         sqlx::query(

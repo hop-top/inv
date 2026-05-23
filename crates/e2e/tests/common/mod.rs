@@ -125,8 +125,8 @@ pub async fn fresh_ctx() -> (CoreCtx, Pool, Arc<InMemoryPublisher>, tempfile::Te
     let (table, nexus) = TaxTable::load_from_str(FIXTURE_TOML).expect("tax fixture");
     let publisher: Arc<InMemoryPublisher> = Arc::new(InMemoryPublisher::new());
     let blob_dir = tempfile::tempdir().expect("blob tempdir");
-    let blob_store = LocalBlobStore::new(blob_dir.path(), b"test-signing-key".to_vec())
-        .expect("blob store");
+    let blob_store =
+        LocalBlobStore::new(blob_dir.path(), b"test-signing-key".to_vec()).expect("blob store");
     let ctx = CoreCtx::new(pool.clone(), table, nexus)
         .with_clock(Arc::new(FrozenClock(frozen_now())))
         .with_blob_store(Arc::new(blob_store))
@@ -136,13 +136,18 @@ pub async fn fresh_ctx() -> (CoreCtx, Pool, Arc<InMemoryPublisher>, tempfile::Te
 
 /// Build a fresh ApiState + Pool + Publisher, leaving auth disabled and
 /// wiring the same tax fixture + frozen clock as `fresh_ctx`.
-pub async fn fresh_api_state() -> (Arc<ApiState>, Pool, Arc<InMemoryPublisher>, tempfile::TempDir) {
+pub async fn fresh_api_state() -> (
+    Arc<ApiState>,
+    Pool,
+    Arc<InMemoryPublisher>,
+    tempfile::TempDir,
+) {
     let pool = fresh_pool().await;
     let (table, nexus) = TaxTable::load_from_str(FIXTURE_TOML).expect("tax fixture");
     let publisher: Arc<InMemoryPublisher> = Arc::new(InMemoryPublisher::new());
     let blob_dir = tempfile::tempdir().expect("blob tempdir");
-    let blob_store = LocalBlobStore::new(blob_dir.path(), b"test-signing-key".to_vec())
-        .expect("blob store");
+    let blob_store =
+        LocalBlobStore::new(blob_dir.path(), b"test-signing-key".to_vec()).expect("blob store");
     let ctx = CoreCtx::new(pool.clone(), table, nexus)
         .with_clock(Arc::new(FrozenClock(frozen_now())))
         .with_blob_store(Arc::new(blob_store))
@@ -220,21 +225,23 @@ pub async fn seed_customer_foreign(pool: &Pool) -> CustomerId {
     .await
 }
 
-async fn seed_customer_with_address(
-    pool: &Pool,
-    name: &str,
-    address: Address,
-) -> CustomerId {
+async fn seed_customer_with_address(pool: &Pool, name: &str, address: Address) -> CustomerId {
     let c = Customer {
         id: CustomerId::new(),
         display_name: name.to_string(),
-        email: Some(format!("billing@{}.example", name.to_ascii_lowercase().replace(' ', "-"))),
+        email: Some(format!(
+            "billing@{}.example",
+            name.to_ascii_lowercase().replace(' ', "-")
+        )),
         address,
         metadata: BTreeMap::new(),
         created_at: frozen_now(),
         updated_at: frozen_now(),
     };
-    CustomerRepo::new(pool).save(&c).await.expect("seed customer");
+    CustomerRepo::new(pool)
+        .save(&c)
+        .await
+        .expect("seed customer");
     c.id
 }
 

@@ -6,9 +6,7 @@ use anyhow::{anyhow, Result};
 use chrono::{DateTime, NaiveDate, Utc};
 use rust_decimal::Decimal;
 
-use inv_core::domain::ids::{
-    CreditNoteId, CustomerId, InvoiceId, ReminderId, ScheduleId,
-};
+use inv_core::domain::ids::{CreditNoteId, CustomerId, InvoiceId, ReminderId, ScheduleId};
 
 /// Parse a decimal amount; surfaces a friendly error on failure.
 pub fn parse_decimal(label: &str, raw: &str) -> Result<Decimal> {
@@ -24,7 +22,8 @@ pub fn parse_datetime(label: &str, raw: &str) -> Result<DateTime<Utc>> {
 
 /// Parse a `YYYY-MM-DD` date.
 pub fn parse_date(label: &str, raw: &str) -> Result<NaiveDate> {
-    NaiveDate::from_str(raw).map_err(|e| anyhow!("invalid {label} `{raw}` (expected YYYY-MM-DD): {e}"))
+    NaiveDate::from_str(raw)
+        .map_err(|e| anyhow!("invalid {label} `{raw}` (expected YYYY-MM-DD): {e}"))
 }
 
 /// Parse a typeid string into the matching newtype.

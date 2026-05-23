@@ -107,7 +107,9 @@ mod tests {
     #[test]
     fn bundled_template_compiles() {
         let tera = build_tera(&TemplateSource::Bundled).unwrap();
-        assert!(tera.get_template_names().any(|n| n == BUNDLED_TEMPLATE_NAME));
+        assert!(tera
+            .get_template_names()
+            .any(|n| n == BUNDLED_TEMPLATE_NAME));
     }
 
     #[test]

@@ -13,10 +13,9 @@ use std::str::FromStr;
 use rust_decimal::Decimal;
 
 use inv_commands::{
-    create_credit_note, draft_invoice, issue_credit_note, issue_invoice, mark_paid,
-    void_invoice, Actor, Channel, CoreError, CreateCreditNoteInput, DraftInvoiceInput,
-    DraftLineInput, IssueCreditNoteInput, IssueInvoiceInput, MarkPaidInput,
-    VoidInvoiceInput,
+    create_credit_note, draft_invoice, issue_credit_note, issue_invoice, mark_paid, void_invoice,
+    Actor, Channel, CoreError, CreateCreditNoteInput, DraftInvoiceInput, DraftLineInput,
+    IssueCreditNoteInput, IssueInvoiceInput, MarkPaidInput, VoidInvoiceInput,
 };
 use inv_core::domain::creditnote::CreditNoteState;
 use inv_core::domain::invoice::{InvoiceState, TaxCategory};
@@ -52,7 +51,9 @@ async fn void_after_paid_rejected_and_credit_note_lifecycle() {
                 },
             ],
             idempotency_key: None,
-            actor: Actor::Cli { name: "agency".into() },
+            actor: Actor::Cli {
+                name: "agency".into(),
+            },
             channel: Channel::Cli,
             due_at: None,
             template_path: None,
@@ -66,7 +67,9 @@ async fn void_after_paid_rejected_and_credit_note_lifecycle() {
         IssueInvoiceInput {
             invoice_id: drafted.invoice.id.clone(),
             idempotency_key: None,
-            actor: Actor::Cli { name: "agency".into() },
+            actor: Actor::Cli {
+                name: "agency".into(),
+            },
             channel: Channel::Cli,
         },
     )
@@ -81,7 +84,9 @@ async fn void_after_paid_rejected_and_credit_note_lifecycle() {
             received_at: None,
             idempotency_key: None,
             bus_event_id: None,
-            actor: Actor::Cli { name: "agency".into() },
+            actor: Actor::Cli {
+                name: "agency".into(),
+            },
             channel: Channel::Cli,
         },
     )
@@ -96,7 +101,9 @@ async fn void_after_paid_rejected_and_credit_note_lifecycle() {
             invoice_id: issued.invoice.id.clone(),
             reason: Some("Client dispute".into()),
             idempotency_key: None,
-            actor: Actor::Cli { name: "agency".into() },
+            actor: Actor::Cli {
+                name: "agency".into(),
+            },
             channel: Channel::Cli,
         },
     )
@@ -121,7 +128,9 @@ async fn void_after_paid_rejected_and_credit_note_lifecycle() {
             reason: Some("Partial refund: under-delivered scope".into()),
             refund_ref: None,
             idempotency_key: None,
-            actor: Actor::Cli { name: "agency".into() },
+            actor: Actor::Cli {
+                name: "agency".into(),
+            },
             channel: Channel::Cli,
         },
     )
@@ -140,7 +149,9 @@ async fn void_after_paid_rejected_and_credit_note_lifecycle() {
         IssueCreditNoteInput {
             credit_note_id: cn_draft.credit_note.id.clone(),
             idempotency_key: None,
-            actor: Actor::Cli { name: "agency".into() },
+            actor: Actor::Cli {
+                name: "agency".into(),
+            },
             channel: Channel::Cli,
         },
     )
@@ -180,6 +191,9 @@ async fn void_after_paid_rejected_and_credit_note_lifecycle() {
         "inv.billing.creditnote.entered",
         "inv.billing.creditnote.issued",
     ] {
-        assert!(topics.contains(&expected), "missing `{expected}` in {topics:?}");
+        assert!(
+            topics.contains(&expected),
+            "missing `{expected}` in {topics:?}"
+        );
     }
 }

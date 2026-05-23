@@ -12,8 +12,8 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 
 use inv_commands::{
-    schedule_cancel, schedule_create, schedule_pause, Actor, Channel,
-    ScheduleCreateInput, ScheduleLineInput, ScheduleStateChangeInput,
+    schedule_cancel, schedule_create, schedule_pause, Actor, Channel, ScheduleCreateInput,
+    ScheduleLineInput, ScheduleStateChangeInput,
 };
 use inv_core::domain::ids::{CustomerId, ScheduleId};
 use inv_core::domain::invoice::TaxCategory;
@@ -96,7 +96,9 @@ pub async fn create(
         start_date: body.start_date,
         end_date: body.end_date,
         auto_issue: body.auto_issue,
-        actor: Actor::Api { name: "http".into() },
+        actor: Actor::Api {
+            name: "http".into(),
+        },
         channel: Channel::Api,
     };
     let out = schedule_create(&state.ctx, input).await?;
@@ -123,7 +125,9 @@ pub async fn pause(
         .map_err(|e| ApiError::BadRequest(format!("invalid schedule id: {e}")))?;
     let input = ScheduleStateChangeInput {
         schedule_id: id,
-        actor: Actor::Api { name: "http".into() },
+        actor: Actor::Api {
+            name: "http".into(),
+        },
         channel: Channel::Api,
     };
     let out = schedule_pause(&state.ctx, input).await?;
@@ -143,7 +147,9 @@ pub async fn cancel(
         .map_err(|e| ApiError::BadRequest(format!("invalid schedule id: {e}")))?;
     let input = ScheduleStateChangeInput {
         schedule_id: id,
-        actor: Actor::Api { name: "http".into() },
+        actor: Actor::Api {
+            name: "http".into(),
+        },
         channel: Channel::Api,
     };
     let out = schedule_cancel(&state.ctx, input).await?;

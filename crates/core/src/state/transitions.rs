@@ -149,7 +149,9 @@ pub fn next_state(
     match (current, event) {
         // -- draft -----------------------------------------------------------
         (S::Draft, E::Issue) => Ok(S::Issued),
-        (S::Draft, E::Send | E::Remind | E::View | E::Pay { .. } | E::Void) => Err(illegal(current, event)),
+        (S::Draft, E::Send | E::Remind | E::View | E::Pay { .. } | E::Void) => {
+            Err(illegal(current, event))
+        }
 
         // -- issued ----------------------------------------------------------
         (S::Issued, E::Send) => Ok(S::Sent),
@@ -181,7 +183,9 @@ pub fn next_state(
             }
         }
         (S::PartiallyPaid, E::Void) => Ok(S::Voided),
-        (S::PartiallyPaid, E::Issue | E::Send | E::Remind | E::View) => Err(illegal(current, event)),
+        (S::PartiallyPaid, E::Issue | E::Send | E::Remind | E::View) => {
+            Err(illegal(current, event))
+        }
 
         // -- paid (terminal) -------------------------------------------------
         (S::Paid, _) => Err(illegal(current, event)),
@@ -192,10 +196,7 @@ pub fn next_state(
 }
 
 /// Common payment-from-open-state helper (Issued / Sent / Viewed).
-fn pay_from_open(
-    amount_paid: Decimal,
-    total: Decimal,
-) -> Result<InvoiceState, TransitionError> {
+fn pay_from_open(amount_paid: Decimal, total: Decimal) -> Result<InvoiceState, TransitionError> {
     match classify_payment(amount_paid, total)? {
         PaymentKind::Full => Ok(InvoiceState::Paid),
         PaymentKind::Partial => Ok(InvoiceState::PartiallyPaid),
@@ -353,13 +354,19 @@ mod tests {
     fn void_on_draft_is_illegal() {
         // Draft is mutable; you delete a draft, you don't void it.
         let err = next_state(InvoiceState::Draft, &InvoiceEvent::Void).unwrap_err();
-        assert!(matches!(err, TransitionError::Illegal { event: "void", .. }));
+        assert!(matches!(
+            err,
+            TransitionError::Illegal { event: "void", .. }
+        ));
     }
 
     #[test]
     fn void_on_paid_is_illegal() {
         let err = next_state(InvoiceState::Paid, &InvoiceEvent::Void).unwrap_err();
-        assert!(matches!(err, TransitionError::Illegal { event: "void", .. }));
+        assert!(matches!(
+            err,
+            TransitionError::Illegal { event: "void", .. }
+        ));
     }
 
     #[test]

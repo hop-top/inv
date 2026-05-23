@@ -16,17 +16,15 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 use inv_commands::{
-    create_credit_note, draft_invoice, issue_credit_note, issue_invoice,
-    mark_overdue_ticker, mark_paid, reminder_cancel, reminder_schedule, reminders_tick,
-    schedule_cancel, schedule_create, schedule_pause, schedules_tick, send_invoice,
-    void_invoice, Actor, Channel, CoreCtx, CoreError, CreateCreditNoteInput,
-    DraftInvoiceInput, DraftLineInput, IssueCreditNoteInput, IssueInvoiceInput,
-    MarkPaidInput, ReminderCancelInput, ReminderScheduleInput, ScheduleCreateInput,
-    ScheduleLineInput, ScheduleStateChangeInput, SendInvoiceInput, VoidInvoiceInput,
+    create_credit_note, draft_invoice, issue_credit_note, issue_invoice, mark_overdue_ticker,
+    mark_paid, reminder_cancel, reminder_schedule, reminders_tick, schedule_cancel,
+    schedule_create, schedule_pause, schedules_tick, send_invoice, void_invoice, Actor, Channel,
+    CoreCtx, CoreError, CreateCreditNoteInput, DraftInvoiceInput, DraftLineInput,
+    IssueCreditNoteInput, IssueInvoiceInput, MarkPaidInput, ReminderCancelInput,
+    ReminderScheduleInput, ScheduleCreateInput, ScheduleLineInput, ScheduleStateChangeInput,
+    SendInvoiceInput, VoidInvoiceInput,
 };
-use inv_core::domain::ids::{
-    CreditNoteId, CustomerId, InvoiceId, ReminderId, ScheduleId,
-};
+use inv_core::domain::ids::{CreditNoteId, CustomerId, InvoiceId, ReminderId, ScheduleId};
 use inv_core::domain::invoice::TaxCategory;
 use inv_core::domain::jurisdiction::Jurisdiction;
 use inv_core::domain::money::Currency;
@@ -124,7 +122,9 @@ pub async fn dispatch(
                 actor,
                 channel,
             };
-            let out = issue_invoice(ctx, input).await.map_err(OpError::from_core)?;
+            let out = issue_invoice(ctx, input)
+                .await
+                .map_err(OpError::from_core)?;
             Ok(json!({
                 "invoice": out.invoice,
                 "lines": out.lines,
@@ -192,7 +192,9 @@ pub async fn dispatch(
                 actor,
                 channel,
             };
-            let out = create_credit_note(ctx, input).await.map_err(OpError::from_core)?;
+            let out = create_credit_note(ctx, input)
+                .await
+                .map_err(OpError::from_core)?;
             Ok(json!({ "credit_note": out.credit_note }))
         }
         "creditnote.issue" => {
@@ -203,7 +205,9 @@ pub async fn dispatch(
                 actor,
                 channel,
             };
-            let out = issue_credit_note(ctx, input).await.map_err(OpError::from_core)?;
+            let out = issue_credit_note(ctx, input)
+                .await
+                .map_err(OpError::from_core)?;
             Ok(json!({ "credit_note": out.credit_note }))
         }
 
@@ -213,7 +217,9 @@ pub async fn dispatch(
         "schedule.create" => {
             let wire: ScheduleCreateWire = decode(payload)?;
             let input = wire.into_input(actor, channel)?;
-            let out = schedule_create(ctx, input).await.map_err(OpError::from_core)?;
+            let out = schedule_create(ctx, input)
+                .await
+                .map_err(OpError::from_core)?;
             Ok(json!({ "schedule": out.schedule }))
         }
         "schedule.pause" => {
@@ -223,7 +229,9 @@ pub async fn dispatch(
                 actor,
                 channel,
             };
-            let out = schedule_pause(ctx, input).await.map_err(OpError::from_core)?;
+            let out = schedule_pause(ctx, input)
+                .await
+                .map_err(OpError::from_core)?;
             Ok(json!({ "schedule": out.schedule }))
         }
         "schedule.cancel" => {
@@ -233,7 +241,9 @@ pub async fn dispatch(
                 actor,
                 channel,
             };
-            let out = schedule_cancel(ctx, input).await.map_err(OpError::from_core)?;
+            let out = schedule_cancel(ctx, input)
+                .await
+                .map_err(OpError::from_core)?;
             Ok(json!({ "schedule": out.schedule }))
         }
 
@@ -249,7 +259,9 @@ pub async fn dispatch(
                 actor,
                 channel,
             };
-            let out = reminder_schedule(ctx, input).await.map_err(OpError::from_core)?;
+            let out = reminder_schedule(ctx, input)
+                .await
+                .map_err(OpError::from_core)?;
             Ok(json!({ "reminder": out.reminder }))
         }
         "reminder.cancel" => {
@@ -259,7 +271,9 @@ pub async fn dispatch(
                 actor,
                 channel,
             };
-            let out = reminder_cancel(ctx, input).await.map_err(OpError::from_core)?;
+            let out = reminder_cancel(ctx, input)
+                .await
+                .map_err(OpError::from_core)?;
             Ok(json!({ "reminder": out.reminder }))
         }
 

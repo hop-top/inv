@@ -30,10 +30,7 @@ impl<'p> ReminderRepo<'p> {
     }
 
     /// Upsert inside a caller-owned transaction (see [`InvoiceRepo::save_in_tx`]).
-    pub async fn save_in_tx(
-        tx: &mut sqlx::Transaction<'_, sqlx::Any>,
-        r: &Reminder,
-    ) -> Result<()> {
+    pub async fn save_in_tx(tx: &mut sqlx::Transaction<'_, sqlx::Any>, r: &Reminder) -> Result<()> {
         sqlx::query(
             "INSERT INTO reminders (id, invoice_id, scheduled_at, sent_at, channel, state) \
              VALUES (?, ?, ?, ?, ?, ?) \

@@ -42,7 +42,11 @@ fn dispatch_inner(matches: &ArgMatches, data: &Value, columns: &[ColumnSpec]) ->
         &mut lock,
         data,
         DispatchOptions {
-            columns: if columns.is_empty() { None } else { Some(columns) },
+            columns: if columns.is_empty() {
+                None
+            } else {
+                Some(columns)
+            },
             ..Default::default()
         },
     )

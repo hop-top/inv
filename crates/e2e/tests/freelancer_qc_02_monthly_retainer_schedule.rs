@@ -66,7 +66,11 @@ async fn schedule_create_then_tick_materialises_and_auto_issues() {
         created.schedule.next_run,
         NaiveDate::from_ymd_opt(2026, 6, 1).unwrap()
     );
-    let topics: Vec<&str> = created.emitted_events.iter().map(|e| e.topic.as_str()).collect();
+    let topics: Vec<&str> = created
+        .emitted_events
+        .iter()
+        .map(|e| e.topic.as_str())
+        .collect();
     assert!(topics.contains(&"inv.billing.schedule.created"));
 
     // ----- Given today is 2026-06-01 + ticker fires. -----------------
@@ -106,7 +110,10 @@ async fn schedule_create_then_tick_materialises_and_auto_issues() {
 
     // Re-tick same day → no new materialisation.
     let tick2 = schedules_tick(&ctx).await.unwrap();
-    assert!(tick2.ran_schedule_ids.is_empty(), "no double-materialisation");
+    assert!(
+        tick2.ran_schedule_ids.is_empty(),
+        "no double-materialisation"
+    );
 
     // ----- When: cancel. ---------------------------------------------
     let cancelled = schedule_cancel(

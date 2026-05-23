@@ -6,8 +6,8 @@ use hop_top_kit::output::ColumnSpec;
 use serde_json::{json, Value};
 
 use inv_commands::{
-    create_credit_note, issue_credit_note, Actor, Channel, CoreCtx,
-    CreateCreditNoteInput, IssueCreditNoteInput,
+    create_credit_note, issue_credit_note, Actor, Channel, CoreCtx, CreateCreditNoteInput,
+    IssueCreditNoteInput,
 };
 use inv_core::domain::creditnote::CreditNoteState;
 use inv_store::repo::credit_note::{CreditNoteFilter, CreditNoteRepo};
@@ -42,11 +42,7 @@ pub fn command() -> Command {
                         .help("Credit amount (positive decimal)")
                         .required(true),
                 )
-                .arg(
-                    Arg::new("reason")
-                        .long("reason")
-                        .help("Free-form reason"),
-                )
+                .arg(Arg::new("reason").long("reason").help("Free-form reason"))
                 .arg(
                     Arg::new("idempotency-key")
                         .long("idempotency-key")
@@ -64,38 +60,24 @@ pub fn command() -> Command {
                 ),
         )
         .subcommand(
-            Command::new("show")
-                .about("Show a single credit note")
-                .arg(
-                    Arg::new("id")
-                        .help("Credit-note typeid")
-                        .required(true)
-                        .index(1),
-                ),
+            Command::new("show").about("Show a single credit note").arg(
+                Arg::new("id")
+                    .help("Credit-note typeid")
+                    .required(true)
+                    .index(1),
+            ),
         )
         .subcommand(
             Command::new("list")
                 .about("List credit notes (optionally filtered)")
-                .arg(
-                    Arg::new("invoice")
-                        .long("invoice")
-                        .help("Invoice typeid"),
-                )
+                .arg(Arg::new("invoice").long("invoice").help("Invoice typeid"))
                 .arg(
                     Arg::new("state")
                         .long("state")
                         .help("Filter by lifecycle state (draft | issued)"),
                 )
-                .arg(
-                    Arg::new("limit")
-                        .long("limit")
-                        .help("Max rows"),
-                )
-                .arg(
-                    Arg::new("offset")
-                        .long("offset")
-                        .help("Offset for paging"),
-                ),
+                .arg(Arg::new("limit").long("limit").help("Max rows"))
+                .arg(Arg::new("offset").long("offset").help("Offset for paging")),
         )
 }
 
@@ -215,9 +197,7 @@ fn parse_credit_note_state(s: &str) -> Result<CreditNoteState> {
     match s {
         "draft" => Ok(CreditNoteState::Draft),
         "issued" => Ok(CreditNoteState::Issued),
-        other => Err(anyhow!(
-            "invalid --state `{other}` (want draft | issued)"
-        )),
+        other => Err(anyhow!("invalid --state `{other}` (want draft | issued)")),
     }
 }
 
@@ -232,8 +212,5 @@ fn columns() -> Vec<ColumnSpec> {
 }
 
 fn event_topics(events: &[inv_commands::EmittedEvent]) -> Value {
-    json!(events
-        .iter()
-        .map(|e| e.topic.clone())
-        .collect::<Vec<_>>())
+    json!(events.iter().map(|e| e.topic.clone()).collect::<Vec<_>>())
 }

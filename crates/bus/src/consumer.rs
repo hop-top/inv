@@ -150,21 +150,18 @@ impl Consumer {
     ) -> Result<DispatchOutput, DispatchError> {
         let canonical = remap_topic(&self.remap, topic).to_string();
         match canonical.as_str() {
-            "fin.billing.charge.created" => {
-                self.handle_charge_created(ctx, &canonical, event_id, payload_json)
-                    .await
-                    .map(DispatchOutput::Drafted)
-            }
-            "fin.billing.payment.received" => {
-                self.handle_payment_received(ctx, &canonical, event_id, payload_json)
-                    .await
-                    .map(DispatchOutput::Paid)
-            }
-            "fin.billing.payment.refunded" => {
-                self.handle_payment_refunded(ctx, &canonical, event_id, payload_json)
-                    .await
-                    .map(DispatchOutput::Refunded)
-            }
+            "fin.billing.charge.created" => self
+                .handle_charge_created(ctx, &canonical, event_id, payload_json)
+                .await
+                .map(DispatchOutput::Drafted),
+            "fin.billing.payment.received" => self
+                .handle_payment_received(ctx, &canonical, event_id, payload_json)
+                .await
+                .map(DispatchOutput::Paid),
+            "fin.billing.payment.refunded" => self
+                .handle_payment_refunded(ctx, &canonical, event_id, payload_json)
+                .await
+                .map(DispatchOutput::Refunded),
             _ => Err(DispatchError::UnknownTopic(canonical)),
         }
     }
@@ -194,16 +191,20 @@ impl Consumer {
             currency: p.currency,
             lines,
             idempotency_key: Some(p.idempotency_key.unwrap_or_else(|| event_id.to_string())),
-            actor: Actor::Bus { source: "fin".into() },
+            actor: Actor::Bus {
+                source: "fin".into(),
+            },
             channel: Channel::Bus,
             due_at: p.due_date,
             template_path: None,
             schedule_id: None,
         };
-        draft_invoice(ctx, input).await.map_err(|e| DispatchError::Command {
-            command: "draft_invoice",
-            source: e,
-        })
+        draft_invoice(ctx, input)
+            .await
+            .map_err(|e| DispatchError::Command {
+                command: "draft_invoice",
+                source: e,
+            })
     }
 
     async fn handle_payment_received(
@@ -214,25 +215,27 @@ impl Consumer {
         payload_json: &str,
     ) -> Result<MarkPaidOutput, DispatchError> {
         let p: PaymentReceivedPayload = decode(topic, payload_json)?;
-        let invoice_id = p
-            .invoice_ref
-            .ok_or_else(|| DispatchError::InvalidPayload {
-                topic: topic.to_string(),
-                message: "payment.received without invoice_ref is not routable at v1".into(),
-            })?;
+        let invoice_id = p.invoice_ref.ok_or_else(|| DispatchError::InvalidPayload {
+            topic: topic.to_string(),
+            message: "payment.received without invoice_ref is not routable at v1".into(),
+        })?;
         let input = MarkPaidInput {
             invoice_id: parse_invoice_id_from_ref(topic, &invoice_id)?,
             amount: p.amount,
             received_at: Some(p.received_at),
             idempotency_key: Some(p.idempotency_key.unwrap_or_else(|| event_id.to_string())),
             bus_event_id: Some(event_id.to_string()),
-            actor: Actor::Bus { source: "fin".into() },
+            actor: Actor::Bus {
+                source: "fin".into(),
+            },
             channel: Channel::Bus,
         };
-        mark_paid(ctx, input).await.map_err(|e| DispatchError::Command {
-            command: "mark_paid",
-            source: e,
-        })
+        mark_paid(ctx, input)
+            .await
+            .map_err(|e| DispatchError::Command {
+                command: "mark_paid",
+                source: e,
+            })
     }
 
     async fn handle_payment_refunded(
@@ -249,7 +252,9 @@ impl Consumer {
             reason: p.reason,
             refund_ref: Some(p.refund_id.unwrap_or_else(|| event_id.to_string())),
             idempotency_key: Some(event_id.to_string()),
-            actor: Actor::Bus { source: "fin".into() },
+            actor: Actor::Bus {
+                source: "fin".into(),
+            },
             channel: Channel::Bus,
         };
         create_credit_note(ctx, input)
@@ -353,9 +358,7 @@ fn parse_customer_id(topic: &str, s: &str) -> Result<CustomerId, DispatchError> 
 /// Accept either a bare `invoice_01J…` typeid or a poly-uri URI
 /// `inv://invoice/invoice_01J…`. Anything else is invalid.
 fn parse_invoice_id_from_ref(topic: &str, s: &str) -> Result<InvoiceId, DispatchError> {
-    let typeid = s
-        .strip_prefix("inv://invoice/")
-        .unwrap_or(s);
+    let typeid = s.strip_prefix("inv://invoice/").unwrap_or(s);
     InvoiceId::from_str(typeid).map_err(|e| DispatchError::InvalidPayload {
         topic: topic.to_string(),
         message: format!("invalid invoice_ref `{s}`: {e}"),

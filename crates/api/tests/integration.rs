@@ -285,7 +285,10 @@ async fn issue_invoice_200() {
     assert_eq!(resp.status(), StatusCode::OK);
     let body = body_json(resp).await;
     assert_eq!(body["invoice"]["state"], "issued");
-    assert!(body["invoice"]["number"].as_str().unwrap().starts_with("INV-"));
+    assert!(body["invoice"]["number"]
+        .as_str()
+        .unwrap()
+        .starts_with("INV-"));
 }
 
 #[tokio::test]
@@ -377,11 +380,7 @@ async fn signed_link_view_serves_html_for_valid_token() {
     let inv_id = draft_and_issue(&app, &cust).await;
 
     // Mint a token directly so we don't depend on /send.
-    let token = inv_api::signed_link::sign(
-        &inv_id,
-        3600,
-        &state.config.link_signing_key,
-    );
+    let token = inv_api::signed_link::sign(&inv_id, 3600, &state.config.link_signing_key);
     let resp = app
         .oneshot(
             Request::builder()
@@ -449,23 +448,25 @@ async fn signed_link_view_publishes_invoice_viewed_event() {
         )
         .await
         .unwrap();
-    assert_eq!(send_resp.status(), StatusCode::OK, "send via file:// failed");
+    assert_eq!(
+        send_resp.status(),
+        StatusCode::OK,
+        "send via file:// failed"
+    );
 
     // Snapshot captured events at the boundary so we can assert the view
     // route adds exactly one new `viewed` row.
     let before = captured.captured();
     assert!(
-        before.iter().all(|e| e.topic != "inv.billing.invoice.viewed"),
+        before
+            .iter()
+            .all(|e| e.topic != "inv.billing.invoice.viewed"),
         "precondition: no viewed events yet, got: {:?}",
         before.iter().map(|e| &e.topic).collect::<Vec<_>>()
     );
 
     // View the invoice via a freshly-minted signed token.
-    let token = inv_api::signed_link::sign(
-        &inv_id,
-        3600,
-        &state.config.link_signing_key,
-    );
+    let token = inv_api::signed_link::sign(&inv_id, 3600, &state.config.link_signing_key);
     let resp = app
         .oneshot(
             Request::builder()
@@ -505,11 +506,7 @@ async fn signed_link_view_tampered_404() {
     let app = router(state.clone());
 
     let inv_id = draft_and_issue(&app, &cust).await;
-    let token = inv_api::signed_link::sign(
-        &inv_id,
-        3600,
-        &state.config.link_signing_key,
-    );
+    let token = inv_api::signed_link::sign(&inv_id, 3600, &state.config.link_signing_key);
     // Drop the last char and replace with a guaranteed-different char so
     // tampering is never a no-op (base64url tokens end in 'A' ~3% of the
     // time, which would flake CI). Invalid base64 or signature mismatch.
@@ -626,7 +623,11 @@ async fn webhook_send_signs_outbound_body() {
     );
 
     server.await.expect("listener exited cleanly");
-    let sig = captured_sig.lock().await.clone().expect("X-Inv-Signature missing");
+    let sig = captured_sig
+        .lock()
+        .await
+        .clone()
+        .expect("X-Inv-Signature missing");
     let body = captured_body.lock().await.clone();
 
     // The signature must equal HMAC-SHA256(body, signing_key).
@@ -697,9 +698,18 @@ async fn list_schedules_returns_all_seeded() {
         updated_at: frozen_now(),
     };
 
-    sched_repo.save(&mk(&c1, ScheduleState::Active, 0)).await.unwrap();
-    sched_repo.save(&mk(&c1, ScheduleState::Paused, 1)).await.unwrap();
-    sched_repo.save(&mk(&c2, ScheduleState::Active, 2)).await.unwrap();
+    sched_repo
+        .save(&mk(&c1, ScheduleState::Active, 0))
+        .await
+        .unwrap();
+    sched_repo
+        .save(&mk(&c1, ScheduleState::Paused, 1))
+        .await
+        .unwrap();
+    sched_repo
+        .save(&mk(&c2, ScheduleState::Active, 2))
+        .await
+        .unwrap();
 
     let app = router(state);
 
@@ -842,9 +852,18 @@ async fn list_credit_notes_returns_all_seeded() {
         created_at: frozen_now() + chrono::Duration::seconds(off),
         metadata: BTreeMap::new(),
     };
-    cn_repo.save(&mk_cn(&inv1.id, CreditNoteState::Draft, 0)).await.unwrap();
-    cn_repo.save(&mk_cn(&inv1.id, CreditNoteState::Issued, 1)).await.unwrap();
-    cn_repo.save(&mk_cn(&inv2.id, CreditNoteState::Draft, 2)).await.unwrap();
+    cn_repo
+        .save(&mk_cn(&inv1.id, CreditNoteState::Draft, 0))
+        .await
+        .unwrap();
+    cn_repo
+        .save(&mk_cn(&inv1.id, CreditNoteState::Issued, 1))
+        .await
+        .unwrap();
+    cn_repo
+        .save(&mk_cn(&inv2.id, CreditNoteState::Draft, 2))
+        .await
+        .unwrap();
 
     let app = router(state);
 

@@ -102,8 +102,14 @@ mod tests {
 
     #[test]
     fn credit_note_state_serde() {
-        assert_eq!(serde_json::to_string(&CreditNoteState::Draft).unwrap(), r#""draft""#);
-        assert_eq!(serde_json::to_string(&CreditNoteState::Issued).unwrap(), r#""issued""#);
+        assert_eq!(
+            serde_json::to_string(&CreditNoteState::Draft).unwrap(),
+            r#""draft""#
+        );
+        assert_eq!(
+            serde_json::to_string(&CreditNoteState::Issued).unwrap(),
+            r#""issued""#
+        );
     }
 
     #[test]

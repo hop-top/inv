@@ -395,7 +395,10 @@ async fn bus_inbox_dedups_on_event_id() {
 #[tokio::test]
 async fn invoice_save_preserves_history_rows() {
     let pool = fresh_pool().await;
-    CustomerRepo::new(&pool).save(&sample_customer()).await.unwrap();
+    CustomerRepo::new(&pool)
+        .save(&sample_customer())
+        .await
+        .unwrap();
 
     let cust = sample_customer();
     CustomerRepo::new(&pool).save(&cust).await.unwrap();
@@ -427,13 +430,16 @@ async fn invoice_save_preserves_history_rows() {
     let mut inv_updated = inv.clone();
     inv_updated.state = InvoiceState::Issued;
     inv_updated.number = Some("INV-2026-0001".into());
-    inv_updated.issued_at =
-        Some(Utc.with_ymd_and_hms(2026, 1, 3, 10, 0, 0).unwrap());
+    inv_updated.issued_at = Some(Utc.with_ymd_and_hms(2026, 1, 3, 10, 0, 0).unwrap());
     inv_repo.save(&inv_updated).await.unwrap();
 
     // The history row must still be there after the second save.
     let rows = hist_repo.list_for_invoice(&inv.id).await.unwrap();
-    assert_eq!(rows.len(), 1, "history row was wiped by repeated InvoiceRepo::save() — CASCADE regression");
+    assert_eq!(
+        rows.len(),
+        1,
+        "history row was wiped by repeated InvoiceRepo::save() — CASCADE regression"
+    );
     assert_eq!(rows[0], h);
 
     // The invoice itself reflects the updated state.
@@ -481,9 +487,7 @@ async fn schedule_list_filters_and_pages() {
             last_run: None,
             state,
             metadata: BTreeMap::new(),
-            created_at: Utc
-                .with_ymd_and_hms(2026, 1, 1, 0, 0, 0)
-                .unwrap()
+            created_at: Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap()
                 + chrono::Duration::days(created_offset_days),
             updated_at: Utc.with_ymd_and_hms(2026, 1, 31, 0, 0, 0).unwrap(),
         }
@@ -585,9 +589,7 @@ async fn credit_note_list_filters_and_pages() {
             reason: None,
             refund_ref: None,
             issued_at: None,
-            created_at: Utc
-                .with_ymd_and_hms(2026, 1, 1, 0, 0, 0)
-                .unwrap()
+            created_at: Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap()
                 + chrono::Duration::days(created_offset_days),
             metadata: BTreeMap::new(),
         }
@@ -709,7 +711,9 @@ async fn customer_save_does_not_fk_violate_when_referenced() {
     // Now save the customer again. Must succeed.
     c.display_name = "Acme Corp (renamed)".into();
     c.updated_at = Utc.with_ymd_and_hms(2026, 1, 5, 0, 0, 0).unwrap();
-    repo.save(&c).await.expect("save must succeed when customer is FK-referenced");
+    repo.save(&c)
+        .await
+        .expect("save must succeed when customer is FK-referenced");
 
     let back = repo.get(&c.id).await.unwrap().unwrap();
     assert_eq!(back.display_name, "Acme Corp (renamed)");

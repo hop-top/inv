@@ -6,8 +6,8 @@ use sqlx::Row;
 use inv_core::domain::ids::{HistoryId, InvoiceId};
 use inv_core::domain::invoice::{HistoryChannel, InvoiceStateHistory};
 
-use super::{metadata_from_json, metadata_to_json, parse_ts, ts_to_string};
 use super::invoice::{state_from_str, state_to_str};
+use super::{metadata_from_json, metadata_to_json, parse_ts, ts_to_string};
 use crate::error::{Result, StoreError};
 use crate::pool::Pool;
 

@@ -201,10 +201,7 @@ impl CreditNoteAdapter {
     /// Apply an event, mutating the machine on success. The credit-note
     /// equivalent of [`StateMachine::apply`] with the credit-note-local
     /// error type.
-    pub fn apply_event(
-        &mut self,
-        e: &CreditNoteEvent,
-    ) -> Result<CreditNoteState, TransitionError> {
+    pub fn apply_event(&mut self, e: &CreditNoteEvent) -> Result<CreditNoteState, TransitionError> {
         let next = next_state(self.state, e)?;
         self.state = next;
         Ok(next)
@@ -212,10 +209,7 @@ impl CreditNoteAdapter {
 
     /// Compute the post-event state without mutating, surfacing the
     /// credit-note-local error verbatim.
-    pub fn dry_run_event(
-        &self,
-        e: &CreditNoteEvent,
-    ) -> Result<CreditNoteState, TransitionError> {
+    pub fn dry_run_event(&self, e: &CreditNoteEvent) -> Result<CreditNoteState, TransitionError> {
         next_state(self.state, e)
     }
 }
@@ -378,18 +372,12 @@ impl StatigAdapter {
     }
 
     /// Compute the post-event state without mutating.
-    pub fn dry_run_event(
-        &self,
-        e: &CreditNoteEvent,
-    ) -> Result<CreditNoteState, TransitionError> {
+    pub fn dry_run_event(&self, e: &CreditNoteEvent) -> Result<CreditNoteState, TransitionError> {
         next_state(self.shadow, e)
     }
 
     /// Apply an event, mutating the machine on success.
-    pub fn apply_event(
-        &mut self,
-        e: &CreditNoteEvent,
-    ) -> Result<CreditNoteState, TransitionError> {
+    pub fn apply_event(&mut self, e: &CreditNoteEvent) -> Result<CreditNoteState, TransitionError> {
         // Canonical verdict from the table. Illegal events bail before we
         // touch the statig machine.
         let next = next_state(self.shadow, e)?;
@@ -627,7 +615,10 @@ mod tests {
     fn bare_machine_rejects_issue_on_issued() {
         let mut m = CreditNoteAdapter::new(CreditNoteState::Issued);
         let err = m.apply_event(&CreditNoteEvent::Issue).unwrap_err();
-        assert!(matches!(err, TransitionError::Illegal { event: "issue", .. }));
+        assert!(matches!(
+            err,
+            TransitionError::Illegal { event: "issue", .. }
+        ));
         // State must not advance on rejection.
         assert_eq!(m.current_state(), CreditNoteState::Issued);
     }
@@ -701,7 +692,10 @@ mod tests {
     fn statig_adapter_rejects_issue_on_issued() {
         let mut a = StatigAdapter::new(CreditNoteState::Issued);
         let err = a.apply_event(&CreditNoteEvent::Issue).unwrap_err();
-        assert!(matches!(err, TransitionError::Illegal { event: "issue", .. }));
+        assert!(matches!(
+            err,
+            TransitionError::Illegal { event: "issue", .. }
+        ));
         // State must not advance on rejection.
         assert_eq!(a.current_state(), CreditNoteState::Issued);
     }
@@ -745,10 +739,7 @@ mod tests {
 
     /// Runs the same event sequence on both machines, asserts each step
     /// agrees, and returns the resulting trace for caller-side assertions.
-    fn run_parity(
-        initial: CreditNoteState,
-        events: &[CreditNoteEvent],
-    ) -> Vec<CreditNoteState> {
+    fn run_parity(initial: CreditNoteState, events: &[CreditNoteEvent]) -> Vec<CreditNoteState> {
         let mut bare = CreditNoteAdapter::new(initial);
         let mut sta = StatigAdapter::new(initial);
         let mut trace = Vec::new();
@@ -756,7 +747,8 @@ mod tests {
             let bare_next = bare.apply_event(ev);
             let stat_next = sta.apply_event(ev);
             assert_eq!(
-                bare_next, stat_next,
+                bare_next,
+                stat_next,
                 "bare/statig disagree on {ev:?} from {:?}",
                 bare.current_state()
             );

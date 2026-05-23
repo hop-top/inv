@@ -85,15 +85,16 @@ mod tests {
     #[test]
     fn empty_map_passes_topic_through() {
         let map = TopicMap::new();
-        assert_eq!(remap_topic(&map, "fin.billing.charge.created"), "fin.billing.charge.created");
+        assert_eq!(
+            remap_topic(&map, "fin.billing.charge.created"),
+            "fin.billing.charge.created"
+        );
     }
 
     #[test]
     fn configured_entry_remaps() {
-        let map = TopicMap::from_pairs([(
-            "fin.finance.charge.created",
-            "fin.billing.charge.created",
-        )]);
+        let map =
+            TopicMap::from_pairs([("fin.finance.charge.created", "fin.billing.charge.created")]);
         assert_eq!(
             remap_topic(&map, "fin.finance.charge.created"),
             "fin.billing.charge.created"
@@ -102,10 +103,8 @@ mod tests {
 
     #[test]
     fn unmapped_topic_passes_through() {
-        let map = TopicMap::from_pairs([(
-            "fin.finance.charge.created",
-            "fin.billing.charge.created",
-        )]);
+        let map =
+            TopicMap::from_pairs([("fin.finance.charge.created", "fin.billing.charge.created")]);
         assert_eq!(remap_topic(&map, "other.topic"), "other.topic");
     }
 }

@@ -145,10 +145,9 @@ fn core_status(err: &CoreError) -> StatusCode {
         CoreError::FsmTransition(_) => StatusCode::CONFLICT,
         CoreError::NotFound(_) => StatusCode::NOT_FOUND,
         CoreError::NotImplemented(_) => StatusCode::NOT_IMPLEMENTED,
-        CoreError::Repo(_)
-        | CoreError::Tax(_)
-        | CoreError::Render(_)
-        | CoreError::Pdf(_) => StatusCode::INTERNAL_SERVER_ERROR,
+        CoreError::Repo(_) | CoreError::Tax(_) | CoreError::Render(_) | CoreError::Pdf(_) => {
+            StatusCode::INTERNAL_SERVER_ERROR
+        }
     }
 }
 

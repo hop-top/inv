@@ -19,7 +19,7 @@
 
 use std::collections::BTreeMap;
 
-use chrono::{Datelike, DateTime, Utc};
+use chrono::{DateTime, Datelike, Utc};
 use rust_decimal::Decimal;
 use serde_json::json;
 use sqlx::Row;
@@ -111,15 +111,12 @@ pub async fn issue_invoice(
     debug_assert_eq!(to_state, InvoiceState::Issued);
 
     // 3. Load customer (for buyer address used in tax resolution).
-    let customer = cust_repo
-        .get(&invoice.customer_id)
-        .await?
-        .ok_or_else(|| {
-            CoreError::NotFound(format!(
-                "customer {} (referenced by invoice {})",
-                invoice.customer_id, input.invoice_id
-            ))
-        })?;
+    let customer = cust_repo.get(&invoice.customer_id).await?.ok_or_else(|| {
+        CoreError::NotFound(format!(
+            "customer {} (referenced by invoice {})",
+            invoice.customer_id, input.invoice_id
+        ))
+    })?;
 
     // 4. Resolve tax for every line and recompute totals.
     let now = ctx.clock.now();
@@ -167,10 +164,7 @@ pub async fn issue_invoice(
 
     // 7. Render HTML + (stub) PDF.
     let render_ctx = RenderContext::new(invoice.clone(), customer.clone(), lines.clone());
-    let template_path = invoice
-        .template_path
-        .as_deref()
-        .map(std::path::Path::new);
+    let template_path = invoice.template_path.as_deref().map(std::path::Path::new);
     let html = render_html(template_path, &render_ctx).await?;
     let pdf = render_pdf(&html).await?;
 
@@ -213,7 +207,15 @@ pub async fn issue_invoice(
     }
 
     // 9. Build emitted events: mechanic-triplet + domain `.issued`.
-    let emitted = build_issued_events(&invoice, from_state, to_state, &event, &input.actor, history.channel, now);
+    let emitted = build_issued_events(
+        &invoice,
+        from_state,
+        to_state,
+        &event,
+        &input.actor,
+        history.channel,
+        now,
+    );
 
     Ok(IssueInvoiceOutput {
         invoice,
@@ -226,10 +228,7 @@ pub async fn issue_invoice(
 
 /// Count invoices that have an `issued_at` falling within the given
 /// year. Best-effort sequence source for `INV-YYYY-NNNN`.
-async fn count_invoices_issued_in_year(
-    ctx: &CoreCtx,
-    year: i32,
-) -> Result<u32, CoreError> {
+async fn count_invoices_issued_in_year(ctx: &CoreCtx, year: i32) -> Result<u32, CoreError> {
     // Issued_at is rfc3339 in the column; a `BETWEEN` over rfc3339
     // strings sorts correctly because the prefix is the year.
     let from = format!("{year:04}-01-01T00:00:00Z");
@@ -277,8 +276,13 @@ fn build_issued_events(
         channel,
         now,
     );
-    let entered =
-        InvoiceEntered::new(invoice.id.clone(), to, channel, Some(actor_audit.clone()), now);
+    let entered = InvoiceEntered::new(
+        invoice.id.clone(),
+        to,
+        channel,
+        Some(actor_audit.clone()),
+        now,
+    );
 
     vec![
         EmittedEvent::new(

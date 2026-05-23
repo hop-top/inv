@@ -65,7 +65,10 @@ mod tests {
 
     #[test]
     fn channel_serde() {
-        assert_eq!(serde_json::to_string(&ReminderChannel::Webhook).unwrap(), r#""webhook""#);
+        assert_eq!(
+            serde_json::to_string(&ReminderChannel::Webhook).unwrap(),
+            r#""webhook""#
+        );
         assert_eq!(
             serde_json::from_str::<ReminderChannel>(r#""stdout""#).unwrap(),
             ReminderChannel::Stdout
@@ -74,8 +77,14 @@ mod tests {
 
     #[test]
     fn state_serde() {
-        assert_eq!(serde_json::to_string(&ReminderState::Scheduled).unwrap(), r#""scheduled""#);
-        assert_eq!(serde_json::to_string(&ReminderState::Cancelled).unwrap(), r#""cancelled""#);
+        assert_eq!(
+            serde_json::to_string(&ReminderState::Scheduled).unwrap(),
+            r#""scheduled""#
+        );
+        assert_eq!(
+            serde_json::to_string(&ReminderState::Cancelled).unwrap(),
+            r#""cancelled""#
+        );
     }
 
     #[test]

@@ -14,10 +14,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 use inv_commands::{
-    draft_invoice, issue_invoice, mark_overdue_ticker, mark_paid, reminders_tick,
-    schedules_tick, send_invoice, send_invoice_render, void_invoice, Actor, Channel,
-    DraftInvoiceInput, DraftLineInput, EmittedEvent, IssueInvoiceInput, MarkPaidInput,
-    SendInvoiceInput, SendInvoiceRenderInput, VoidInvoiceInput,
+    draft_invoice, issue_invoice, mark_overdue_ticker, mark_paid, reminders_tick, schedules_tick,
+    send_invoice, send_invoice_render, void_invoice, Actor, Channel, DraftInvoiceInput,
+    DraftLineInput, EmittedEvent, IssueInvoiceInput, MarkPaidInput, SendInvoiceInput,
+    SendInvoiceRenderInput, VoidInvoiceInput,
 };
 use inv_core::domain::ids::{CustomerId, InvoiceId};
 use inv_core::domain::invoice::{Invoice, InvoiceLine, InvoiceState, TaxCategory};
@@ -116,7 +116,11 @@ fn parse_state(s: &str) -> Result<InvoiceState, ApiError> {
         "partially_paid" => InvoiceState::PartiallyPaid,
         "paid" => InvoiceState::Paid,
         "voided" => InvoiceState::Voided,
-        other => return Err(ApiError::BadRequest(format!("invalid invoice state `{other}`"))),
+        other => {
+            return Err(ApiError::BadRequest(format!(
+                "invalid invoice state `{other}`"
+            )))
+        }
     })
 }
 
@@ -124,7 +128,9 @@ fn parse_state(s: &str) -> Result<InvoiceState, ApiError> {
 /// principal is opaque to the command layer at v1 — T-0029 will replace
 /// `"http"` with the resolved identity.
 fn api_actor() -> Actor {
-    Actor::Api { name: "http".into() }
+    Actor::Api {
+        name: "http".into(),
+    }
 }
 
 // =============================================================================
@@ -344,11 +350,8 @@ pub async fn send(
             .map_err(inv_commands::CoreError::from)?
             .ok_or_else(|| ApiError::NotFound(format!("invoice {invoice_id}")))?;
         let ttl = state.config.link_ttl.as_secs();
-        let token = crate::signed_link::sign(
-            &invoice_id.to_string(),
-            ttl,
-            &state.config.link_signing_key,
-        );
+        let token =
+            crate::signed_link::sign(&invoice_id.to_string(), ttl, &state.config.link_signing_key);
         let url = format!(
             "{}/v/{}",
             state.config.public_base_url.trim_end_matches('/'),
@@ -520,9 +523,7 @@ pub async fn void(
 // =============================================================================
 
 /// `POST /v1/tick/schedules` — materialise due schedules.
-pub async fn tick_schedules(
-    State(state): State<Arc<ApiState>>,
-) -> Result<Json<Value>, ApiError> {
+pub async fn tick_schedules(State(state): State<Arc<ApiState>>) -> Result<Json<Value>, ApiError> {
     let out = schedules_tick(&state.ctx).await?;
     Ok(Json(json!({
         "ran_schedule_ids": out.ran_schedule_ids.iter().map(|id| id.to_string()).collect::<Vec<_>>(),
@@ -532,9 +533,7 @@ pub async fn tick_schedules(
 }
 
 /// `POST /v1/tick/reminders` — dispatch due reminders.
-pub async fn tick_reminders(
-    State(state): State<Arc<ApiState>>,
-) -> Result<Json<Value>, ApiError> {
+pub async fn tick_reminders(State(state): State<Arc<ApiState>>) -> Result<Json<Value>, ApiError> {
     let out = reminders_tick(&state.ctx).await?;
     Ok(Json(json!({
         "sent_reminders": out.sent_reminders,
@@ -543,9 +542,7 @@ pub async fn tick_reminders(
 }
 
 /// `POST /v1/tick/overdue` — emit overdue events for unpaid invoices.
-pub async fn tick_overdue(
-    State(state): State<Arc<ApiState>>,
-) -> Result<Json<Value>, ApiError> {
+pub async fn tick_overdue(State(state): State<Arc<ApiState>>) -> Result<Json<Value>, ApiError> {
     let out = mark_overdue_ticker(&state.ctx).await?;
     Ok(Json(json!({
         "overdue_invoices": out.overdue_invoices,
@@ -566,4 +563,3 @@ pub async fn list_tax_rates(State(state): State<Arc<ApiState>>) -> Json<Value> {
         "rates": state.ctx.tax_table.rates,
     }))
 }
-

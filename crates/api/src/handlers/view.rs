@@ -21,9 +21,7 @@ use chrono::Utc;
 
 use inv_bus::{InvoiceViewed, TOPIC_INVOICE_VIEWED};
 use inv_core::domain::ids::{HistoryId, InvoiceId};
-use inv_core::domain::invoice::{
-    HistoryChannel, InvoiceState, InvoiceStateHistory,
-};
+use inv_core::domain::invoice::{HistoryChannel, InvoiceState, InvoiceStateHistory};
 use inv_core::render::{render_html, RenderContext};
 use inv_store::repo::customer::CustomerRepo;
 use inv_store::repo::history::InvoiceHistoryRepo;
@@ -132,10 +130,7 @@ pub async fn view_invoice(
             };
             match serde_json::to_value(&payload) {
                 Ok(value) => {
-                    if let Err(e) = publisher
-                        .publish(TOPIC_INVOICE_VIEWED, value, now)
-                        .await
-                    {
+                    if let Err(e) = publisher.publish(TOPIC_INVOICE_VIEWED, value, now).await {
                         tracing::warn!(
                             error = %e,
                             invoice_id = %invoice.id,
@@ -160,10 +155,7 @@ pub async fn view_invoice(
     );
     // Cache: never. The signed link is per-recipient; intermediaries
     // shouldn't cache it.
-    headers.insert(
-        header::CACHE_CONTROL,
-        HeaderValue::from_static("no-store"),
-    );
+    headers.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
 
     Ok((axum::http::StatusCode::OK, headers, html).into_response())
 }

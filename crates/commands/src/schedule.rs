@@ -20,8 +20,7 @@ use inv_store::repo::schedule::ScheduleRepo;
 
 use crate::ctx::{Actor, Channel, CoreCtx};
 use crate::draft::{
-    draft_invoice, history_channel_str, DraftInvoiceInput, DraftLineInput,
-    DraftInvoiceOutput,
+    draft_invoice, history_channel_str, DraftInvoiceInput, DraftInvoiceOutput, DraftLineInput,
 };
 use crate::error::CoreError;
 use crate::events::EmittedEvent;
@@ -72,19 +71,27 @@ impl ScheduleCreateInput {
     /// Validate: non-empty lines, positive qty/price.
     pub fn validate(&self) -> Result<(), CoreError> {
         if self.template_lines.is_empty() {
-            return Err(CoreError::Validation("schedule must have at least one template line".into()));
+            return Err(CoreError::Validation(
+                "schedule must have at least one template line".into(),
+            ));
         }
         for (i, l) in self.template_lines.iter().enumerate() {
             if l.quantity <= Decimal::ZERO {
-                return Err(CoreError::Validation(format!("line {i}: quantity must be > 0")));
+                return Err(CoreError::Validation(format!(
+                    "line {i}: quantity must be > 0"
+                )));
             }
             if l.unit_price < Decimal::ZERO {
-                return Err(CoreError::Validation(format!("line {i}: unit_price must be >= 0")));
+                return Err(CoreError::Validation(format!(
+                    "line {i}: unit_price must be >= 0"
+                )));
             }
         }
         if let Some(end) = self.end_date {
             if end < self.start_date {
-                return Err(CoreError::Validation("end_date must be >= start_date".into()));
+                return Err(CoreError::Validation(
+                    "end_date must be >= start_date".into(),
+                ));
             }
         }
         Ok(())
@@ -310,10 +317,11 @@ pub async fn schedules_tick(ctx: &CoreCtx) -> Result<SchedulesTickOutput, CoreEr
             lines,
             idempotency_key: Some(format!(
                 "schedule:{}:run:{}",
-                schedule.id,
-                schedule.next_run
+                schedule.id, schedule.next_run
             )),
-            actor: Actor::Bus { source: "inv.scheduler".into() },
+            actor: Actor::Bus {
+                source: "inv.scheduler".into(),
+            },
             channel: Channel::Bus,
             due_at: None,
             template_path: None,
@@ -328,7 +336,9 @@ pub async fn schedules_tick(ctx: &CoreCtx) -> Result<SchedulesTickOutput, CoreEr
                 IssueInvoiceInput {
                     invoice_id: drafted.invoice.id.clone(),
                     idempotency_key: None,
-                    actor: Actor::Bus { source: "inv.scheduler".into() },
+                    actor: Actor::Bus {
+                        source: "inv.scheduler".into(),
+                    },
                     channel: Channel::Bus,
                 },
             )

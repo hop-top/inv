@@ -7,9 +7,9 @@ use serde_json::{json, Value};
 
 use inv_commands::send::StdoutSink;
 use inv_commands::{
-    draft_invoice, issue_invoice, mark_paid, send_invoice, void_invoice, Actor,
-    Channel, CoreCtx, DraftInvoiceInput, DraftLineInput, IssueInvoiceInput,
-    MarkPaidInput, SendInvoiceInput, VoidInvoiceInput,
+    draft_invoice, issue_invoice, mark_paid, send_invoice, void_invoice, Actor, Channel, CoreCtx,
+    DraftInvoiceInput, DraftLineInput, IssueInvoiceInput, MarkPaidInput, SendInvoiceInput,
+    VoidInvoiceInput,
 };
 use inv_core::domain::invoice::{InvoiceState, TaxCategory};
 use inv_core::domain::jurisdiction::Jurisdiction;
@@ -175,11 +175,9 @@ fn list_cmd() -> Command {
                 .long("customer")
                 .help("Filter by customer typeid"),
         )
-        .arg(
-            Arg::new("state")
-                .long("state")
-                .help("Filter by lifecycle state (draft|issued|sent|viewed|partially_paid|paid|voided)"),
-        )
+        .arg(Arg::new("state").long("state").help(
+            "Filter by lifecycle state (draft|issued|sent|viewed|partially_paid|paid|voided)",
+        ))
         .arg(
             Arg::new("limit")
                 .long("limit")
@@ -278,7 +276,9 @@ pub fn build_draft_input(matches: &ArgMatches, actor: Actor) -> Result<DraftInvo
 
 async fn run_draft(ctx: &CoreCtx, matches: &ArgMatches) -> Result<()> {
     let input = build_draft_input(matches, cli_actor())?;
-    let output = draft_invoice(ctx, input).await.context("draft_invoice failed")?;
+    let output = draft_invoice(ctx, input)
+        .await
+        .context("draft_invoice failed")?;
     let value = json!({
         "invoice": output.invoice,
         "lines": output.lines,
@@ -305,7 +305,9 @@ pub fn build_issue_input(matches: &ArgMatches, actor: Actor) -> Result<IssueInvo
 
 async fn run_issue(ctx: &CoreCtx, matches: &ArgMatches) -> Result<()> {
     let input = build_issue_input(matches, cli_actor())?;
-    let output = issue_invoice(ctx, input).await.context("issue_invoice failed")?;
+    let output = issue_invoice(ctx, input)
+        .await
+        .context("issue_invoice failed")?;
     let value = json!({
         "invoice": output.invoice,
         "lines": output.lines,
@@ -336,7 +338,9 @@ async fn run_send(ctx: &CoreCtx, matches: &ArgMatches) -> Result<()> {
         channel: Channel::Cli,
         sink: Some(&mut stdout_sink as &mut dyn inv_commands::SendSink),
     };
-    let output = send_invoice(ctx, input).await.context("send_invoice failed")?;
+    let output = send_invoice(ctx, input)
+        .await
+        .context("send_invoice failed")?;
     let value = json!({
         "invoice": output.invoice,
         "delivered_to": output.delivered_to,
@@ -394,7 +398,9 @@ async fn run_void(ctx: &CoreCtx, matches: &ArgMatches) -> Result<()> {
         actor: cli_actor(),
         channel: Channel::Cli,
     };
-    let output = void_invoice(ctx, input).await.context("void_invoice failed")?;
+    let output = void_invoice(ctx, input)
+        .await
+        .context("void_invoice failed")?;
     let value = json!({
         "invoice": output.invoice,
         "emitted_events": event_topics(&output.emitted_events),
@@ -520,10 +526,7 @@ fn invoice_columns() -> Vec<ColumnSpec> {
 }
 
 fn event_topics(events: &[inv_commands::EmittedEvent]) -> Value {
-    json!(events
-        .iter()
-        .map(|e| e.topic.clone())
-        .collect::<Vec<_>>())
+    json!(events.iter().map(|e| e.topic.clone()).collect::<Vec<_>>())
 }
 
 #[cfg(test)]
@@ -532,9 +535,7 @@ mod schedule_column_tests {
     //! list` table rows. These exercise the pure JSON-shaping helpers
     //! WITHOUT booting a CoreCtx / DB.
 
-    use super::{
-        decorate_schedule_column, invoice_columns, schedule_id_suffix, NULL_GLYPH,
-    };
+    use super::{decorate_schedule_column, invoice_columns, schedule_id_suffix, NULL_GLYPH};
     use serde_json::json;
 
     #[test]
@@ -577,7 +578,10 @@ mod schedule_column_tests {
             { "id": "invoice_01k6aaa" },  // no schedule_id (skip_serializing_if)
         ]);
         decorate_schedule_column(&mut rows);
-        assert_eq!(rows[0].get("schedule").and_then(|v| v.as_str()), Some(NULL_GLYPH));
+        assert_eq!(
+            rows[0].get("schedule").and_then(|v| v.as_str()),
+            Some(NULL_GLYPH)
+        );
     }
 
     #[test]
@@ -590,7 +594,10 @@ mod schedule_column_tests {
         // First row gets the suffix; second gets the em-dash.
         let s0 = rows[0].get("schedule").and_then(|v| v.as_str()).unwrap();
         assert_eq!(s0.len(), 8);
-        assert_eq!(rows[1].get("schedule").and_then(|v| v.as_str()), Some(NULL_GLYPH));
+        assert_eq!(
+            rows[1].get("schedule").and_then(|v| v.as_str()),
+            Some(NULL_GLYPH)
+        );
     }
 
     #[test]
@@ -607,9 +614,21 @@ mod schedule_column_tests {
     fn columns_include_schedule_between_state_and_total() {
         let cols = invoice_columns();
         let headers: Vec<&str> = cols.iter().map(|c| c.header.as_str()).collect();
-        let pos = headers.iter().position(|h| *h == "schedule").expect("schedule column");
-        let state_pos = headers.iter().position(|h| *h == "state").expect("state column");
-        let total_pos = headers.iter().position(|h| *h == "total").expect("total column");
-        assert!(state_pos < pos && pos < total_pos, "schedule must sit between state and total: {headers:?}");
+        let pos = headers
+            .iter()
+            .position(|h| *h == "schedule")
+            .expect("schedule column");
+        let state_pos = headers
+            .iter()
+            .position(|h| *h == "state")
+            .expect("state column");
+        let total_pos = headers
+            .iter()
+            .position(|h| *h == "total")
+            .expect("total column");
+        assert!(
+            state_pos < pos && pos < total_pos,
+            "schedule must sit between state and total: {headers:?}"
+        );
     }
 }

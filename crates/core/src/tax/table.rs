@@ -74,9 +74,7 @@ impl TaxTable {
     }
 
     /// Load from a file path.
-    pub fn load_from_file(
-        path: impl AsRef<Path>,
-    ) -> Result<(Self, NexusConfig), TaxTableError> {
+    pub fn load_from_file(path: impl AsRef<Path>) -> Result<(Self, NexusConfig), TaxTableError> {
         let path = path.as_ref();
         let text = std::fs::read_to_string(path).map_err(|source| TaxTableError::Io {
             path: path.display().to_string(),
@@ -238,7 +236,11 @@ revenue = "500000"
             .join("tax-tables/default.toml");
         let (table, nexus) = TaxTable::load_from_file(&path)
             .unwrap_or_else(|e| panic!("loading {}: {e}", path.display()));
-        assert!(table.len() >= 5, "expected several rate rows, got {}", table.len());
+        assert!(
+            table.len() >= 5,
+            "expected several rate rows, got {}",
+            table.len()
+        );
         // Every shipped US nexus state must default to disabled.
         for (state, t) in &nexus.states {
             assert!(!t.enabled, "shipped default has nexus.{state} enabled");

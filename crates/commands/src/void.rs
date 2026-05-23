@@ -10,9 +10,7 @@ use chrono::{DateTime, Utc};
 use serde_json::json;
 
 use inv_core::domain::ids::{HistoryId, InvoiceId};
-use inv_core::domain::invoice::{
-    HistoryChannel, Invoice, InvoiceState, InvoiceStateHistory,
-};
+use inv_core::domain::invoice::{HistoryChannel, Invoice, InvoiceState, InvoiceStateHistory};
 use inv_core::state::transitions::{next_state, InvoiceEvent};
 use inv_core::state::{
     InvoiceEntered, InvoiceProposed, InvoiceTransitioned, TOPIC_ENTERED, TOPIC_PROPOSED,
@@ -124,14 +122,48 @@ fn build_voided_events(
     now: DateTime<Utc>,
 ) -> Vec<EmittedEvent> {
     let actor_audit = input.actor.audit_string();
-    let proposed = InvoiceProposed::new(invoice.id.clone(), from, to, event.clone(), Some(actor_audit.clone()), channel, now);
-    let transitioned = InvoiceTransitioned::new(invoice.id.clone(), from, to, event.clone(), Some(actor_audit.clone()), channel, now);
-    let entered = InvoiceEntered::new(invoice.id.clone(), to, channel, Some(actor_audit.clone()), now);
+    let proposed = InvoiceProposed::new(
+        invoice.id.clone(),
+        from,
+        to,
+        event.clone(),
+        Some(actor_audit.clone()),
+        channel,
+        now,
+    );
+    let transitioned = InvoiceTransitioned::new(
+        invoice.id.clone(),
+        from,
+        to,
+        event.clone(),
+        Some(actor_audit.clone()),
+        channel,
+        now,
+    );
+    let entered = InvoiceEntered::new(
+        invoice.id.clone(),
+        to,
+        channel,
+        Some(actor_audit.clone()),
+        now,
+    );
 
     vec![
-        EmittedEvent::new(TOPIC_PROPOSED, serde_json::to_value(&proposed).unwrap_or(json!({})), now),
-        EmittedEvent::new(TOPIC_TRANSITIONED, serde_json::to_value(&transitioned).unwrap_or(json!({})), now),
-        EmittedEvent::new(TOPIC_ENTERED, serde_json::to_value(&entered).unwrap_or(json!({})), now),
+        EmittedEvent::new(
+            TOPIC_PROPOSED,
+            serde_json::to_value(&proposed).unwrap_or(json!({})),
+            now,
+        ),
+        EmittedEvent::new(
+            TOPIC_TRANSITIONED,
+            serde_json::to_value(&transitioned).unwrap_or(json!({})),
+            now,
+        ),
+        EmittedEvent::new(
+            TOPIC_ENTERED,
+            serde_json::to_value(&entered).unwrap_or(json!({})),
+            now,
+        ),
         EmittedEvent::new(
             "inv.billing.invoice.voided",
             json!({

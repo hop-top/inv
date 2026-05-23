@@ -223,13 +223,7 @@ pub async fn send_invoice(
     }
 
     // Render + FSM-mutate shared with the render-only path.
-    let prepared = prepare_send(
-        ctx,
-        &input.invoice_id,
-        &input.actor,
-        input.channel,
-    )
-    .await?;
+    let prepared = prepare_send(ctx, &input.invoice_id, &input.actor, input.channel).await?;
 
     // Dispatch via the local sink (file:// or stdout).
     let delivered_to = match scheme.as_str() {
@@ -245,9 +239,8 @@ pub async fn send_invoice(
                     })?;
                 }
             }
-            std::fs::write(&path, &prepared.pdf).map_err(|e| {
-                CoreError::Validation(format!("writing {}: {e}", path.display()))
-            })?;
+            std::fs::write(&path, &prepared.pdf)
+                .map_err(|e| CoreError::Validation(format!("writing {}: {e}", path.display())))?;
             format!("file://{}", path.display())
         }
         "stdout" => {
@@ -256,9 +249,8 @@ pub async fn send_invoice(
                     "send_invoice: stdout destination requires a sink (none supplied)".into(),
                 )
             })?;
-            sink.write_all(&prepared.pdf).map_err(|e| {
-                CoreError::Validation(format!("writing to stdout sink: {e}"))
-            })?;
+            sink.write_all(&prepared.pdf)
+                .map_err(|e| CoreError::Validation(format!("writing to stdout sink: {e}")))?;
             "stdout".to_string()
         }
         _ => unreachable!("scheme guard above"),
@@ -305,13 +297,7 @@ pub async fn send_invoice_render(
         }
     }
 
-    let prepared = prepare_send(
-        ctx,
-        &input.invoice_id,
-        &input.actor,
-        input.channel,
-    )
-    .await?;
+    let prepared = prepare_send(ctx, &input.invoice_id, &input.actor, input.channel).await?;
     let delivered_to = input.destination_uri.clone();
     finalize_send(
         ctx,
@@ -360,9 +346,7 @@ async fn prepare_send(
     // row + event still fire so the audit trail records every send.
     let from_state = invoice.state;
     let to_state = match from_state {
-        InvoiceState::Issued | InvoiceState::Viewed => {
-            next_state(from_state, &InvoiceEvent::Send)?
-        }
+        InvoiceState::Issued | InvoiceState::Viewed => next_state(from_state, &InvoiceEvent::Send)?,
         InvoiceState::Sent => InvoiceState::Sent,
         other => {
             return Err(CoreError::FsmTransition(
@@ -374,15 +358,12 @@ async fn prepare_send(
         }
     };
 
-    let customer = cust_repo
-        .get(&invoice.customer_id)
-        .await?
-        .ok_or_else(|| {
-            CoreError::NotFound(format!(
-                "customer {} (referenced by invoice {})",
-                invoice.customer_id, invoice_id
-            ))
-        })?;
+    let customer = cust_repo.get(&invoice.customer_id).await?.ok_or_else(|| {
+        CoreError::NotFound(format!(
+            "customer {} (referenced by invoice {})",
+            invoice.customer_id, invoice_id
+        ))
+    })?;
 
     let now = ctx.clock.now();
 
@@ -518,15 +499,12 @@ async fn try_replay(
         .await?
         .ok_or_else(|| CoreError::NotFound(format!("invoice {invoice_id}")))?;
     let lines = line_repo.list_for_invoice(invoice_id).await?;
-    let customer = cust_repo
-        .get(&invoice.customer_id)
-        .await?
-        .ok_or_else(|| {
-            CoreError::NotFound(format!(
-                "customer {} (referenced by invoice {})",
-                invoice.customer_id, invoice_id
-            ))
-        })?;
+    let customer = cust_repo.get(&invoice.customer_id).await?.ok_or_else(|| {
+        CoreError::NotFound(format!(
+            "customer {} (referenced by invoice {})",
+            invoice.customer_id, invoice_id
+        ))
+    })?;
 
     let render_ctx = RenderContext::new(invoice.clone(), customer, lines.clone());
     let template_path = invoice.template_path.as_deref().map(std::path::Path::new);
@@ -553,9 +531,9 @@ fn scheme_of(uri: &str) -> String {
 }
 
 fn file_path_from_uri(uri: &str) -> Result<PathBuf, CoreError> {
-    let rest = uri
-        .strip_prefix("file://")
-        .ok_or_else(|| CoreError::Validation(format!("file URI: missing `file://` prefix: {uri}")))?;
+    let rest = uri.strip_prefix("file://").ok_or_else(|| {
+        CoreError::Validation(format!("file URI: missing `file://` prefix: {uri}"))
+    })?;
     if rest.is_empty() {
         return Err(CoreError::Validation(
             "file URI: empty path component".into(),
@@ -595,8 +573,13 @@ fn build_sent_events(
         channel,
         now,
     );
-    let entered =
-        InvoiceEntered::new(invoice.id.clone(), to, channel, Some(actor_audit.clone()), now);
+    let entered = InvoiceEntered::new(
+        invoice.id.clone(),
+        to,
+        channel,
+        Some(actor_audit.clone()),
+        now,
+    );
 
     vec![
         EmittedEvent::new(

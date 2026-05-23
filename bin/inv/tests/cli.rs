@@ -56,10 +56,7 @@ fn tax_rates_show_yaml_has_rows() {
 fn invoice_list_table_format_default() {
     // Default --format=table on an empty DB is still a success exit;
     // table output may be a one-liner or empty depending on schema.
-    inv()
-        .args(["invoice", "list"])
-        .assert()
-        .success();
+    inv().args(["invoice", "list"]).assert().success();
 }
 
 /// Smoke test: `inv server` boots the HTTP listener, serves /healthz,
@@ -104,14 +101,18 @@ fn server_starts_and_serves_healthz() {
     // Drain stdout/stderr in background so the child doesn't block on
     // a full pipe. We don't assert on contents — just keep the pipe open.
     if let Some(stdout) = child.stdout.take() {
-        thread::spawn(move || {
-            for _ in BufReader::new(stdout).lines().map_while(Result::ok) {}
-        });
+        thread::spawn(
+            move || {
+                for _ in BufReader::new(stdout).lines().map_while(Result::ok) {}
+            },
+        );
     }
     if let Some(stderr) = child.stderr.take() {
-        thread::spawn(move || {
-            for _ in BufReader::new(stderr).lines().map_while(Result::ok) {}
-        });
+        thread::spawn(
+            move || {
+                for _ in BufReader::new(stderr).lines().map_while(Result::ok) {}
+            },
+        );
     }
 
     // Poll /healthz for up to ~5s.
@@ -157,10 +158,16 @@ fn server_starts_and_serves_healthz() {
 /// Tiny extension on Child::wait that times out instead of hanging
 /// forever. We use it to bound test runtime if SIGTERM is ignored.
 trait WaitTimeout {
-    fn wait_timeout(&mut self, dur: std::time::Duration) -> std::io::Result<Option<std::process::ExitStatus>>;
+    fn wait_timeout(
+        &mut self,
+        dur: std::time::Duration,
+    ) -> std::io::Result<Option<std::process::ExitStatus>>;
 }
 impl WaitTimeout for std::process::Child {
-    fn wait_timeout(&mut self, dur: std::time::Duration) -> std::io::Result<Option<std::process::ExitStatus>> {
+    fn wait_timeout(
+        &mut self,
+        dur: std::time::Duration,
+    ) -> std::io::Result<Option<std::process::ExitStatus>> {
         let start = std::time::Instant::now();
         while start.elapsed() < dur {
             if let Some(status) = self.try_wait()? {

@@ -34,10 +34,7 @@ impl<'p> CustomerRepo<'p> {
     }
 
     /// Upsert inside a caller-owned transaction (see [`InvoiceRepo::save_in_tx`]).
-    pub async fn save_in_tx(
-        tx: &mut sqlx::Transaction<'_, sqlx::Any>,
-        c: &Customer,
-    ) -> Result<()> {
+    pub async fn save_in_tx(tx: &mut sqlx::Transaction<'_, sqlx::Any>, c: &Customer) -> Result<()> {
         let address_json = serde_json::to_string(&c.address)?;
         let metadata = metadata_to_json(&c.metadata)?;
         sqlx::query(

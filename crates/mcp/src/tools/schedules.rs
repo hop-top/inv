@@ -63,20 +63,22 @@ pub async fn create(
     ctx: &CoreCtx,
     input: ScheduleCreateWire,
 ) -> Result<serde_json::Value, McpError> {
-    let customer_id: CustomerId = input
-        .customer_id
-        .parse()
-        .map_err(|e: inv_core::domain::ids::IdError| {
-            McpError::Decode(format!("customer_id: {e}"))
-        })?;
-    let currency = Currency::new(&input.currency)
-        .map_err(|e| McpError::Decode(format!("currency: {e}")))?;
-    let cadence: Cadence = input
-        .cadence
-        .parse()
-        .map_err(|e: inv_core::domain::schedule::CadenceError| {
-            McpError::Decode(format!("cadence: {e}"))
-        })?;
+    let customer_id: CustomerId =
+        input
+            .customer_id
+            .parse()
+            .map_err(|e: inv_core::domain::ids::IdError| {
+                McpError::Decode(format!("customer_id: {e}"))
+            })?;
+    let currency =
+        Currency::new(&input.currency).map_err(|e| McpError::Decode(format!("currency: {e}")))?;
+    let cadence: Cadence =
+        input
+            .cadence
+            .parse()
+            .map_err(|e: inv_core::domain::schedule::CadenceError| {
+                McpError::Decode(format!("cadence: {e}"))
+            })?;
     let template_lines = input
         .template_lines
         .into_iter()
@@ -114,12 +116,13 @@ pub async fn pause(
     ctx: &CoreCtx,
     input: ScheduleStateChangeWire,
 ) -> Result<serde_json::Value, McpError> {
-    let id: ScheduleId = input
-        .schedule_id
-        .parse()
-        .map_err(|e: inv_core::domain::ids::IdError| {
-            McpError::Decode(format!("schedule_id: {e}"))
-        })?;
+    let id: ScheduleId =
+        input
+            .schedule_id
+            .parse()
+            .map_err(|e: inv_core::domain::ids::IdError| {
+                McpError::Decode(format!("schedule_id: {e}"))
+            })?;
     let req = ScheduleStateChangeInput {
         schedule_id: id,
         actor: mcp_actor(),
@@ -134,12 +137,13 @@ pub async fn cancel(
     ctx: &CoreCtx,
     input: ScheduleStateChangeWire,
 ) -> Result<serde_json::Value, McpError> {
-    let id: ScheduleId = input
-        .schedule_id
-        .parse()
-        .map_err(|e: inv_core::domain::ids::IdError| {
-            McpError::Decode(format!("schedule_id: {e}"))
-        })?;
+    let id: ScheduleId =
+        input
+            .schedule_id
+            .parse()
+            .map_err(|e: inv_core::domain::ids::IdError| {
+                McpError::Decode(format!("schedule_id: {e}"))
+            })?;
     let req = ScheduleStateChangeInput {
         schedule_id: id,
         actor: mcp_actor(),

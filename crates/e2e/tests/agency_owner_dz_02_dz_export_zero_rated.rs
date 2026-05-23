@@ -44,7 +44,9 @@ async fn dz_to_foreign_buyer_resolves_zero_rated_export() {
                 tax_category: TaxCategory::Standard,
             }],
             idempotency_key: None,
-            actor: Actor::Cli { name: "agency".into() },
+            actor: Actor::Cli {
+                name: "agency".into(),
+            },
             channel: Channel::Cli,
             due_at: None,
             template_path: None,
@@ -54,7 +56,10 @@ async fn dz_to_foreign_buyer_resolves_zero_rated_export() {
     .await
     .expect("draft");
 
-    assert_eq!(drafted.invoice.subtotal, Decimal::from_str("5000.00").unwrap());
+    assert_eq!(
+        drafted.invoice.subtotal,
+        Decimal::from_str("5000.00").unwrap()
+    );
 
     // ----- When: issue. ----------------------------------------------
     let issued = issue_invoice(
@@ -62,7 +67,9 @@ async fn dz_to_foreign_buyer_resolves_zero_rated_export() {
         IssueInvoiceInput {
             invoice_id: drafted.invoice.id.clone(),
             idempotency_key: None,
-            actor: Actor::Cli { name: "agency".into() },
+            actor: Actor::Cli {
+                name: "agency".into(),
+            },
             channel: Channel::Cli,
         },
     )
@@ -108,7 +115,9 @@ async fn dz_to_foreign_with_explicit_zero_rated_records_rate_id() {
                 tax_category: TaxCategory::ZeroRated,
             }],
             idempotency_key: None,
-            actor: Actor::Cli { name: "agency".into() },
+            actor: Actor::Cli {
+                name: "agency".into(),
+            },
             channel: Channel::Cli,
             due_at: None,
             template_path: None,
@@ -122,7 +131,9 @@ async fn dz_to_foreign_with_explicit_zero_rated_records_rate_id() {
         IssueInvoiceInput {
             invoice_id: drafted.invoice.id.clone(),
             idempotency_key: None,
-            actor: Actor::Cli { name: "agency".into() },
+            actor: Actor::Cli {
+                name: "agency".into(),
+            },
             channel: Channel::Cli,
         },
     )

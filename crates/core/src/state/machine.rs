@@ -153,7 +153,10 @@ mod tests {
     #[test]
     fn propose_does_not_mutate() {
         let m = BareMachine::new(InvoiceState::Draft);
-        assert_eq!(m.propose(&InvoiceEvent::Issue).unwrap(), InvoiceState::Issued);
+        assert_eq!(
+            m.propose(&InvoiceEvent::Issue).unwrap(),
+            InvoiceState::Issued
+        );
         // Still Draft after a non-mutating propose.
         assert_eq!(m.current_state(), InvoiceState::Draft);
     }

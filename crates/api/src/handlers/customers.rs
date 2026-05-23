@@ -48,9 +48,7 @@ pub async fn create(
     Json(body): Json<CreateBody>,
 ) -> Result<(StatusCode, Json<Customer>), ApiError> {
     if body.address.country.trim().is_empty() {
-        return Err(ApiError::BadRequest(
-            "address.country is required".into(),
-        ));
+        return Err(ApiError::BadRequest("address.country is required".into()));
     }
     let now = Utc::now();
     let customer = Customer {

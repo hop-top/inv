@@ -191,8 +191,7 @@ pub fn resolve_tax(
     match line.tax_category {
         TaxCategory::ZeroRated | TaxCategory::Exempt => {
             // Try to record a matching row id for audit (per §6.1).
-            let (matches, warnings) =
-                pick_rates(seller, buyer, line.tax_category, table, at_date);
+            let (matches, warnings) = pick_rates(seller, buyer, line.tax_category, table, at_date);
             return Ok(ResolvedTax {
                 amount: currency.round(Decimal::ZERO),
                 applied_rate_ids: matches.iter().map(|r| r.id.clone()).collect(),
@@ -207,11 +206,13 @@ pub fn resolve_tax(
 
     // Step 2: by scope.
     match scope {
-        BuyerScope::Export => Ok(ResolvedTax { export: true, ..zero }),
+        BuyerScope::Export => Ok(ResolvedTax {
+            export: true,
+            ..zero
+        }),
 
         BuyerScope::DomesticLocal => {
-            let (rates, warnings) =
-                pick_rates(seller, buyer, line.tax_category, table, at_date);
+            let (rates, warnings) = pick_rates(seller, buyer, line.tax_category, table, at_date);
             if rates.is_empty() {
                 // No table rows means 0% with a warning, not an error —
                 // operators can run inv without configuring rates yet.
@@ -881,10 +882,7 @@ revenue = "500000"
         .unwrap();
         assert_eq!(r.amount, Decimal::ZERO);
         // The zero-rated row from the fixture should be recorded.
-        assert_eq!(
-            r.applied_rate_ids,
-            vec!["ca-qc-gst-zero-foods".to_string()]
-        );
+        assert_eq!(r.applied_rate_ids, vec!["ca-qc-gst-zero-foods".to_string()]);
     }
 
     #[test]

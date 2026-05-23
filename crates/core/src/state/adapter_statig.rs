@@ -337,7 +337,10 @@ mod tests {
     #[test]
     fn adapter_propose_does_not_mutate() {
         let a = StatigAdapter::new(InvoiceState::Draft);
-        assert_eq!(a.propose(&InvoiceEvent::Issue).unwrap(), InvoiceState::Issued);
+        assert_eq!(
+            a.propose(&InvoiceEvent::Issue).unwrap(),
+            InvoiceState::Issued
+        );
         assert_eq!(a.current_state(), InvoiceState::Draft);
     }
 
@@ -421,7 +424,8 @@ mod tests {
             let bare_next = bare.apply(ev);
             let stat_next = sta.apply(ev);
             assert_eq!(
-                bare_next, stat_next,
+                bare_next,
+                stat_next,
                 "bare/statig disagree on {ev:?} from {:?}",
                 bare.current_state()
             );

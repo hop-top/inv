@@ -10,20 +10,18 @@
 
 use std::collections::BTreeMap;
 
-use chrono::{Datelike, DateTime, Utc};
+use chrono::{DateTime, Datelike, Utc};
 use rust_decimal::Decimal;
 use serde_json::json;
 use sqlx::Row;
 
-use inv_core::domain::creditnote::{
-    CreditNote, CreditNoteState, CreditNoteStateHistory,
-};
+use inv_core::domain::creditnote::{CreditNote, CreditNoteState, CreditNoteStateHistory};
 use inv_core::domain::ids::{CreditNoteId, HistoryId, InvoiceId};
 use inv_core::domain::invoice::HistoryChannel;
 use inv_core::domain::money::Currency;
 use inv_core::state::creditnote::{
-    next_state, CreditNoteEntered, CreditNoteEvent, CreditNoteProposed,
-    CreditNoteTransitioned, TOPIC_ENTERED, TOPIC_PROPOSED, TOPIC_TRANSITIONED,
+    next_state, CreditNoteEntered, CreditNoteEvent, CreditNoteProposed, CreditNoteTransitioned,
+    TOPIC_ENTERED, TOPIC_PROPOSED, TOPIC_TRANSITIONED,
 };
 use inv_store::repo::credit_note::{CreditNoteHistoryRepo, CreditNoteRepo};
 use inv_store::repo::invoice::InvoiceRepo;
@@ -197,15 +195,12 @@ pub async fn issue_credit_note(
     let mut cn = cn_repo
         .get(&input.credit_note_id)
         .await?
-        .ok_or_else(|| {
-            CoreError::NotFound(format!("credit note {}", input.credit_note_id))
-        })?;
+        .ok_or_else(|| CoreError::NotFound(format!("credit note {}", input.credit_note_id)))?;
 
     let from_state = cn.state;
     let event = CreditNoteEvent::Issue;
-    let to_state = next_state(from_state, &event).map_err(|e| {
-        CoreError::Validation(format!("credit-note FSM rejected: {e}"))
-    })?;
+    let to_state = next_state(from_state, &event)
+        .map_err(|e| CoreError::Validation(format!("credit-note FSM rejected: {e}")))?;
     debug_assert_eq!(to_state, CreditNoteState::Issued);
 
     let now = ctx.clock.now();
@@ -239,7 +234,15 @@ pub async fn issue_credit_note(
         tx.commit().await.map_err(inv_store::StoreError::from)?;
     }
 
-    let emitted = build_creditnote_issued_events(&cn, from_state, to_state, &event, &input.actor, channel, now);
+    let emitted = build_creditnote_issued_events(
+        &cn,
+        from_state,
+        to_state,
+        &event,
+        &input.actor,
+        channel,
+        now,
+    );
 
     Ok(IssueCreditNoteOutput {
         credit_note: cn,
@@ -247,10 +250,7 @@ pub async fn issue_credit_note(
     })
 }
 
-async fn count_credit_notes_issued_in_year(
-    ctx: &CoreCtx,
-    year: i32,
-) -> Result<u32, CoreError> {
+async fn count_credit_notes_issued_in_year(ctx: &CoreCtx, year: i32) -> Result<u32, CoreError> {
     let from = format!("{year:04}-01-01T00:00:00Z");
     let to = format!("{:04}-01-01T00:00:00Z", year + 1);
     let row = sqlx::query(
@@ -277,14 +277,43 @@ fn build_creditnote_issued_events(
     now: DateTime<Utc>,
 ) -> Vec<EmittedEvent> {
     let actor_audit = actor.audit_string();
-    let proposed = CreditNoteProposed::new(cn.id.clone(), from, to, event.clone(), Some(actor_audit.clone()), channel, now);
-    let transitioned = CreditNoteTransitioned::new(cn.id.clone(), from, to, event.clone(), Some(actor_audit.clone()), channel, now);
-    let entered = CreditNoteEntered::new(cn.id.clone(), to, channel, Some(actor_audit.clone()), now);
+    let proposed = CreditNoteProposed::new(
+        cn.id.clone(),
+        from,
+        to,
+        event.clone(),
+        Some(actor_audit.clone()),
+        channel,
+        now,
+    );
+    let transitioned = CreditNoteTransitioned::new(
+        cn.id.clone(),
+        from,
+        to,
+        event.clone(),
+        Some(actor_audit.clone()),
+        channel,
+        now,
+    );
+    let entered =
+        CreditNoteEntered::new(cn.id.clone(), to, channel, Some(actor_audit.clone()), now);
 
     vec![
-        EmittedEvent::new(TOPIC_PROPOSED, serde_json::to_value(&proposed).unwrap_or(json!({})), now),
-        EmittedEvent::new(TOPIC_TRANSITIONED, serde_json::to_value(&transitioned).unwrap_or(json!({})), now),
-        EmittedEvent::new(TOPIC_ENTERED, serde_json::to_value(&entered).unwrap_or(json!({})), now),
+        EmittedEvent::new(
+            TOPIC_PROPOSED,
+            serde_json::to_value(&proposed).unwrap_or(json!({})),
+            now,
+        ),
+        EmittedEvent::new(
+            TOPIC_TRANSITIONED,
+            serde_json::to_value(&transitioned).unwrap_or(json!({})),
+            now,
+        ),
+        EmittedEvent::new(
+            TOPIC_ENTERED,
+            serde_json::to_value(&entered).unwrap_or(json!({})),
+            now,
+        ),
         EmittedEvent::new(
             "inv.billing.creditnote.issued",
             json!({

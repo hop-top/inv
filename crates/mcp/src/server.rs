@@ -12,9 +12,8 @@ use std::sync::Arc;
 use rmcp::handler::server::router::tool::ToolRouter;
 use rmcp::handler::server::wrapper::Parameters;
 use rmcp::model::{
-    ListResourceTemplatesResult, ListResourcesResult, PaginatedRequestParams,
-    ProtocolVersion, ReadResourceRequestParams, ReadResourceResult, ServerCapabilities,
-    ServerInfo,
+    ListResourceTemplatesResult, ListResourcesResult, PaginatedRequestParams, ProtocolVersion,
+    ReadResourceRequestParams, ReadResourceResult, ServerCapabilities, ServerInfo,
 };
 use rmcp::service::RequestContext;
 use rmcp::{tool, tool_handler, tool_router, ErrorData as RmcpError, RoleServer, ServerHandler};
@@ -170,7 +169,10 @@ impl InvMcpServer {
     }
 
     /// Show a customer.
-    #[tool(name = "inv_customer_show", description = "Show a single customer by id.")]
+    #[tool(
+        name = "inv_customer_show",
+        description = "Show a single customer by id."
+    )]
     pub async fn inv_customer_show(
         &self,
         Parameters(input): Parameters<CustomerShowInput>,
@@ -195,9 +197,7 @@ impl InvMcpServer {
         name = "inv_tax_rates_show",
         description = "Return the loaded tax-rate table and US nexus configuration."
     )]
-    pub async fn inv_tax_rates_show(
-        &self,
-    ) -> Result<rmcp::model::CallToolResult, RmcpError> {
+    pub async fn inv_tax_rates_show(&self) -> Result<rmcp::model::CallToolResult, RmcpError> {
         wrap(invoices::tax_rates_show(&self.ctx).await)
     }
 
@@ -306,9 +306,7 @@ impl InvMcpServer {
         name = "inv_tick_schedules",
         description = "Materialise invoices for every active schedule whose next_run <= today."
     )]
-    pub async fn inv_tick_schedules(
-        &self,
-    ) -> Result<rmcp::model::CallToolResult, RmcpError> {
+    pub async fn inv_tick_schedules(&self) -> Result<rmcp::model::CallToolResult, RmcpError> {
         wrap(tickers::tick_schedules(&self.ctx).await)
     }
 
@@ -317,9 +315,7 @@ impl InvMcpServer {
         name = "inv_tick_reminders",
         description = "Dispatch every reminder whose scheduled_at <= now and is still in Scheduled state."
     )]
-    pub async fn inv_tick_reminders(
-        &self,
-    ) -> Result<rmcp::model::CallToolResult, RmcpError> {
+    pub async fn inv_tick_reminders(&self) -> Result<rmcp::model::CallToolResult, RmcpError> {
         wrap(tickers::tick_reminders(&self.ctx).await)
     }
 
@@ -328,9 +324,7 @@ impl InvMcpServer {
         name = "inv_tick_overdue",
         description = "Emit `inv.billing.invoice.overdue` for every Issued/Sent/Viewed/PartiallyPaid invoice past its due date."
     )]
-    pub async fn inv_tick_overdue(
-        &self,
-    ) -> Result<rmcp::model::CallToolResult, RmcpError> {
+    pub async fn inv_tick_overdue(&self) -> Result<rmcp::model::CallToolResult, RmcpError> {
         wrap(tickers::tick_overdue(&self.ctx).await)
     }
 }
@@ -357,9 +351,8 @@ impl ServerHandler for InvMcpServer {
             .enable_tool_list_changed()
             .enable_resources()
             .build();
-        let server_info =
-            rmcp::model::Implementation::new("inv-mcp", env!("CARGO_PKG_VERSION"))
-                .with_title("inv MCP server");
+        let server_info = rmcp::model::Implementation::new("inv-mcp", env!("CARGO_PKG_VERSION"))
+            .with_title("inv MCP server");
         ServerInfo::new(capabilities)
             .with_protocol_version(ProtocolVersion::default())
             .with_server_info(server_info)

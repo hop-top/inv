@@ -120,7 +120,9 @@ mod tests {
     }
 
     fn actor() -> Actor {
-        Actor::Cli { name: "tester".to_string() }
+        Actor::Cli {
+            name: "tester".to_string(),
+        }
     }
 
     #[test]
@@ -152,7 +154,10 @@ mod tests {
         assert_eq!(input.lines.len(), 2);
         assert_eq!(input.lines[0].description, "Consulting");
         assert_eq!(input.lines[0].quantity, Decimal::from_str("10").unwrap());
-        assert_eq!(input.lines[0].unit_price, Decimal::from_str("125.00").unwrap());
+        assert_eq!(
+            input.lines[0].unit_price,
+            Decimal::from_str("125.00").unwrap()
+        );
         assert_eq!(input.lines[1].description, "Travel");
         assert_eq!(input.lines[1].unit_price, Decimal::from_str("200").unwrap());
         assert_eq!(input.idempotency_key.as_deref(), Some("key-1"));

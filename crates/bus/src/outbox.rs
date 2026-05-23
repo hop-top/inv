@@ -46,9 +46,9 @@ use inv_store::Pool;
 
 use crate::error::RelayError;
 use crate::events::{
-    TOPIC_CREDITNOTE_DRAFTED, TOPIC_CREDITNOTE_ISSUED, TOPIC_INVOICE_DRAFTED,
-    TOPIC_INVOICE_ISSUED, TOPIC_INVOICE_PAID, TOPIC_INVOICE_PARTIALLY_PAID,
-    TOPIC_INVOICE_SENT, TOPIC_INVOICE_VIEWED, TOPIC_INVOICE_VOIDED,
+    TOPIC_CREDITNOTE_DRAFTED, TOPIC_CREDITNOTE_ISSUED, TOPIC_INVOICE_DRAFTED, TOPIC_INVOICE_ISSUED,
+    TOPIC_INVOICE_PAID, TOPIC_INVOICE_PARTIALLY_PAID, TOPIC_INVOICE_SENT, TOPIC_INVOICE_VIEWED,
+    TOPIC_INVOICE_VOIDED,
 };
 use crate::publisher::Publisher;
 
@@ -84,9 +84,7 @@ pub async fn run_outbox_relay(
     for row in pending_inv {
         let events = invoice_row_to_events(&row);
         for (topic, payload) in events {
-            publisher
-                .publish(&topic, payload, row.occurred_at)
-                .await?;
+            publisher.publish(&topic, payload, row.occurred_at).await?;
             stats.events_published += 1;
         }
         inv_repo.mark_published(&row.id).await?;
@@ -99,9 +97,7 @@ pub async fn run_outbox_relay(
     for row in pending_cn {
         let events = credit_note_row_to_events(&row);
         for (topic, payload) in events {
-            publisher
-                .publish(&topic, payload, row.occurred_at)
-                .await?;
+            publisher.publish(&topic, payload, row.occurred_at).await?;
             stats.events_published += 1;
         }
         cn_repo.mark_published(&row.id).await?;
@@ -427,11 +423,7 @@ mod tests {
     #[test]
     fn mapper_pay_splits_paid_vs_partially_paid() {
         let row_paid = invoice_row("pay", Some(InvoiceState::Sent), InvoiceState::Paid);
-        let row_partial = invoice_row(
-            "pay",
-            Some(InvoiceState::Sent),
-            InvoiceState::PartiallyPaid,
-        );
+        let row_partial = invoice_row("pay", Some(InvoiceState::Sent), InvoiceState::PartiallyPaid);
         let ev_paid = invoice_row_to_events(&row_paid);
         let ev_partial = invoice_row_to_events(&row_partial);
         assert_eq!(ev_paid.last().unwrap().0, TOPIC_INVOICE_PAID);

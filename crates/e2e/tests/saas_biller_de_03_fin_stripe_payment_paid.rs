@@ -23,8 +23,8 @@ use hop_top_xrr::adapters::exec::{ExecAdapter, ExecRequest, ExecResponse};
 
 use inv_bus::{dispatch_inbound_event, Consumer, DispatchOutput};
 use inv_commands::{
-    draft_invoice, issue_invoice, send_invoice, Actor, Channel, DraftInvoiceInput,
-    DraftLineInput, IssueInvoiceInput, SendInvoiceInput,
+    draft_invoice, issue_invoice, send_invoice, Actor, Channel, DraftInvoiceInput, DraftLineInput,
+    IssueInvoiceInput, SendInvoiceInput,
 };
 use inv_core::domain::invoice::{InvoiceState, TaxCategory};
 use inv_core::domain::jurisdiction::Jurisdiction;
@@ -111,10 +111,7 @@ async fn fin_payment_received_advances_invoice_to_paid() {
     })
     .to_string();
     let req = ExecRequest {
-        argv: vec![
-            "fin-bus-emit".into(),
-            "fin.billing.payment.received".into(),
-        ],
+        argv: vec!["fin-bus-emit".into(), "fin.billing.payment.received".into()],
         stdin: recorded_payload.clone(),
         env: HashMap::new(),
     };
@@ -129,7 +126,9 @@ async fn fin_payment_received_advances_invoice_to_paid() {
         })
         .expect("xrr session");
     assert_eq!(resp.exit_code, 0);
-    let event_payload = resp.stdout.replace(PLACEHOLDER_ID, &issued.invoice.id.to_string());
+    let event_payload = resp
+        .stdout
+        .replace(PLACEHOLDER_ID, &issued.invoice.id.to_string());
 
     let inbox = BusInboxRepo::new(&pool);
     let first = dispatch_inbound_event(
@@ -161,7 +160,10 @@ async fn fin_payment_received_advances_invoice_to_paid() {
     // ----- Then: state=paid, .paid emitted, cumulative=1667.14. ------
     assert!(paid.fully_paid);
     assert_eq!(paid.invoice.state, InvoiceState::Paid);
-    assert_eq!(paid.invoice.amount_paid, Decimal::from_str("1667.14").unwrap());
+    assert_eq!(
+        paid.invoice.amount_paid,
+        Decimal::from_str("1667.14").unwrap()
+    );
     let topics: Vec<&str> = paid
         .emitted_events
         .iter()
@@ -239,7 +241,12 @@ async fn fin_partial_payment_then_remainder_reaches_paid() {
     })
     .to_string();
     let out1 = consumer
-        .dispatch(&ctx, "fin.billing.payment.received", "fin-partial-1", &p1_payload)
+        .dispatch(
+            &ctx,
+            "fin.billing.payment.received",
+            "fin-partial-1",
+            &p1_payload,
+        )
         .await
         .expect("partial 1");
     match out1 {
@@ -257,7 +264,12 @@ async fn fin_partial_payment_then_remainder_reaches_paid() {
     })
     .to_string();
     let out2 = consumer
-        .dispatch(&ctx, "fin.billing.payment.received", "fin-partial-2", &p2_payload)
+        .dispatch(
+            &ctx,
+            "fin.billing.payment.received",
+            "fin-partial-2",
+            &p2_payload,
+        )
         .await
         .expect("partial 2");
     match out2 {

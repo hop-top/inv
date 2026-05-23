@@ -31,9 +31,12 @@ pub fn command() -> Command {
         .arg_required_else_help(true)
         .subcommand(add_cmd())
         .subcommand(
-            Command::new("show")
-                .about("Show a single customer")
-                .arg(Arg::new("id").help("Customer typeid").required(true).index(1)),
+            Command::new("show").about("Show a single customer").arg(
+                Arg::new("id")
+                    .help("Customer typeid")
+                    .required(true)
+                    .index(1),
+            ),
         )
         .subcommand(
             Command::new("list")

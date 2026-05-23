@@ -112,10 +112,7 @@ pub async fn dispatch(ctx: &CoreCtx, m: &ArgMatches) -> anyhow::Result<()> {
     ctx_with_pub.publisher = Some(ws_publisher.clone() as Arc<dyn inv_commands::Publisher>);
     let ctx_arc = Arc::new(ctx_with_pub);
 
-    let api_state = Arc::new(ApiState::new(
-        ctx_arc.clone(),
-        ApiConfig::default(),
-    ));
+    let api_state = Arc::new(ApiState::new(ctx_arc.clone(), ApiConfig::default()));
     let api_router = inv_api::router(api_state);
 
     let ws_router = inv_ws::router(ctx_arc.clone(), ws_publisher);
@@ -173,9 +170,7 @@ pub async fn dispatch(ctx: &CoreCtx, m: &ArgMatches) -> anyhow::Result<()> {
 }
 
 fn parse_secs(m: &ArgMatches, key: &str) -> anyhow::Result<u64> {
-    let raw: &String = m
-        .get_one(key)
-        .ok_or_else(|| anyhow!("missing --{key}"))?;
+    let raw: &String = m.get_one(key).ok_or_else(|| anyhow!("missing --{key}"))?;
     raw.parse()
         .with_context(|| format!("parsing --{key} as u64 seconds: {raw}"))
 }

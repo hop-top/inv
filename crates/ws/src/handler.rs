@@ -48,10 +48,7 @@ pub struct AppState {
 }
 
 /// Axum upgrade route. Wired by [`crate::router`] at `GET /ws`.
-pub async fn ws_upgrade(
-    ws: WebSocketUpgrade,
-    State(state): State<AppState>,
-) -> Response {
+pub async fn ws_upgrade(ws: WebSocketUpgrade, State(state): State<AppState>) -> Response {
     ws.on_upgrade(move |socket| run_connection(socket, state))
 }
 
@@ -99,14 +96,8 @@ async fn run_connection(socket: WebSocket, state: AppState) {
 
         match msg {
             Message::Text(text) => {
-                handle_text_frame(
-                    &state,
-                    &out_tx,
-                    &mut subs,
-                    &mut next_sub_id,
-                    text.as_str(),
-                )
-                .await;
+                handle_text_frame(&state, &out_tx, &mut subs, &mut next_sub_id, text.as_str())
+                    .await;
             }
             Message::Binary(_) => {
                 let _ = out_tx
@@ -158,17 +149,11 @@ async fn handle_text_frame(
 
     match frame {
         ClientFrame::Request(req) => handle_request(state, out_tx, req).await,
-        ClientFrame::SubMgmt(sub) => {
-            handle_sub_mgmt(state, out_tx, subs, next_sub_id, sub).await
-        }
+        ClientFrame::SubMgmt(sub) => handle_sub_mgmt(state, out_tx, subs, next_sub_id, sub).await,
     }
 }
 
-async fn handle_request(
-    state: &AppState,
-    out_tx: &mpsc::Sender<ServerFrame>,
-    req: RequestFrame,
-) {
+async fn handle_request(state: &AppState, out_tx: &mpsc::Sender<ServerFrame>, req: RequestFrame) {
     let frame = match ops::dispatch(&state.ctx, &req.op, req.payload, "anonymous").await {
         Ok(result) => ResponseFrame::result(req.id, result),
         Err(err) => {
@@ -235,11 +220,7 @@ async fn handle_sub_mgmt(
                     serde_json::json!({"sub_id": sub_id, "cancelled": true}),
                 )
             } else {
-                ResponseFrame::error(
-                    sub.id,
-                    "not_found",
-                    format!("unknown sub_id: {sub_id}"),
-                )
+                ResponseFrame::error(sub.id, "not_found", format!("unknown sub_id: {sub_id}"))
             };
             let _ = out_tx.send(ServerFrame::Response(frame)).await;
         }

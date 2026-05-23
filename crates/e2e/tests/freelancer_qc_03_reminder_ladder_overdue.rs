@@ -119,8 +119,16 @@ async fn reminder_ladder_dispatches_and_overdue_flags() {
     assert_eq!(tick.sent_reminders.len(), 1);
     assert_eq!(tick.sent_reminders[0].id, r1.reminder.id);
     let back = InvoiceRepo::new(&pool).get(&inv_id).await.unwrap().unwrap();
-    assert_eq!(back.state, InvoiceState::Sent, "FSM stays Sent on reminder self-edge");
-    let topics: Vec<&str> = tick.emitted_events.iter().map(|e| e.topic.as_str()).collect();
+    assert_eq!(
+        back.state,
+        InvoiceState::Sent,
+        "FSM stays Sent on reminder self-edge"
+    );
+    let topics: Vec<&str> = tick
+        .emitted_events
+        .iter()
+        .map(|e| e.topic.as_str())
+        .collect();
     assert!(topics.contains(&"inv.billing.reminder.sent"));
     // The invoice's FSM did NOT move → no transitioned/entered events
     // from this tick.
@@ -140,8 +148,16 @@ async fn reminder_ladder_dispatches_and_overdue_flags() {
     // ----- Then: invoice.overdue emitted, state still Sent. ----------
     assert_eq!(overdue.overdue_invoices.len(), 1);
     assert_eq!(overdue.overdue_invoices[0].id, inv_id);
-    let topics: Vec<&str> = overdue.emitted_events.iter().map(|e| e.topic.as_str()).collect();
+    let topics: Vec<&str> = overdue
+        .emitted_events
+        .iter()
+        .map(|e| e.topic.as_str())
+        .collect();
     assert!(topics.contains(&"inv.billing.invoice.overdue"));
     let back2 = InvoiceRepo::new(&pool).get(&inv_id).await.unwrap().unwrap();
-    assert_eq!(back2.state, InvoiceState::Sent, "overdue is a flag, not a state");
+    assert_eq!(
+        back2.state,
+        InvoiceState::Sent,
+        "overdue is a flag, not a state"
+    );
 }

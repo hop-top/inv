@@ -94,14 +94,15 @@ struct DraftOutputWire<'a> {
 
 /// Run `draft_invoice`.
 pub async fn draft(ctx: &CoreCtx, input: InvoiceDraftInput) -> Result<serde_json::Value, McpError> {
-    let customer_id: CustomerId = input
-        .customer_id
-        .parse()
-        .map_err(|e: inv_core::domain::ids::IdError| {
-            McpError::Decode(format!("customer_id: {e}"))
-        })?;
-    let currency = Currency::new(&input.currency)
-        .map_err(|e| McpError::Decode(format!("currency: {e}")))?;
+    let customer_id: CustomerId =
+        input
+            .customer_id
+            .parse()
+            .map_err(|e: inv_core::domain::ids::IdError| {
+                McpError::Decode(format!("customer_id: {e}"))
+            })?;
+    let currency =
+        Currency::new(&input.currency).map_err(|e| McpError::Decode(format!("currency: {e}")))?;
     let lines = input
         .lines
         .into_iter()
@@ -164,10 +165,13 @@ struct IssueOutputWire<'a> {
 
 /// Run `issue_invoice`.
 pub async fn issue(ctx: &CoreCtx, input: InvoiceIssueInput) -> Result<serde_json::Value, McpError> {
-    let invoice_id: InvoiceId = input
-        .invoice_id
-        .parse()
-        .map_err(|e: inv_core::domain::ids::IdError| McpError::Decode(format!("invoice_id: {e}")))?;
+    let invoice_id: InvoiceId =
+        input
+            .invoice_id
+            .parse()
+            .map_err(|e: inv_core::domain::ids::IdError| {
+                McpError::Decode(format!("invoice_id: {e}"))
+            })?;
     let req = IssueInvoiceInput {
         invoice_id,
         idempotency_key: input.idempotency_key,
@@ -217,10 +221,13 @@ struct SendOutputWire<'a> {
 /// corrupt the JSON-RPC stream).
 pub async fn send(ctx: &CoreCtx, input: InvoiceSendInput) -> Result<serde_json::Value, McpError> {
     use inv_commands::SendInvoiceInput;
-    let invoice_id: InvoiceId = input
-        .invoice_id
-        .parse()
-        .map_err(|e: inv_core::domain::ids::IdError| McpError::Decode(format!("invoice_id: {e}")))?;
+    let invoice_id: InvoiceId =
+        input
+            .invoice_id
+            .parse()
+            .map_err(|e: inv_core::domain::ids::IdError| {
+                McpError::Decode(format!("invoice_id: {e}"))
+            })?;
     let mut sink: Vec<u8> = Vec::new();
     let cmd_input = SendInvoiceInput {
         invoice_id,
@@ -272,10 +279,13 @@ struct PayOutputWire<'a> {
 
 /// Run `mark_paid`.
 pub async fn pay(ctx: &CoreCtx, input: InvoicePayInput) -> Result<serde_json::Value, McpError> {
-    let invoice_id: InvoiceId = input
-        .invoice_id
-        .parse()
-        .map_err(|e: inv_core::domain::ids::IdError| McpError::Decode(format!("invoice_id: {e}")))?;
+    let invoice_id: InvoiceId =
+        input
+            .invoice_id
+            .parse()
+            .map_err(|e: inv_core::domain::ids::IdError| {
+                McpError::Decode(format!("invoice_id: {e}"))
+            })?;
     let req = MarkPaidInput {
         invoice_id,
         amount: input.amount,
@@ -313,10 +323,13 @@ pub struct InvoiceVoidInput {
 
 /// Run `void_invoice`.
 pub async fn void(ctx: &CoreCtx, input: InvoiceVoidInput) -> Result<serde_json::Value, McpError> {
-    let invoice_id: InvoiceId = input
-        .invoice_id
-        .parse()
-        .map_err(|e: inv_core::domain::ids::IdError| McpError::Decode(format!("invoice_id: {e}")))?;
+    let invoice_id: InvoiceId =
+        input
+            .invoice_id
+            .parse()
+            .map_err(|e: inv_core::domain::ids::IdError| {
+                McpError::Decode(format!("invoice_id: {e}"))
+            })?;
     let req = VoidInvoiceInput {
         invoice_id,
         reason: input.reason,
@@ -350,7 +363,9 @@ pub async fn show(ctx: &CoreCtx, input: InvoiceShowInput) -> Result<serde_json::
     let id: InvoiceId = input
         .invoice_id
         .parse()
-        .map_err(|e: inv_core::domain::ids::IdError| McpError::Decode(format!("invoice_id: {e}")))?;
+        .map_err(|e: inv_core::domain::ids::IdError| {
+            McpError::Decode(format!("invoice_id: {e}"))
+        })?;
     let inv = InvoiceRepo::new(&ctx.db)
         .get(&id)
         .await?
@@ -461,12 +476,13 @@ pub async fn customer_show(
     ctx: &CoreCtx,
     input: CustomerShowInput,
 ) -> Result<serde_json::Value, McpError> {
-    let id: CustomerId = input
-        .customer_id
-        .parse()
-        .map_err(|e: inv_core::domain::ids::IdError| {
-            McpError::Decode(format!("customer_id: {e}"))
-        })?;
+    let id: CustomerId =
+        input
+            .customer_id
+            .parse()
+            .map_err(|e: inv_core::domain::ids::IdError| {
+                McpError::Decode(format!("customer_id: {e}"))
+            })?;
     let c = CustomerRepo::new(&ctx.db)
         .get(&id)
         .await?
@@ -521,4 +537,3 @@ pub async fn tax_rates_show(ctx: &CoreCtx) -> Result<serde_json::Value, McpError
         "rate_count": ctx.tax_table.len(),
     }))
 }
-

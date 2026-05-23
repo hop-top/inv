@@ -31,9 +31,9 @@ use inv_commands::{
     ReminderScheduleInput, ScheduleCreateInput, ScheduleLineInput, ScheduleStateChangeInput,
     SendInvoiceInput, VoidInvoiceInput,
 };
+use inv_core::domain::creditnote::CreditNoteState;
 use inv_core::domain::reminder::{ReminderChannel, ReminderState};
 use inv_core::domain::schedule::{Cadence, ScheduleState};
-use inv_core::domain::creditnote::CreditNoteState;
 use inv_store::blob::LocalBlobStore;
 use inv_store::pool::{connect, Pool};
 use inv_store::repo::history::InvoiceHistoryRepo;
@@ -77,7 +77,11 @@ fn frozen_now() -> DateTime<Utc> {
 
 async fn fresh_ctx() -> (CoreCtx, Pool, tempfile::TempDir) {
     let (ctx, pool, blob_dir) = fresh_ctx_inner(true).await;
-    (ctx, pool, blob_dir.expect("blob dir present when blob store wired"))
+    (
+        ctx,
+        pool,
+        blob_dir.expect("blob dir present when blob store wired"),
+    )
 }
 
 /// Variant that returns a ctx with `blob_store = None`. Used by the
@@ -91,8 +95,8 @@ async fn fresh_ctx_inner(with_blob: bool) -> (CoreCtx, Pool, Option<tempfile::Te
     let pool = connect("sqlite::memory:").await.expect("connect");
     run_migrations(&pool).await.expect("migrate");
     let (table, nexus) = TaxTable::load_from_str(FIXTURE_TOML).expect("tax fixture");
-    let mut ctx = CoreCtx::new(pool.clone(), table, nexus)
-        .with_clock(Arc::new(FrozenClock(frozen_now())));
+    let mut ctx =
+        CoreCtx::new(pool.clone(), table, nexus).with_clock(Arc::new(FrozenClock(frozen_now())));
     let blob_dir = if with_blob {
         let dir = tempfile::tempdir().expect("tempdir");
         let store = LocalBlobStore::new(dir.path(), b"test-signing-key".to_vec())
@@ -126,10 +130,7 @@ async fn seed_customer(pool: &Pool) -> CustomerId {
     c.id
 }
 
-fn draft_input(
-    customer_id: &CustomerId,
-    idempotency: Option<&str>,
-) -> DraftInvoiceInput {
+fn draft_input(customer_id: &CustomerId, idempotency: Option<&str>) -> DraftInvoiceInput {
     DraftInvoiceInput {
         customer_id: customer_id.clone(),
         seller_jurisdiction: Jurisdiction::QuebecCa,
@@ -141,9 +142,7 @@ fn draft_input(
             tax_category: TaxCategory::Standard,
         }],
         idempotency_key: idempotency.map(|s| s.to_string()),
-        actor: Actor::Cli {
-            name: "jad".into(),
-        },
+        actor: Actor::Cli { name: "jad".into() },
         channel: Channel::Cli,
         due_at: None,
         template_path: None,
@@ -266,18 +265,14 @@ async fn draft_validation_rejects_zero_quantity() {
 async fn issue_happy_path_freezes_tax_and_assigns_number() {
     let (ctx, pool, _blob_dir) = fresh_ctx().await;
     let cust = seed_customer(&pool).await;
-    let drafted = draft_invoice(&ctx, draft_input(&cust, None))
-        .await
-        .unwrap();
+    let drafted = draft_invoice(&ctx, draft_input(&cust, None)).await.unwrap();
 
     let out = issue_invoice(
         &ctx,
         IssueInvoiceInput {
             invoice_id: drafted.invoice.id.clone(),
             idempotency_key: None,
-            actor: Actor::Cli {
-                name: "jad".into(),
-            },
+            actor: Actor::Cli { name: "jad".into() },
             channel: Channel::Cli,
         },
     )
@@ -288,10 +283,7 @@ async fn issue_happy_path_freezes_tax_and_assigns_number() {
     assert_eq!(out.invoice.number.as_deref(), Some("INV-2026-0001"));
     assert!(out.invoice.issued_at.is_some());
     // GST 5% + QST 9.975% on 1250 = 187.1875 → banker's-round to 187.19.
-    assert_eq!(
-        out.invoice.tax_total,
-        Decimal::from_str("187.19").unwrap()
-    );
+    assert_eq!(out.invoice.tax_total, Decimal::from_str("187.19").unwrap());
     assert_eq!(out.invoice.total, Decimal::from_str("1437.19").unwrap());
     assert_eq!(out.lines.len(), 1);
     assert_eq!(out.lines[0].tax_rate_ids.len(), 2);
@@ -338,17 +330,13 @@ async fn issue_happy_path_freezes_tax_and_assigns_number() {
 async fn issue_on_already_issued_returns_fsm_error() {
     let (ctx, pool, _blob_dir) = fresh_ctx().await;
     let cust = seed_customer(&pool).await;
-    let drafted = draft_invoice(&ctx, draft_input(&cust, None))
-        .await
-        .unwrap();
+    let drafted = draft_invoice(&ctx, draft_input(&cust, None)).await.unwrap();
     issue_invoice(
         &ctx,
         IssueInvoiceInput {
             invoice_id: drafted.invoice.id.clone(),
             idempotency_key: None,
-            actor: Actor::Cli {
-                name: "jad".into(),
-            },
+            actor: Actor::Cli { name: "jad".into() },
             channel: Channel::Cli,
         },
     )
@@ -360,9 +348,7 @@ async fn issue_on_already_issued_returns_fsm_error() {
         IssueInvoiceInput {
             invoice_id: drafted.invoice.id.clone(),
             idempotency_key: None,
-            actor: Actor::Cli {
-                name: "jad".into(),
-            },
+            actor: Actor::Cli { name: "jad".into() },
             channel: Channel::Cli,
         },
     )
@@ -385,18 +371,14 @@ async fn issue_without_blob_store_leaves_pdf_blob_ref_unset() {
     let (ctx, pool) = fresh_ctx_no_blob().await;
     assert!(ctx.blob_store.is_none(), "precondition: no blob store");
     let cust = seed_customer(&pool).await;
-    let drafted = draft_invoice(&ctx, draft_input(&cust, None))
-        .await
-        .unwrap();
+    let drafted = draft_invoice(&ctx, draft_input(&cust, None)).await.unwrap();
 
     let out = issue_invoice(
         &ctx,
         IssueInvoiceInput {
             invoice_id: drafted.invoice.id.clone(),
             idempotency_key: None,
-            actor: Actor::Cli {
-                name: "jad".into(),
-            },
+            actor: Actor::Cli { name: "jad".into() },
             channel: Channel::Cli,
         },
     )
@@ -419,17 +401,13 @@ async fn issue_without_blob_store_leaves_pdf_blob_ref_unset() {
 async fn send_file_writes_bytes_and_transitions_to_sent() {
     let (ctx, pool, _blob_dir) = fresh_ctx().await;
     let cust = seed_customer(&pool).await;
-    let drafted = draft_invoice(&ctx, draft_input(&cust, None))
-        .await
-        .unwrap();
+    let drafted = draft_invoice(&ctx, draft_input(&cust, None)).await.unwrap();
     let issued = issue_invoice(
         &ctx,
         IssueInvoiceInput {
             invoice_id: drafted.invoice.id.clone(),
             idempotency_key: None,
-            actor: Actor::Cli {
-                name: "jad".into(),
-            },
+            actor: Actor::Cli { name: "jad".into() },
             channel: Channel::Cli,
         },
     )
@@ -450,9 +428,7 @@ async fn send_file_writes_bytes_and_transitions_to_sent() {
             invoice_id: issued.invoice.id.clone(),
             destination_uri: uri.clone(),
             idempotency_key: None,
-            actor: Actor::Cli {
-                name: "jad".into(),
-            },
+            actor: Actor::Cli { name: "jad".into() },
             channel: Channel::Cli,
             sink: None,
         },
@@ -492,17 +468,13 @@ async fn send_file_writes_bytes_and_transitions_to_sent() {
 async fn send_stdout_writes_to_injected_sink() {
     let (ctx, pool, _blob_dir) = fresh_ctx().await;
     let cust = seed_customer(&pool).await;
-    let drafted = draft_invoice(&ctx, draft_input(&cust, None))
-        .await
-        .unwrap();
+    let drafted = draft_invoice(&ctx, draft_input(&cust, None)).await.unwrap();
     let issued = issue_invoice(
         &ctx,
         IssueInvoiceInput {
             invoice_id: drafted.invoice.id.clone(),
             idempotency_key: None,
-            actor: Actor::Cli {
-                name: "jad".into(),
-            },
+            actor: Actor::Cli { name: "jad".into() },
             channel: Channel::Cli,
         },
     )
@@ -516,9 +488,7 @@ async fn send_stdout_writes_to_injected_sink() {
             invoice_id: issued.invoice.id.clone(),
             destination_uri: "stdout".to_string(),
             idempotency_key: None,
-            actor: Actor::Cli {
-                name: "jad".into(),
-            },
+            actor: Actor::Cli { name: "jad".into() },
             channel: Channel::Cli,
             sink: Some(&mut sink),
         },
@@ -536,17 +506,13 @@ async fn send_stdout_writes_to_injected_sink() {
 async fn send_unsupported_scheme_returns_not_implemented() {
     let (ctx, pool, _blob_dir) = fresh_ctx().await;
     let cust = seed_customer(&pool).await;
-    let drafted = draft_invoice(&ctx, draft_input(&cust, None))
-        .await
-        .unwrap();
+    let drafted = draft_invoice(&ctx, draft_input(&cust, None)).await.unwrap();
     let issued = issue_invoice(
         &ctx,
         IssueInvoiceInput {
             invoice_id: drafted.invoice.id.clone(),
             idempotency_key: None,
-            actor: Actor::Cli {
-                name: "jad".into(),
-            },
+            actor: Actor::Cli { name: "jad".into() },
             channel: Channel::Cli,
         },
     )
@@ -559,9 +525,7 @@ async fn send_unsupported_scheme_returns_not_implemented() {
             invoice_id: issued.invoice.id.clone(),
             destination_uri: "bus://inv.billing".to_string(),
             idempotency_key: None,
-            actor: Actor::Cli {
-                name: "jad".into(),
-            },
+            actor: Actor::Cli { name: "jad".into() },
             channel: Channel::Cli,
             sink: None,
         },
@@ -579,9 +543,7 @@ async fn send_unsupported_scheme_returns_not_implemented() {
 /// for a send call.
 async fn drafted_then_issued(ctx: &CoreCtx, pool: &Pool) -> inv_core::domain::ids::InvoiceId {
     let cust = seed_customer(pool).await;
-    let drafted = draft_invoice(ctx, draft_input(&cust, None))
-        .await
-        .unwrap();
+    let drafted = draft_invoice(ctx, draft_input(&cust, None)).await.unwrap();
     let issued = issue_invoice(
         ctx,
         IssueInvoiceInput {
@@ -645,7 +607,10 @@ async fn send_idempotency_same_key_replays_no_mutation() {
     .await
     .expect("second send (replay)");
 
-    assert!(out2.idempotency_replay, "replay flag is set on the second call");
+    assert!(
+        out2.idempotency_replay,
+        "replay flag is set on the second call"
+    );
     assert!(out2.emitted_events.is_empty(), "replay must not emit");
     assert_eq!(out2.delivered_to, first_delivered);
     assert_eq!(out2.invoice.state, InvoiceState::Sent);
@@ -774,9 +739,7 @@ async fn send_idempotency_key_scoped_per_invoice() {
 async fn mark_paid_full_settles_invoice() {
     let (ctx, pool, _blob_dir) = fresh_ctx().await;
     let cust = seed_customer(&pool).await;
-    let drafted = draft_invoice(&ctx, draft_input(&cust, None))
-        .await
-        .unwrap();
+    let drafted = draft_invoice(&ctx, draft_input(&cust, None)).await.unwrap();
     let issued = issue_invoice(
         &ctx,
         IssueInvoiceInput {
@@ -809,7 +772,11 @@ async fn mark_paid_full_settles_invoice() {
     assert_eq!(out.invoice.amount_paid, issued.invoice.total);
     assert!(out.invoice.paid_at.is_some());
 
-    let topics: Vec<&str> = out.emitted_events.iter().map(|e| e.topic.as_str()).collect();
+    let topics: Vec<&str> = out
+        .emitted_events
+        .iter()
+        .map(|e| e.topic.as_str())
+        .collect();
     assert!(topics.contains(&"inv.billing.invoice.paid"));
 
     // history grew: draft + issue + paid
@@ -945,7 +912,11 @@ async fn void_pre_payment_succeeds() {
     assert_eq!(out.invoice.state, InvoiceState::Voided);
     assert!(out.invoice.voided_at.is_some());
 
-    let topics: Vec<&str> = out.emitted_events.iter().map(|e| e.topic.as_str()).collect();
+    let topics: Vec<&str> = out
+        .emitted_events
+        .iter()
+        .map(|e| e.topic.as_str())
+        .collect();
     assert!(topics.contains(&"inv.billing.invoice.voided"));
 }
 
@@ -1033,9 +1004,19 @@ async fn credit_note_draft_then_issue() {
     .expect("draft cn ok");
 
     assert_eq!(cn_draft.credit_note.state, CreditNoteState::Draft);
-    assert_eq!(cn_draft.credit_note.amount, Decimal::from_str("100.00").unwrap());
-    assert_eq!(cn_draft.credit_note.refund_ref.as_deref(), Some("refund-evt-1"));
-    let topics: Vec<&str> = cn_draft.emitted_events.iter().map(|e| e.topic.as_str()).collect();
+    assert_eq!(
+        cn_draft.credit_note.amount,
+        Decimal::from_str("100.00").unwrap()
+    );
+    assert_eq!(
+        cn_draft.credit_note.refund_ref.as_deref(),
+        Some("refund-evt-1")
+    );
+    let topics: Vec<&str> = cn_draft
+        .emitted_events
+        .iter()
+        .map(|e| e.topic.as_str())
+        .collect();
     assert!(topics.contains(&"inv.billing.creditnote.drafted"));
 
     // 2. Issue credit note.
@@ -1052,7 +1033,12 @@ async fn credit_note_draft_then_issue() {
     .expect("issue cn ok");
 
     assert_eq!(cn_issued.credit_note.state, CreditNoteState::Issued);
-    assert!(cn_issued.credit_note.number.as_deref().unwrap_or("").starts_with("CN-2026-"));
+    assert!(cn_issued
+        .credit_note
+        .number
+        .as_deref()
+        .unwrap_or("")
+        .starts_with("CN-2026-"));
     assert!(cn_issued.credit_note.issued_at.is_some());
 
     // Verify the cn is in the DB at the issued state.
@@ -1063,7 +1049,11 @@ async fn credit_note_draft_then_issue() {
         .unwrap();
     assert_eq!(back.state, CreditNoteState::Issued);
 
-    let topics: Vec<&str> = cn_issued.emitted_events.iter().map(|e| e.topic.as_str()).collect();
+    let topics: Vec<&str> = cn_issued
+        .emitted_events
+        .iter()
+        .map(|e| e.topic.as_str())
+        .collect();
     assert!(topics.contains(&"inv.billing.creditnote.proposed"));
     assert!(topics.contains(&"inv.billing.creditnote.transitioned"));
     assert!(topics.contains(&"inv.billing.creditnote.entered"));
@@ -1136,11 +1126,19 @@ async fn overdue_ticker_flags_past_due_invoices() {
     assert_eq!(out.overdue_invoices.len(), 1);
     assert_eq!(out.overdue_invoices[0].id, issued.invoice.id);
 
-    let topics: Vec<&str> = out.emitted_events.iter().map(|e| e.topic.as_str()).collect();
+    let topics: Vec<&str> = out
+        .emitted_events
+        .iter()
+        .map(|e| e.topic.as_str())
+        .collect();
     assert_eq!(topics, vec!["inv.billing.invoice.overdue"]);
 
     // State unchanged — overdue is a flag, not an FSM state.
-    let back = InvoiceRepo::new(&pool).get(&issued.invoice.id).await.unwrap().unwrap();
+    let back = InvoiceRepo::new(&pool)
+        .get(&issued.invoice.id)
+        .await
+        .unwrap()
+        .unwrap();
     assert_eq!(back.state, InvoiceState::Issued);
 }
 
@@ -1219,7 +1217,9 @@ async fn schedule_validation_rejects_end_before_start() {
 async fn schedule_pause_then_cancel() {
     let (ctx, pool, _blob_dir) = fresh_ctx().await;
     let cust = seed_customer(&pool).await;
-    let created = schedule_create(&ctx, schedule_input(&cust, false)).await.unwrap();
+    let created = schedule_create(&ctx, schedule_input(&cust, false))
+        .await
+        .unwrap();
 
     let paused = schedule_pause(
         &ctx,
@@ -1282,7 +1282,10 @@ async fn schedules_tick_materialises_drafts_for_due_schedules() {
 
     // A second tick on the same day must NOT re-materialise.
     let out2 = schedules_tick(&ctx).await.unwrap();
-    assert!(out2.ran_schedule_ids.is_empty(), "no double-materialisation");
+    assert!(
+        out2.ran_schedule_ids.is_empty(),
+        "no double-materialisation"
+    );
 }
 
 #[tokio::test]
@@ -1293,7 +1296,9 @@ async fn schedules_tick_auto_issue_promotes_to_issued() {
         Utc.with_ymd_and_hms(2026, 6, 5, 0, 0, 0).unwrap(),
     )));
 
-    let _ = schedule_create(&ctx, schedule_input(&cust, true)).await.unwrap();
+    let _ = schedule_create(&ctx, schedule_input(&cust, true))
+        .await
+        .unwrap();
     let out = schedules_tick(&ctx).await.unwrap();
     assert_eq!(out.ran_schedule_ids.len(), 1);
 
@@ -1442,7 +1447,9 @@ async fn reminders_tick_dispatches_due_reminders() {
     .unwrap();
 
     // Now advance the clock past scheduled_at.
-    ctx = ctx.with_clock(Arc::new(FrozenClock(scheduled_at + chrono::Duration::minutes(5))));
+    ctx = ctx.with_clock(Arc::new(FrozenClock(
+        scheduled_at + chrono::Duration::minutes(5),
+    )));
 
     let out = reminders_tick(&ctx).await.unwrap();
     assert_eq!(out.sent_reminders.len(), 1);

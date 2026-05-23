@@ -191,7 +191,10 @@ async fn send_idempotency_key_replays() {
     let s1 = send_invoice(&ctx, mk_send(issued.invoice.id.clone(), &mut sink1))
         .await
         .expect("send1");
-    assert_eq!(s1.invoice.state, inv_core::domain::invoice::InvoiceState::Sent);
+    assert_eq!(
+        s1.invoice.state,
+        inv_core::domain::invoice::InvoiceState::Sent
+    );
     assert!(!s1.idempotency_replay, "first call must NOT be a replay");
     let s1_delivered = s1.delivered_to.clone();
     drop(s1);
@@ -215,7 +218,10 @@ async fn send_idempotency_key_replays() {
         .await
         .unwrap();
     let send_rows = hist.iter().filter(|h| h.event == "send").count();
-    assert_eq!(send_rows, 1, "replay must not insert a second send history row");
+    assert_eq!(
+        send_rows, 1,
+        "replay must not insert a second send history row"
+    );
 
     // Sink1 sanity — len unchanged after replay (closing the loop).
     assert_eq!(sink1.len(), sink1_len);

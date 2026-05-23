@@ -52,7 +52,9 @@ pub enum CadenceError {
 
 impl Cadence {
     fn parse_dom(s: &str) -> Result<u8, CadenceError> {
-        let dom: u8 = s.parse().map_err(|_| CadenceError::InvalidDom(s.to_string()))?;
+        let dom: u8 = s
+            .parse()
+            .map_err(|_| CadenceError::InvalidDom(s.to_string()))?;
         if !(1..=28).contains(&dom) {
             // Restricting to 1..=28 keeps every month valid without special-casing
             // February. Tools needing end-of-month should add a "last day" form later.
@@ -131,8 +133,12 @@ impl FromStr for Cadence {
             .split_once('@')
             .ok_or_else(|| CadenceError::MissingArg(s.to_string()))?;
         match prefix {
-            "monthly" => Ok(Cadence::Monthly { dom: Self::parse_dom(arg)? }),
-            "quarterly" => Ok(Cadence::Quarterly { dom: Self::parse_dom(arg)? }),
+            "monthly" => Ok(Cadence::Monthly {
+                dom: Self::parse_dom(arg)?,
+            }),
+            "quarterly" => Ok(Cadence::Quarterly {
+                dom: Self::parse_dom(arg)?,
+            }),
             "yearly" => {
                 // arg is `MM-DD`
                 let (mm, dd) = arg
@@ -306,8 +312,14 @@ mod tests {
 
     #[test]
     fn schedule_state_serde() {
-        assert_eq!(serde_json::to_string(&ScheduleState::Active).unwrap(), r#""active""#);
-        assert_eq!(serde_json::to_string(&ScheduleState::Paused).unwrap(), r#""paused""#);
+        assert_eq!(
+            serde_json::to_string(&ScheduleState::Active).unwrap(),
+            r#""active""#
+        );
+        assert_eq!(
+            serde_json::to_string(&ScheduleState::Paused).unwrap(),
+            r#""paused""#
+        );
     }
 
     #[test]

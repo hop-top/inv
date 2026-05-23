@@ -41,26 +41,47 @@ mod tests {
 
     #[test]
     fn matches_literal_topic() {
-        assert!(topic_matches("inv.billing.invoice.drafted", "inv.billing.invoice.drafted"));
-        assert!(!topic_matches("inv.billing.invoice.drafted", "inv.billing.invoice.issued"));
+        assert!(topic_matches(
+            "inv.billing.invoice.drafted",
+            "inv.billing.invoice.drafted"
+        ));
+        assert!(!topic_matches(
+            "inv.billing.invoice.drafted",
+            "inv.billing.invoice.issued"
+        ));
     }
 
     #[test]
     fn matches_segment_wildcard() {
-        assert!(topic_matches("inv.billing.*.drafted", "inv.billing.invoice.drafted"));
-        assert!(!topic_matches("inv.billing.*.drafted", "inv.billing.invoice.issued"));
+        assert!(topic_matches(
+            "inv.billing.*.drafted",
+            "inv.billing.invoice.drafted"
+        ));
+        assert!(!topic_matches(
+            "inv.billing.*.drafted",
+            "inv.billing.invoice.issued"
+        ));
         // `*` matches exactly one segment, not zero.
-        assert!(!topic_matches("inv.billing.*.drafted", "inv.billing.drafted"));
+        assert!(!topic_matches(
+            "inv.billing.*.drafted",
+            "inv.billing.drafted"
+        ));
     }
 
     #[test]
     fn matches_tail_wildcard() {
-        assert!(topic_matches("inv.billing.invoice.#", "inv.billing.invoice.drafted"));
+        assert!(topic_matches(
+            "inv.billing.invoice.#",
+            "inv.billing.invoice.drafted"
+        ));
         assert!(topic_matches(
             "inv.billing.invoice.#",
             "inv.billing.invoice.payment.received"
         ));
         // `#` at the end matches zero-or-more segments — including zero.
-        assert!(topic_matches("inv.billing.invoice.#", "inv.billing.invoice"));
+        assert!(topic_matches(
+            "inv.billing.invoice.#",
+            "inv.billing.invoice"
+        ));
     }
 }

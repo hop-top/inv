@@ -6,17 +6,15 @@ use hop_top_kit::output::ColumnSpec;
 use serde_json::{json, Value};
 
 use inv_commands::{
-    schedule_cancel, schedule_create, schedule_pause, Actor, Channel, CoreCtx,
-    ScheduleCreateInput, ScheduleLineInput, ScheduleStateChangeInput,
+    schedule_cancel, schedule_create, schedule_pause, Actor, Channel, CoreCtx, ScheduleCreateInput,
+    ScheduleLineInput, ScheduleStateChangeInput,
 };
 use inv_core::domain::invoice::TaxCategory;
 use inv_core::domain::money::Currency;
 use inv_core::domain::schedule::{Cadence, ScheduleState};
 use inv_store::repo::schedule::{ScheduleFilter, ScheduleRepo};
 
-use super::parse::{
-    parse_customer_id, parse_date, parse_line, parse_schedule_id, LineSpec,
-};
+use super::parse::{parse_customer_id, parse_date, parse_line, parse_schedule_id, LineSpec};
 use crate::render::{render_list, render_value};
 
 fn cli_actor() -> Actor {
@@ -33,19 +31,30 @@ pub fn command() -> Command {
         .arg_required_else_help(true)
         .subcommand(create_cmd())
         .subcommand(
-            Command::new("pause")
-                .about("Pause an active schedule")
-                .arg(Arg::new("id").help("Schedule typeid").required(true).index(1)),
+            Command::new("pause").about("Pause an active schedule").arg(
+                Arg::new("id")
+                    .help("Schedule typeid")
+                    .required(true)
+                    .index(1),
+            ),
         )
         .subcommand(
             Command::new("cancel")
                 .about("Cancel a schedule (terminal)")
-                .arg(Arg::new("id").help("Schedule typeid").required(true).index(1)),
+                .arg(
+                    Arg::new("id")
+                        .help("Schedule typeid")
+                        .required(true)
+                        .index(1),
+                ),
         )
         .subcommand(
-            Command::new("show")
-                .about("Show a single schedule")
-                .arg(Arg::new("id").help("Schedule typeid").required(true).index(1)),
+            Command::new("show").about("Show a single schedule").arg(
+                Arg::new("id")
+                    .help("Schedule typeid")
+                    .required(true)
+                    .index(1),
+            ),
         )
         .subcommand(
             Command::new("list")
@@ -60,16 +69,8 @@ pub fn command() -> Command {
                         .long("state")
                         .help("Filter by lifecycle state (active | paused | cancelled)"),
                 )
-                .arg(
-                    Arg::new("limit")
-                        .long("limit")
-                        .help("Max rows"),
-                )
-                .arg(
-                    Arg::new("offset")
-                        .long("offset")
-                        .help("Offset for paging"),
-                ),
+                .arg(Arg::new("limit").long("limit").help("Max rows"))
+                .arg(Arg::new("offset").long("offset").help("Offset for paging")),
         )
 }
 
@@ -311,8 +312,5 @@ fn columns() -> Vec<ColumnSpec> {
 }
 
 fn event_topics(events: &[inv_commands::EmittedEvent]) -> Value {
-    json!(events
-        .iter()
-        .map(|e| e.topic.clone())
-        .collect::<Vec<_>>())
+    json!(events.iter().map(|e| e.topic.clone()).collect::<Vec<_>>())
 }
