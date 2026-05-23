@@ -1,4 +1,4 @@
-# inv-e2e
+# hop-top-inv-e2e
 
 End-to-end tests, one file per user story in [`docs/stories/`](../../docs/stories/).
 
@@ -12,8 +12,8 @@ recorded once + replayed on every run.
 ## Run
 
 ```sh
-cargo test -p inv-e2e                          # all stories, replay mode
-cargo test -p inv-e2e --test freelancer_qc_01_draft_link_fin_paid
+cargo test -p hop-top-inv-e2e                          # all stories, replay mode
+cargo test -p hop-top-inv-e2e --test freelancer_qc_01_draft_link_fin_paid
 ```
 
 ## xrr cassettes
@@ -22,7 +22,7 @@ Tests default to `Mode::Replay` reading from `cassettes/<test-name>/`.
 To re-record against the real world:
 
 ```sh
-XRR_MODE=record cargo test -p inv-e2e --test <test-name>
+XRR_MODE=record cargo test -p hop-top-inv-e2e --test <test-name>
 ```
 
 Inspect the resulting `cassettes/<test-name>/*.yaml` for any leaked

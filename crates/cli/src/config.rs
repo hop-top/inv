@@ -1,6 +1,6 @@
 //! Inline TOML configuration loader.
 //!
-//! `inv-cli` reads a single `inv.toml` file in the kit-conventional
+//! `hop-top-inv-cli` reads a single `inv.toml` file in the kit-conventional
 //! location (`$XDG_CONFIG_HOME/inv/config.toml`, falling back to
 //! `$HOME/.config/inv/config.toml` on platforms without `XDG_CONFIG_HOME`)
 //! or wherever `--config <path>` points. The on-disk format is a subset

@@ -2,8 +2,8 @@
 
 use sqlx::Row;
 
-use inv_core::domain::ids::{InvoiceId, ReminderId};
-use inv_core::domain::reminder::{Reminder, ReminderChannel, ReminderState};
+use hop_top_inv_core::domain::ids::{InvoiceId, ReminderId};
+use hop_top_inv_core::domain::reminder::{Reminder, ReminderChannel, ReminderState};
 
 use super::{parse_ts, ts_to_string};
 use crate::error::{Result, StoreError};

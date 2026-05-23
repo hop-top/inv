@@ -1,5 +1,5 @@
 [package]
-name = "inv-cli"
+name = "hop-top-inv-cli"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -20,17 +20,17 @@ toml = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 
-inv-bus = { workspace = true }
-inv-commands = { workspace = true }
-inv-core = { workspace = true }
-inv-store = { workspace = true }
+hop-top-inv-bus = { workspace = true }
+hop-top-inv-commands = { workspace = true }
+hop-top-inv-core = { workspace = true }
+hop-top-inv-store = { workspace = true }
 
 # `inv server` composition: the cli subcommand boots HTTP+WS+MCP and the
 # tickers + outbox in a single tokio runtime. These are server-only deps;
 # all the other inv subcommands stay light.
-inv-api = { workspace = true }
-inv-mcp = { workspace = true }
-inv-ws = { workspace = true }
+hop-top-inv-api = { workspace = true }
+hop-top-inv-mcp = { workspace = true }
+hop-top-inv-ws = { workspace = true }
 axum = { workspace = true }
 
 [dev-dependencies]

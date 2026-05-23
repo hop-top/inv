@@ -5,7 +5,7 @@
 //! [`issue_credit_note`], which moves Draft → Issued and allocates a
 //! `CN-YYYY-NNNN` number.
 //!
-//! The credit-note FSM (see [`inv_core::state::creditnote`]) is
+//! The credit-note FSM (see [`hop_top_inv_core::state::creditnote`]) is
 //! `Draft → Issued`. Issued is terminal.
 
 use std::collections::BTreeMap;
@@ -15,16 +15,16 @@ use rust_decimal::Decimal;
 use serde_json::json;
 use sqlx::Row;
 
-use inv_core::domain::creditnote::{CreditNote, CreditNoteState, CreditNoteStateHistory};
-use inv_core::domain::ids::{CreditNoteId, HistoryId, InvoiceId};
-use inv_core::domain::invoice::HistoryChannel;
-use inv_core::domain::money::Currency;
-use inv_core::state::creditnote::{
+use hop_top_inv_core::domain::creditnote::{CreditNote, CreditNoteState, CreditNoteStateHistory};
+use hop_top_inv_core::domain::ids::{CreditNoteId, HistoryId, InvoiceId};
+use hop_top_inv_core::domain::invoice::HistoryChannel;
+use hop_top_inv_core::domain::money::Currency;
+use hop_top_inv_core::state::creditnote::{
     next_state, CreditNoteEntered, CreditNoteEvent, CreditNoteProposed, CreditNoteTransitioned,
     TOPIC_ENTERED, TOPIC_PROPOSED, TOPIC_TRANSITIONED,
 };
-use inv_store::repo::credit_note::{CreditNoteHistoryRepo, CreditNoteRepo};
-use inv_store::repo::invoice::InvoiceRepo;
+use hop_top_inv_store::repo::credit_note::{CreditNoteHistoryRepo, CreditNoteRepo};
+use hop_top_inv_store::repo::invoice::InvoiceRepo;
 
 use crate::ctx::{Actor, Channel, CoreCtx};
 use crate::draft::history_channel_str;
@@ -121,10 +121,16 @@ pub async fn create_credit_note(
     };
 
     {
-        let mut tx = ctx.db.begin().await.map_err(inv_store::StoreError::from)?;
+        let mut tx = ctx
+            .db
+            .begin()
+            .await
+            .map_err(hop_top_inv_store::StoreError::from)?;
         CreditNoteRepo::save_in_tx(&mut tx, &cn).await?;
         CreditNoteHistoryRepo::save_in_tx(&mut tx, &history).await?;
-        tx.commit().await.map_err(inv_store::StoreError::from)?;
+        tx.commit()
+            .await
+            .map_err(hop_top_inv_store::StoreError::from)?;
     }
 
     try_publish(
@@ -223,10 +229,16 @@ pub async fn issue_credit_note(
     };
 
     {
-        let mut tx = ctx.db.begin().await.map_err(inv_store::StoreError::from)?;
+        let mut tx = ctx
+            .db
+            .begin()
+            .await
+            .map_err(hop_top_inv_store::StoreError::from)?;
         CreditNoteRepo::save_in_tx(&mut tx, &cn).await?;
         CreditNoteHistoryRepo::save_in_tx(&mut tx, &history).await?;
-        tx.commit().await.map_err(inv_store::StoreError::from)?;
+        tx.commit()
+            .await
+            .map_err(hop_top_inv_store::StoreError::from)?;
     }
 
     publish_creditnote_issued_events(
@@ -255,8 +267,10 @@ async fn count_credit_notes_issued_in_year(ctx: &CoreCtx, year: i32) -> Result<u
     .bind(to)
     .fetch_one(&ctx.db)
     .await
-    .map_err(inv_store::StoreError::from)?;
-    let c: i64 = row.try_get("c").map_err(inv_store::StoreError::from)?;
+    .map_err(hop_top_inv_store::StoreError::from)?;
+    let c: i64 = row
+        .try_get("c")
+        .map_err(hop_top_inv_store::StoreError::from)?;
     Ok(c.max(0) as u32)
 }
 

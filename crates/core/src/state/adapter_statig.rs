@@ -132,7 +132,7 @@ impl blocking::State<Ctx> for StatigState {
     }
 
     fn call_entry_action(&mut self, _shared: &mut Ctx, _ctx: &mut ()) {
-        // No-op at v1. T-0014 (`inv-bus`) hooks `.entered` emission here.
+        // No-op at v1. T-0014 (`hop-top-inv-bus`) hooks `.entered` emission here.
     }
 
     fn call_exit_action(&mut self, _shared: &mut Ctx, _ctx: &mut ()) {

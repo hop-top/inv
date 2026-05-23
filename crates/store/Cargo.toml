@@ -1,5 +1,5 @@
 [package]
-name = "inv-store"
+name = "hop-top-inv-store"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -21,8 +21,8 @@ sha2 = { workspace = true }
 async-trait = { workspace = true }
 mti = { workspace = true }
 
-# Local crate dependency (read-only consumer of inv-core domain types).
-inv-core = { workspace = true }
+# Local crate dependency (read-only consumer of hop-top-inv-core domain types).
+hop-top-inv-core = { workspace = true }
 
 # sqlx — driver features gated by this crate's storage features below.
 # `any` is always on so pool.rs can dispatch at runtime; sqlx::Any will

@@ -31,8 +31,8 @@ serde_json = "1"
 serde_yaml = "0.9"
 toml = "0.8"
 
-# JSON Schema derive. Gated behind crate features (see inv-core's `schema`
-# feature, inv-mcp's hard dep). `chrono04` brings JsonSchema impls for
+# JSON Schema derive. Gated behind crate features (see hop-top-inv-core's `schema`
+# feature, hop-top-inv-mcp's hard dep). `chrono04` brings JsonSchema impls for
 # chrono::DateTime so downstream derives covering timestamp fields compile.
 schemars = { version = "1", features = ["chrono04"] }
 
@@ -50,17 +50,17 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 
 # --- Crypto primitives ---------------------------------------------------
-# Used by inv-store::blob to compute HMAC-SHA256 over signed file:// URLs
+# Used by hop-top-inv-store::blob to compute HMAC-SHA256 over signed file:// URLs
 # for the local backend. Lightweight; no key-management story shipped at
 # v1 — the signing key is passed in by the caller.
 sha2 = "0.10"
-# Constant-time byte comparison for bearer-token auth (inv-api). Already
+# Constant-time byte comparison for bearer-token auth (hop-top-inv-api). Already
 # pulled in transitively by sha2/rustls/etc.; pinned here so the api crate
 # can take a direct dep.
 subtle = "2"
 
 # --- Async traits --------------------------------------------------------
-# Needed by inv-store::blob::BlobStore — native async-fn-in-trait is
+# Needed by hop-top-inv-store::blob::BlobStore — native async-fn-in-trait is
 # stable but not yet object-safe, and we want `Arc<dyn BlobStore>` at
 # the command layer.
 async-trait = "0.1"
@@ -71,7 +71,7 @@ tera = "1"
 
 # --- SQL + blob -----------------------------------------------------------
 # sqlx enables driver features per consumer crate (storage-* features
-# on inv-store). Default sqlite; postgres + mysql (tidb) opt-in.
+# on hop-top-inv-store). Default sqlite; postgres + mysql (tidb) opt-in.
 sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "macros", "migrate", "chrono", "rust_decimal"] }
 
 # --- HTTP + WS + MCP -----------------------------------------------------
@@ -79,14 +79,14 @@ axum = { version = "0.8", features = ["macros", "tokio", "ws", "tracing"] }
 tower = "0.5"
 tower-http = { version = "0.6", features = ["trace", "cors", "limit"] }
 rmcp = "1.7"
-# Outbound webhook delivery (inv-api) + base64url encoding for signed-link
+# Outbound webhook delivery (hop-top-inv-api) + base64url encoding for signed-link
 # tokens served by the public-view route. Both sit on the request path so
 # we pin narrowly.
 base64 = "0.22"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 
 # Streams/Sinks helpers for the WebSocket adapter (SplitStream + StreamExt
-# used by inv-ws to fan a single ws::WebSocket out into a reader half and
+# used by hop-top-inv-ws to fan a single ws::WebSocket out into a reader half and
 # a writer half).
 futures-util = "0.3"
 
@@ -98,14 +98,14 @@ hop-top-kit = { version = "0.4.0-experimental.3", features = ["cli"] }
 hop-top-uri = "0.2.0-alpha.1"
 
 # --- Workspace-internal crates (path deps) -------------------------------
-inv-api      = { path = "crates/api" }
-inv-bus      = { path = "crates/bus" }
-inv-cli      = { path = "crates/cli" }
-inv-commands = { path = "crates/commands" }
-inv-core     = { path = "crates/core" }
-inv-mcp      = { path = "crates/mcp" }
-inv-store    = { path = "crates/store" }
-inv-ws       = { path = "crates/ws" }
+hop-top-inv-api      = { path = "crates/api" }
+hop-top-inv-bus      = { path = "crates/bus" }
+hop-top-inv-cli      = { path = "crates/cli" }
+hop-top-inv-commands = { path = "crates/commands" }
+hop-top-inv-core     = { path = "crates/core" }
+hop-top-inv-mcp      = { path = "crates/mcp" }
+hop-top-inv-store    = { path = "crates/store" }
+hop-top-inv-ws       = { path = "crates/ws" }
 
 # --- Test helpers --------------------------------------------------------
 assert_cmd = "2"

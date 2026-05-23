@@ -1,5 +1,5 @@
 [package]
-name = "inv-ws"
+name = "hop-top-inv-ws"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -26,17 +26,17 @@ rust_decimal = { workspace = true }
 
 # inv: domain types live in core; commands are the dispatch target;
 # store + bus surface the types CoreCtx + Publisher need.
-inv-core     = { workspace = true }
-inv-store    = { workspace = true }
-inv-commands = { workspace = true }
-inv-bus      = { workspace = true }
+hop-top-inv-core     = { workspace = true }
+hop-top-inv-store    = { workspace = true }
+hop-top-inv-commands = { workspace = true }
+hop-top-inv-bus      = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true }
 # Dev-only WebSocket client; separate from axum's runtime ws use.
 tokio-tungstenite = "0.24"
 # Tax fixtures + in-memory pool require the sqlite-backed store.
-inv-store = { workspace = true, features = ["sqlite"] }
+hop-top-inv-store = { workspace = true, features = ["sqlite"] }
 tempfile = { workspace = true }
 rust_decimal = { workspace = true }
 

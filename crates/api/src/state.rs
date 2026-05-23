@@ -2,7 +2,7 @@
 //!
 //! The [`ApiState`] owns:
 //!
-//! - The [`inv_commands::CoreCtx`] that every command consumes.
+//! - The [`hop_top_inv_commands::CoreCtx`] that every command consumes.
 //! - Adapter-specific config ([`ApiConfig`]): bearer-token allowlist,
 //!   signed-link signing key + TTL + public base URL, and the webhook
 //!   signing key for outbound deliveries.
@@ -16,7 +16,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use inv_commands::CoreCtx;
+use hop_top_inv_commands::CoreCtx;
 
 /// Config knobs the api adapter needs but the command layer doesn't.
 #[derive(Debug, Clone)]

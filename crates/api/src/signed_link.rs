@@ -37,7 +37,7 @@ pub fn sign(invoice_id: &str, ttl_secs: u64, signing_key: &[u8]) -> String {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VerifiedToken {
     /// Invoice id embedded in the token (string form; caller parses to
-    /// the typed [`inv_core::domain::ids::InvoiceId`]).
+    /// the typed [`hop_top_inv_core::domain::ids::InvoiceId`]).
     pub invoice_id: String,
     /// Unix-seconds expiry encoded in the token.
     pub expiry_unix: u64,
@@ -97,7 +97,7 @@ pub fn verify_at(
 }
 
 /// HMAC-SHA256 as lowercase hex. Inline impl avoids pulling in the `hmac`
-/// crate for this single call site — `inv-store::blob::local` does the
+/// crate for this single call site — `hop-top-inv-store::blob::local` does the
 /// same.
 fn hmac_sha256_hex(key: &[u8], msg: &[u8]) -> String {
     const BLOCK: usize = 64; // SHA-256 block size

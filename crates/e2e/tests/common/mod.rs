@@ -18,17 +18,17 @@ use std::time::Duration;
 
 use chrono::{DateTime, TimeZone, Utc};
 
-use inv_api::{ApiConfig, ApiState};
-use inv_bus::InMemoryPublisher;
-use inv_commands::{Clock, CoreCtx};
-use inv_core::domain::address::Address;
-use inv_core::domain::customer::Customer;
-use inv_core::domain::ids::CustomerId;
-use inv_core::tax::TaxTable;
-use inv_store::blob::LocalBlobStore;
-use inv_store::pool::{connect, Pool};
-use inv_store::repo::customer::CustomerRepo;
-use inv_store::run_migrations;
+use hop_top_inv_api::{ApiConfig, ApiState};
+use hop_top_inv_bus::InMemoryPublisher;
+use hop_top_inv_commands::{Clock, CoreCtx};
+use hop_top_inv_core::domain::address::Address;
+use hop_top_inv_core::domain::customer::Customer;
+use hop_top_inv_core::domain::ids::CustomerId;
+use hop_top_inv_core::tax::TaxTable;
+use hop_top_inv_store::blob::LocalBlobStore;
+use hop_top_inv_store::pool::{connect, Pool};
+use hop_top_inv_store::repo::customer::CustomerRepo;
+use hop_top_inv_store::run_migrations;
 
 use hop_top_xrr::{FileCassette, Mode, Session};
 
@@ -130,7 +130,7 @@ pub async fn fresh_ctx() -> (CoreCtx, Pool, Arc<InMemoryPublisher>, tempfile::Te
     let ctx = CoreCtx::new(pool.clone(), table, nexus)
         .with_clock(Arc::new(FrozenClock(frozen_now())))
         .with_blob_store(Arc::new(blob_store))
-        .with_publisher(publisher.clone() as Arc<dyn inv_commands::Publisher>);
+        .with_publisher(publisher.clone() as Arc<dyn hop_top_inv_commands::Publisher>);
     (ctx, pool, publisher, blob_dir)
 }
 
@@ -151,7 +151,7 @@ pub async fn fresh_api_state() -> (
     let ctx = CoreCtx::new(pool.clone(), table, nexus)
         .with_clock(Arc::new(FrozenClock(frozen_now())))
         .with_blob_store(Arc::new(blob_store))
-        .with_publisher(publisher.clone() as Arc<dyn inv_commands::Publisher>);
+        .with_publisher(publisher.clone() as Arc<dyn hop_top_inv_commands::Publisher>);
     let state = Arc::new(ApiState::new(
         Arc::new(ctx),
         ApiConfig {
@@ -205,7 +205,7 @@ pub async fn seed_customer_dz(pool: &Pool) -> CustomerId {
 
 /// Seed a foreign-buyer customer (US) for the DZ export story. Per
 /// stories/agency-owner-dz-02 the canonical buyer is FR/EUR, but
-/// `inv-commands` rejects EUR at v1 (USD/CAD/DZD only). The buyer's
+/// `hop-top-inv-commands` rejects EUR at v1 (USD/CAD/DZD only). The buyer's
 /// country alone determines `export` scope in the resolver — currency
 /// doesn't gate it — so US/USD exercises the same code path with a
 /// currency the validator accepts.

@@ -9,15 +9,17 @@ use std::collections::BTreeMap;
 use chrono::{DateTime, Utc};
 use serde_json::json;
 
-use inv_core::domain::ids::{HistoryId, InvoiceId};
-use inv_core::domain::invoice::{HistoryChannel, Invoice, InvoiceState, InvoiceStateHistory};
-use inv_core::state::transitions::{next_state, InvoiceEvent};
-use inv_core::state::{
+use hop_top_inv_core::domain::ids::{HistoryId, InvoiceId};
+use hop_top_inv_core::domain::invoice::{
+    HistoryChannel, Invoice, InvoiceState, InvoiceStateHistory,
+};
+use hop_top_inv_core::state::transitions::{next_state, InvoiceEvent};
+use hop_top_inv_core::state::{
     InvoiceEntered, InvoiceProposed, InvoiceTransitioned, TOPIC_ENTERED, TOPIC_PROPOSED,
     TOPIC_TRANSITIONED,
 };
-use inv_store::repo::history::InvoiceHistoryRepo;
-use inv_store::repo::invoice::InvoiceRepo;
+use hop_top_inv_store::repo::history::InvoiceHistoryRepo;
+use hop_top_inv_store::repo::invoice::InvoiceRepo;
 
 use crate::ctx::{Actor, Channel, CoreCtx};
 use crate::draft::history_channel_str;
@@ -95,10 +97,16 @@ pub async fn void_invoice(
     };
 
     {
-        let mut tx = ctx.db.begin().await.map_err(inv_store::StoreError::from)?;
+        let mut tx = ctx
+            .db
+            .begin()
+            .await
+            .map_err(hop_top_inv_store::StoreError::from)?;
         InvoiceRepo::save_in_tx(&mut tx, &invoice).await?;
         InvoiceHistoryRepo::save_in_tx(&mut tx, &history).await?;
-        tx.commit().await.map_err(inv_store::StoreError::from)?;
+        tx.commit()
+            .await
+            .map_err(hop_top_inv_store::StoreError::from)?;
     }
 
     publish_voided_events(

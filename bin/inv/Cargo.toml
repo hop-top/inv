@@ -12,7 +12,7 @@ name = "inv"
 path = "src/main.rs"
 
 [dependencies]
-inv-cli = { workspace = true }
+hop-top-inv-cli = { workspace = true }
 
 [dev-dependencies]
 assert_cmd = "2"

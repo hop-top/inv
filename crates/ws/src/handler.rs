@@ -23,8 +23,8 @@ use futures_util::{SinkExt, StreamExt};
 use tokio::sync::{mpsc, oneshot};
 use tracing::{debug, warn};
 
-use inv_bus::{BroadcastPublisher, BusMessage};
-use inv_commands::CoreCtx;
+use hop_top_inv_bus::{BroadcastPublisher, BusMessage};
+use hop_top_inv_commands::CoreCtx;
 
 use crate::frames::{
     ClientFrame, EventFrame, RequestFrame, ResponseFrame, ServerFrame, SubMgmtFrame, SubMgmtOp,

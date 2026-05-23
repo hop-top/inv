@@ -2,14 +2,14 @@
 //!
 //! Mostly useful for tests + operator chores. Production runs invoke
 //! the tickers from `inv-server` (T-0020). Each subcommand calls the
-//! corresponding `inv-commands` function and renders a summary.
+//! corresponding `hop-top-inv-commands` function and renders a summary.
 
 use anyhow::{anyhow, Context, Result};
 use clap::{ArgMatches, Command};
 use hop_top_kit::output::ColumnSpec;
 use serde_json::json;
 
-use inv_commands::{mark_overdue_ticker, reminders_tick, schedules_tick, CoreCtx};
+use hop_top_inv_commands::{mark_overdue_ticker, reminders_tick, schedules_tick, CoreCtx};
 
 use crate::render::render_value;
 

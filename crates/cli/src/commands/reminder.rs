@@ -5,12 +5,12 @@ use clap::{Arg, ArgMatches, Command};
 use hop_top_kit::output::ColumnSpec;
 use serde_json::json;
 
-use inv_commands::{
+use hop_top_inv_commands::{
     reminder_cancel, reminder_schedule, Actor, Channel, CoreCtx, ReminderCancelInput,
     ReminderScheduleInput,
 };
-use inv_core::domain::reminder::ReminderChannel;
-use inv_store::repo::reminder::ReminderRepo;
+use hop_top_inv_core::domain::reminder::ReminderChannel;
+use hop_top_inv_store::repo::reminder::ReminderRepo;
 
 use super::parse::{parse_datetime, parse_invoice_id, parse_reminder_id};
 use crate::render::{render_list, render_value};

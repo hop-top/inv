@@ -1,7 +1,7 @@
-//! End-to-end HTTP tests for the inv-api adapter.
+//! End-to-end HTTP tests for the hop-top-inv-api adapter.
 //!
 //! Each test boots an in-memory sqlite-backed `CoreCtx`, builds the
-//! assembled router via `inv_api::router`, and drives requests through
+//! assembled router via `hop_top_inv_api::router`, and drives requests through
 //! `tower::ServiceExt::oneshot`. Auth is left disabled (empty
 //! `bearer_tokens`) except where the test explicitly opts in.
 
@@ -18,17 +18,17 @@ use rust_decimal::Decimal;
 use serde_json::{json, Value};
 use tower::ServiceExt;
 
-use inv_api::{router, ApiConfig, ApiState};
-use inv_bus::InMemoryPublisher;
-use inv_commands::{Clock, CoreCtx};
-use inv_core::domain::address::Address;
-use inv_core::domain::customer::Customer;
-use inv_core::domain::ids::CustomerId;
-use inv_core::tax::TaxTable;
-use inv_store::pool::{connect, Pool};
-use inv_store::repo::customer::CustomerRepo;
-use inv_store::repo::history::InvoiceHistoryRepo;
-use inv_store::run_migrations;
+use hop_top_inv_api::{router, ApiConfig, ApiState};
+use hop_top_inv_bus::InMemoryPublisher;
+use hop_top_inv_commands::{Clock, CoreCtx};
+use hop_top_inv_core::domain::address::Address;
+use hop_top_inv_core::domain::customer::Customer;
+use hop_top_inv_core::domain::ids::CustomerId;
+use hop_top_inv_core::tax::TaxTable;
+use hop_top_inv_store::pool::{connect, Pool};
+use hop_top_inv_store::repo::customer::CustomerRepo;
+use hop_top_inv_store::repo::history::InvoiceHistoryRepo;
+use hop_top_inv_store::run_migrations;
 
 // =============================================================================
 // fixtures
@@ -105,7 +105,7 @@ async fn fresh_state_with_config_and_publisher(
     let publisher: Arc<InMemoryPublisher> = Arc::new(InMemoryPublisher::new());
     let ctx = CoreCtx::new(pool.clone(), table, nexus)
         .with_clock(Arc::new(FrozenClock(frozen_now())))
-        .with_publisher(publisher.clone() as Arc<dyn inv_commands::Publisher>);
+        .with_publisher(publisher.clone() as Arc<dyn hop_top_inv_commands::Publisher>);
     let state = Arc::new(ApiState::new(Arc::new(ctx), config));
     (state, pool, publisher)
 }
@@ -319,7 +319,7 @@ async fn pay_invoice_200() {
 
 #[tokio::test]
 async fn unknown_id_404() {
-    use inv_core::domain::ids::InvoiceId;
+    use hop_top_inv_core::domain::ids::InvoiceId;
     let (state, _pool) = fresh_state().await;
     let app = router(state);
 
@@ -380,7 +380,7 @@ async fn signed_link_view_serves_html_for_valid_token() {
     let inv_id = draft_and_issue(&app, &cust).await;
 
     // Mint a token directly so we don't depend on /send.
-    let token = inv_api::signed_link::sign(&inv_id, 3600, &state.config.link_signing_key);
+    let token = hop_top_inv_api::signed_link::sign(&inv_id, 3600, &state.config.link_signing_key);
     let resp = app
         .oneshot(
             Request::builder()
@@ -408,7 +408,7 @@ async fn signed_link_view_expired_404() {
     let inv_id = draft_and_issue(&app, &cust).await;
 
     // TTL=0 → token is born expired.
-    let token = inv_api::signed_link::sign(&inv_id, 0, &state.config.link_signing_key);
+    let token = hop_top_inv_api::signed_link::sign(&inv_id, 0, &state.config.link_signing_key);
     let resp = app
         .oneshot(
             Request::builder()
@@ -466,7 +466,7 @@ async fn signed_link_view_publishes_invoice_viewed_event() {
     );
 
     // View the invoice via a freshly-minted signed token.
-    let token = inv_api::signed_link::sign(&inv_id, 3600, &state.config.link_signing_key);
+    let token = hop_top_inv_api::signed_link::sign(&inv_id, 3600, &state.config.link_signing_key);
     let resp = app
         .oneshot(
             Request::builder()
@@ -506,7 +506,7 @@ async fn signed_link_view_tampered_404() {
     let app = router(state.clone());
 
     let inv_id = draft_and_issue(&app, &cust).await;
-    let token = inv_api::signed_link::sign(&inv_id, 3600, &state.config.link_signing_key);
+    let token = hop_top_inv_api::signed_link::sign(&inv_id, 3600, &state.config.link_signing_key);
     // Drop the last char and replace with a guaranteed-different char so
     // tampering is never a no-op (base64url tokens end in 'A' ~3% of the
     // time, which would flake CI). Invalid base64 or signature mismatch.
@@ -536,7 +536,7 @@ async fn webhook_send_signs_outbound_body() {
 
     let (state, pool) = fresh_state().await;
     let cust = seed_customer(&pool).await;
-    use inv_core::domain::ids::InvoiceId;
+    use hop_top_inv_core::domain::ids::InvoiceId;
 
     // Spin up a one-shot HTTP listener that accepts the POST and
     // captures the X-Inv-Signature header + body.
@@ -631,7 +631,8 @@ async fn webhook_send_signs_outbound_body() {
     let body = captured_body.lock().await.clone();
 
     // The signature must equal HMAC-SHA256(body, signing_key).
-    let expected = inv_api::webhook::signature_header(&body, &state.config.webhook_signing_key);
+    let expected =
+        hop_top_inv_api::webhook::signature_header(&body, &state.config.webhook_signing_key);
     assert_eq!(sig, expected, "signature header mismatch");
     assert!(!body.is_empty(), "webhook receiver got empty body");
 
@@ -663,11 +664,11 @@ async fn webhook_send_signs_outbound_body() {
 #[tokio::test]
 async fn list_schedules_returns_all_seeded() {
     use chrono::NaiveDate;
-    use inv_core::domain::ids::{LineId, ScheduleId};
-    use inv_core::domain::invoice::TaxCategory;
-    use inv_core::domain::money::Currency;
-    use inv_core::domain::schedule::{Cadence, Schedule, ScheduleLine, ScheduleState};
-    use inv_store::repo::schedule::ScheduleRepo;
+    use hop_top_inv_core::domain::ids::{LineId, ScheduleId};
+    use hop_top_inv_core::domain::invoice::TaxCategory;
+    use hop_top_inv_core::domain::money::Currency;
+    use hop_top_inv_core::domain::schedule::{Cadence, Schedule, ScheduleLine, ScheduleState};
+    use hop_top_inv_store::repo::schedule::ScheduleRepo;
 
     let (state, pool) = fresh_state().await;
     let c1 = seed_customer(&pool).await;
@@ -793,13 +794,13 @@ async fn list_schedules_returns_all_seeded() {
 
 #[tokio::test]
 async fn list_credit_notes_returns_all_seeded() {
-    use inv_core::domain::creditnote::{CreditNote, CreditNoteState};
-    use inv_core::domain::ids::{CreditNoteId, InvoiceId};
-    use inv_core::domain::invoice::{Invoice, InvoiceState};
-    use inv_core::domain::jurisdiction::Jurisdiction;
-    use inv_core::domain::money::Currency;
-    use inv_store::repo::credit_note::CreditNoteRepo;
-    use inv_store::repo::invoice::InvoiceRepo;
+    use hop_top_inv_core::domain::creditnote::{CreditNote, CreditNoteState};
+    use hop_top_inv_core::domain::ids::{CreditNoteId, InvoiceId};
+    use hop_top_inv_core::domain::invoice::{Invoice, InvoiceState};
+    use hop_top_inv_core::domain::jurisdiction::Jurisdiction;
+    use hop_top_inv_core::domain::money::Currency;
+    use hop_top_inv_store::repo::credit_note::CreditNoteRepo;
+    use hop_top_inv_store::repo::invoice::InvoiceRepo;
 
     let (state, pool) = fresh_state().await;
     let cust = seed_customer(&pool).await;

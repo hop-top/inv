@@ -1,6 +1,6 @@
 //! Error type surfaced by the MCP adapter.
 //!
-//! Wraps `inv_commands::CoreError` and `inv_store::StoreError`, and
+//! Wraps `hop_top_inv_commands::CoreError` and `hop_top_inv_store::StoreError`, and
 //! converts them into rmcp's wire-level [`rmcp::ErrorData`] (a.k.a.
 //! `McpError`). Validation failures map to `invalid_params`; FSM /
 //! not-found / repo errors map to `internal_error` with the original
@@ -9,8 +9,8 @@
 use rmcp::ErrorData as RmcpErrorData;
 use thiserror::Error;
 
-use inv_commands::CoreError;
-use inv_store::StoreError;
+use hop_top_inv_commands::CoreError;
+use hop_top_inv_store::StoreError;
 
 /// Errors surfaced by the MCP adapter layer.
 #[derive(Debug, Error)]

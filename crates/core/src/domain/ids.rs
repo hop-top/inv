@@ -1,6 +1,6 @@
 //! Entity ID facade.
 //!
-//! Wraps the [`mti`] crate so the rest of `inv-core` (and downstream
+//! Wraps the [`mti`] crate so the rest of `hop-top-inv-core` (and downstream
 //! crates) never touch `mti` directly. When `hop_top_kit::id` lands
 //! (see `hop-top/poly-kit#id-typeid`) the body of this module swaps
 //! to kit's API in one place; consumers don't change.
@@ -8,7 +8,7 @@
 //! Each entity has its own newtype:
 //!
 //! ```ignore
-//! use inv_core::domain::ids::InvoiceId;
+//! use hop_top_inv_core::domain::ids::InvoiceId;
 //! let id = InvoiceId::new();
 //! // id.to_string() => "invoice_01j5xk..."
 //! // id.as_uri()     => "inv://invoice/invoice_01j5xk..."

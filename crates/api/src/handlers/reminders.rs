@@ -9,12 +9,12 @@ use chrono::{DateTime, Utc};
 use serde::Deserialize;
 use serde_json::{json, Value};
 
-use inv_commands::{
+use hop_top_inv_commands::{
     reminder_cancel, reminder_schedule, Actor, Channel, ReminderCancelInput, ReminderScheduleInput,
 };
-use inv_core::domain::ids::{InvoiceId, ReminderId};
-use inv_core::domain::reminder::ReminderChannel;
-use inv_store::repo::reminder::ReminderRepo;
+use hop_top_inv_core::domain::ids::{InvoiceId, ReminderId};
+use hop_top_inv_core::domain::reminder::ReminderChannel;
+use hop_top_inv_store::repo::reminder::ReminderRepo;
 
 use crate::error::ApiError;
 use crate::state::ApiState;
@@ -110,7 +110,7 @@ pub async fn list(
                 .map_err(|e| ApiError::BadRequest(format!("invalid invoice id: {e}")))?;
             repo.list_for_invoice(&invoice_id)
                 .await
-                .map_err(inv_commands::CoreError::from)?
+                .map_err(hop_top_inv_commands::CoreError::from)?
         }
     };
     Ok(Json(json!({ "reminders": rows })))

@@ -9,10 +9,10 @@ use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 
-use inv_core::domain::invoice::HistoryChannel;
-use inv_core::tax::{NexusConfig, TaxTable};
-use inv_store::blob::BlobStore;
-use inv_store::pool::Pool;
+use hop_top_inv_core::domain::invoice::HistoryChannel;
+use hop_top_inv_core::tax::{NexusConfig, TaxTable};
+use hop_top_inv_store::blob::BlobStore;
+use hop_top_inv_store::pool::Pool;
 
 use crate::publisher::Publisher;
 
@@ -85,7 +85,7 @@ impl Actor {
 }
 
 /// Channel a command came in on. Mirrors
-/// [`inv_core::domain::invoice::HistoryChannel`] one-for-one (kept here
+/// [`hop_top_inv_core::domain::invoice::HistoryChannel`] one-for-one (kept here
 /// so adapters can build a `CoreCtx` without re-importing the domain
 /// module just for the enum).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

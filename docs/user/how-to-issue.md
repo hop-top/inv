@@ -12,7 +12,7 @@ copy-pasteable recipe to draft → issue → send → mark-paid via each channel
 | Building a real-time dashboard | WebSocket: `{op: "invoice.draft", ...}` + topic subscriptions |
 | An LLM agent with MCP tools | MCP: `inv_invoice_draft` |
 
-All four call into the same `inv-commands` functions. Behaviour is identical;
+All four call into the same `hop-top-inv-commands` functions. Behaviour is identical;
 only the request decode + response encode differ.
 
 ## CLI

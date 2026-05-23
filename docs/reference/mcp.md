@@ -1,6 +1,6 @@
 # MCP reference
 
-Every tool + resource template `inv-mcp` exposes. Authored from
+Every tool + resource template `hop-top-inv-mcp` exposes. Authored from
 [`crates/mcp/src/server.rs`](../../crates/mcp/src/server.rs),
 [`crates/mcp/src/tools/`](../../crates/mcp/src/tools/), and
 [`crates/mcp/src/resources.rs`](../../crates/mcp/src/resources.rs).
@@ -20,16 +20,16 @@ Programmatic boot:
 
 ```rust
 use std::sync::Arc;
-use inv_commands::CoreCtx;
+use hop_top_inv_commands::CoreCtx;
 
 # async fn run(ctx: Arc<CoreCtx>) -> anyhow::Result<()> {
-inv_mcp::run_stdio(ctx).await?;
+hop_top_inv_mcp::run_stdio(ctx).await?;
 # Ok(()) }
 ```
 
 ## Tools (20 total)
 
-Every command in `inv-commands` is exposed as one MCP tool. Tool inputs use
+Every command in `hop-top-inv-commands` is exposed as one MCP tool. Tool inputs use
 `schemars::JsonSchema` to publish a typed JSON schema; payloads mirror the
 matching CLI / WS request shapes.
 
@@ -116,7 +116,7 @@ is the canonical surface.
 - `enable_tool_list_changed()`
 - `enable_resources()`
 
-Server identifier: `inv-mcp` at the workspace `CARGO_PKG_VERSION`.
+Server identifier: `hop-top-inv-mcp` at the workspace `CARGO_PKG_VERSION`.
 
 ## Error envelope
 
@@ -129,7 +129,7 @@ maps to rmcp's wire-level error:
 | `NotFound` | Resource not in store. |
 | `Decode` | Tool input failed JSON schema validation. |
 | `Repo` | DB / repo failure. |
-| `Command` | `inv-commands` returned `CoreError`. |
+| `Command` | `hop-top-inv-commands` returned `CoreError`. |
 
 ## See also
 

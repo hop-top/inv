@@ -1,5 +1,5 @@
 [package]
-name = "inv-bus"
+name = "hop-top-inv-bus"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -21,9 +21,9 @@ async-trait = { workspace = true }
 # inv crates: bus consumes EmittedEvent envelopes from commands, history-row
 # repositories from store, and the FSM mechanic-event payload structs +
 # topic constants from core. No mutation of upstream code — facade-only.
-inv-core = { workspace = true }
-inv-store = { workspace = true }
-inv-commands = { workspace = true }
+hop-top-inv-core = { workspace = true }
+hop-top-inv-store = { workspace = true }
+hop-top-inv-commands = { workspace = true }
 
 # sqlx — needed to scan `credit_note_state_history` directly because the
 # credit-note history repo doesn't yet expose `pending_outbox` /
@@ -35,7 +35,7 @@ sqlx = { workspace = true, features = ["any"] }
 tokio = { workspace = true }
 tempfile = { workspace = true }
 rust_decimal = { workspace = true }
-inv-store = { workspace = true, features = ["sqlite"] }
+hop-top-inv-store = { workspace = true, features = ["sqlite"] }
 
 [lints]
 workspace = true

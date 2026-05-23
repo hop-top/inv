@@ -1,10 +1,10 @@
 //! Story freelancer-qc-01: draft → issue → send via signed link →
 //! fin auto-marks paid.
 //!
-//! Surfaces: CLI (in-process via inv-commands; the CLI binary is a thin
+//! Surfaces: CLI (in-process via hop-top-inv-commands; the CLI binary is a thin
 //! wrapper around the same commands), bus consumer (fin.billing.payment.received
 //! via inbox), store (invoices + invoice_state_history + bus_inbox),
-//! signed-link minting (api adapter — exercised via inv_api directly).
+//! signed-link minting (api adapter — exercised via hop_top_inv_api directly).
 //!
 //! xrr: used for the inbound `fin.billing.payment.received` event —
 //! adapter `exec` (since the synthetic fin source is just a string blob
@@ -24,17 +24,17 @@ use serde_json::Value;
 
 use hop_top_xrr::adapters::exec::{ExecAdapter, ExecRequest, ExecResponse};
 
-use inv_bus::{dispatch_inbound_event, Consumer, DispatchOutput};
-use inv_commands::{
+use hop_top_inv_bus::{dispatch_inbound_event, Consumer, DispatchOutput};
+use hop_top_inv_commands::{
     draft_invoice, issue_invoice, send_invoice, Actor, Channel, DraftInvoiceInput, DraftLineInput,
     IssueInvoiceInput, SendInvoiceInput,
 };
-use inv_core::domain::invoice::{InvoiceState, TaxCategory};
-use inv_core::domain::jurisdiction::Jurisdiction;
-use inv_core::domain::money::Currency;
-use inv_store::repo::bus_inbox::BusInboxRepo;
-use inv_store::repo::history::InvoiceHistoryRepo;
-use inv_store::repo::invoice::InvoiceRepo;
+use hop_top_inv_core::domain::invoice::{InvoiceState, TaxCategory};
+use hop_top_inv_core::domain::jurisdiction::Jurisdiction;
+use hop_top_inv_core::domain::money::Currency;
+use hop_top_inv_store::repo::bus_inbox::BusInboxRepo;
+use hop_top_inv_store::repo::history::InvoiceHistoryRepo;
+use hop_top_inv_store::repo::invoice::InvoiceRepo;
 
 const TEST_NAME: &str = "freelancer_qc_01_draft_link_fin_paid";
 
@@ -126,7 +126,7 @@ async fn full_lifecycle_with_fin_payment() {
 
     // ----- When: send via link://. -----------------------------------
     // The command itself returns NotImplemented for link:// (channel
-    // owns transport). We mint the signed link the same way inv-api's
+    // owns transport). We mint the signed link the same way hop-top-inv-api's
     // POST /v1/invoices/{id}/send does for link:// and assert FSM
     // transitions via a stdout-sink send to model the "send" event.
     let mut sink: Vec<u8> = Vec::new();
@@ -146,9 +146,10 @@ async fn full_lifecycle_with_fin_payment() {
     assert_eq!(sent.invoice.state, InvoiceState::Sent);
     let topics = captured.topics();
     assert!(topics.contains(&"inv.billing.invoice.sent".to_string()));
-    // Signed-link minting (mirrors inv-api's POST /v1/invoices/{id}/send
+    // Signed-link minting (mirrors hop-top-inv-api's POST /v1/invoices/{id}/send
     // for link://): assert the helper produces a stable token round-trip.
-    let token = inv_api::signed_link::sign(&issued.invoice.id.to_string(), 3600, b"test-link-key");
+    let token =
+        hop_top_inv_api::signed_link::sign(&issued.invoice.id.to_string(), 3600, b"test-link-key");
     let url = format!("http://localhost:7400/v/{token}");
     assert!(url.contains("/v/"));
     assert!(!token.is_empty());
@@ -255,7 +256,7 @@ async fn full_lifecycle_with_fin_payment() {
 
     // Drain the outbox relay → publisher captures every queued event.
     // The publisher Arc was wired into CoreCtx via fresh_ctx().
-    let stats = inv_bus::run_outbox_relay(&pool, captured.as_ref(), 50)
+    let stats = hop_top_inv_bus::run_outbox_relay(&pool, captured.as_ref(), 50)
         .await
         .expect("relay");
     assert!(stats.rows_processed > 0, "relay should drain pending rows");

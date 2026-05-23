@@ -2,7 +2,7 @@
 //!
 //! Each module hosts the routes that share a URL prefix in the design's
 //! channel-surface table (§10). The actual business logic stays in
-//! `inv-commands`; these functions only translate JSON ↔ command IO and
+//! `hop-top-inv-commands`; these functions only translate JSON ↔ command IO and
 //! map errors to [`crate::ApiError`].
 
 pub mod credit_notes;

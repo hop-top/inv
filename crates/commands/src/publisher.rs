@@ -1,13 +1,13 @@
 //! [`Publisher`] trait + [`PublishError`] — the canonical bus seam every
 //! command consumes.
 //!
-//! The trait used to live in `inv-bus` (T-0014/T-0027). It moved here so
+//! The trait used to live in `hop-top-inv-bus` (T-0014/T-0027). It moved here so
 //! [`crate::CoreCtx`] can hold an `Option<Arc<dyn Publisher>>` without
-//! creating an `inv-commands` → `inv-bus` cycle (`inv-bus` already
-//! depends on `inv-commands` for the per-command surface the outbox
+//! creating an `hop-top-inv-commands` → `hop-top-inv-bus` cycle (`hop-top-inv-bus` already
+//! depends on `hop-top-inv-commands` for the per-command surface the outbox
 //! relay re-derives from).
 //!
-//! `inv-bus` re-exports both items as `inv_bus::{Publisher, PublishError}`
+//! `hop-top-inv-bus` re-exports both items as `hop_top_inv_bus::{Publisher, PublishError}`
 //! so existing call-sites keep compiling unchanged.
 
 use async_trait::async_trait;

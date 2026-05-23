@@ -6,7 +6,7 @@ use anyhow::{anyhow, Result};
 use chrono::{DateTime, NaiveDate, Utc};
 use rust_decimal::Decimal;
 
-use inv_core::domain::ids::{CreditNoteId, CustomerId, InvoiceId, ReminderId, ScheduleId};
+use hop_top_inv_core::domain::ids::{CreditNoteId, CustomerId, InvoiceId, ReminderId, ScheduleId};
 
 /// Parse a decimal amount; surfaces a friendly error on failure.
 pub fn parse_decimal(label: &str, raw: &str) -> Result<Decimal> {

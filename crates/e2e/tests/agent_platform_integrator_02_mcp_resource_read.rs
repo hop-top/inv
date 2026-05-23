@@ -11,10 +11,10 @@ use std::sync::Arc;
 
 use chrono::{DateTime, TimeZone, Utc};
 
-use inv_commands::{Clock, CoreCtx};
-use inv_core::tax::TaxTable;
-use inv_mcp::InvMcpServer;
-use inv_store::pool::Pool;
+use hop_top_inv_commands::{Clock, CoreCtx};
+use hop_top_inv_core::tax::TaxTable;
+use hop_top_inv_mcp::InvMcpServer;
+use hop_top_inv_store::pool::Pool;
 
 use rmcp::model::{CallToolRequestParams, ReadResourceRequestParams};
 use rmcp::service::ServiceExt;
@@ -209,7 +209,7 @@ async fn resource_read_unknown_id_errors() {
     let client = spawn_pair(ctx).await;
 
     // A well-formed-but-nonexistent invoice id.
-    let id = inv_core::domain::ids::InvoiceId::new();
+    let id = hop_top_inv_core::domain::ids::InvoiceId::new();
     let err = client
         .peer()
         .read_resource(ReadResourceRequestParams::new(format!(

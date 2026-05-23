@@ -47,7 +47,7 @@ no state change, no bus emission.
 ## Surfaces touched
 
 - HTTP API — `POST /v1/invoices/{id}/send` with `idempotency_key`.
-- Commands — `idempotency_key` dedup check in `inv-commands` before
+- Commands — `idempotency_key` dedup check in `hop-top-inv-commands` before
   mutation (design [§3.5](../../architecture/design-spec.md#35-cross-cutting-concerns)).
 - Store — `invoices.idempotency_key UNIQUE`; `invoice_state_history`
   (no new row on replay).

@@ -2,10 +2,10 @@
 
 use sqlx::Row;
 
-use inv_core::domain::ids::{CustomerId, InvoiceId, LineId, ScheduleId};
-use inv_core::domain::invoice::{Invoice, InvoiceLine, InvoiceState, TaxCategory};
-use inv_core::domain::jurisdiction::Jurisdiction;
-use inv_core::domain::money::Currency;
+use hop_top_inv_core::domain::ids::{CustomerId, InvoiceId, LineId, ScheduleId};
+use hop_top_inv_core::domain::invoice::{Invoice, InvoiceLine, InvoiceState, TaxCategory};
+use hop_top_inv_core::domain::jurisdiction::Jurisdiction;
+use hop_top_inv_core::domain::money::Currency;
 
 use super::{
     decimal_to_string, metadata_from_json, metadata_to_json, parse_decimal, parse_ts, ts_to_string,

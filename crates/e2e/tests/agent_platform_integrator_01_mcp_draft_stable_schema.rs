@@ -13,10 +13,10 @@ use std::sync::Arc;
 
 use chrono::{DateTime, TimeZone, Utc};
 
-use inv_commands::{Clock, CoreCtx};
-use inv_core::tax::TaxTable;
-use inv_mcp::InvMcpServer;
-use inv_store::pool::Pool;
+use hop_top_inv_commands::{Clock, CoreCtx};
+use hop_top_inv_core::tax::TaxTable;
+use hop_top_inv_mcp::InvMcpServer;
+use hop_top_inv_store::pool::Pool;
 
 use rmcp::model::CallToolRequestParams;
 use rmcp::service::ServiceExt;

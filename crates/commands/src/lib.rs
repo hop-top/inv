@@ -1,4 +1,4 @@
-//! inv-commands — the one-command-core layer that every channel adapter
+//! hop-top-inv-commands — the one-command-core layer that every channel adapter
 //! (CLI, API, WS, MCP, bus consumer) calls into.
 //!
 //! Per design spec §3.1, every channel reduces to the same set of
@@ -7,10 +7,10 @@
 //!
 //! ## Why a separate crate?
 //!
-//! Commands need both the domain/FSM/render/tax modules of `inv-core`
-//! AND the repository structs of `inv-store`. `inv-store` already
-//! depends on `inv-core` for domain types — putting commands inside
-//! `inv-core` would create a cycle. Splitting them out keeps the graph
+//! Commands need both the domain/FSM/render/tax modules of `hop-top-inv-core`
+//! AND the repository structs of `hop-top-inv-store`. `hop-top-inv-store` already
+//! depends on `hop-top-inv-core` for domain types — putting commands inside
+//! `hop-top-inv-core` would create a cycle. Splitting them out keeps the graph
 //! acyclic and lets every channel adapter (which also depends on both)
 //! reuse the exact same code paths.
 //!
@@ -33,7 +33,7 @@
 //! ## Module layout
 //!
 //! - [`ctx`] — [`CoreCtx`] + [`Actor`] + [`Channel`] (channel mirror of
-//!   `inv_core::domain::invoice::HistoryChannel`).
+//!   `hop_top_inv_core::domain::invoice::HistoryChannel`).
 //! - [`error`] — [`CoreError`] variants surfaced to every channel.
 //! - [`publisher`] — [`Publisher`] trait + `try_publish` helper.
 //! - [`draft`] — `draft_invoice`.

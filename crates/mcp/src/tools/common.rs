@@ -12,7 +12,7 @@
 use rmcp::model::CallToolResult;
 use serde::Serialize;
 
-use inv_commands::{Actor, Channel};
+use hop_top_inv_commands::{Actor, Channel};
 
 use crate::error::McpError;
 

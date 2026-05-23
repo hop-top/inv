@@ -4,7 +4,7 @@
 //! Surfaces: commands (draft + issue), tax engine (resolve_tax on
 //! export scope), store (tax_total = 0).
 //!
-//! Deviation: the story's example uses EUR, but `inv-commands` validates
+//! Deviation: the story's example uses EUR, but `hop-top-inv-commands` validates
 //! `currency ∈ {USD, CAD, DZD}` at v1 (see crates/commands/src/draft.rs).
 //! USD exercises the same export-scope code path (buyer.country != seller
 //! country drives `export` scope, not the currency) so we use USD.
@@ -15,13 +15,13 @@ use std::str::FromStr;
 
 use rust_decimal::Decimal;
 
-use inv_commands::{
+use hop_top_inv_commands::{
     draft_invoice, issue_invoice, Actor, Channel, DraftInvoiceInput, DraftLineInput,
     IssueInvoiceInput,
 };
-use inv_core::domain::invoice::TaxCategory;
-use inv_core::domain::jurisdiction::Jurisdiction;
-use inv_core::domain::money::Currency;
+use hop_top_inv_core::domain::invoice::TaxCategory;
+use hop_top_inv_core::domain::jurisdiction::Jurisdiction;
+use hop_top_inv_core::domain::money::Currency;
 
 #[tokio::test]
 async fn dz_to_foreign_buyer_resolves_zero_rated_export() {

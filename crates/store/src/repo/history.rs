@@ -3,8 +3,8 @@
 use chrono::Utc;
 use sqlx::Row;
 
-use inv_core::domain::ids::{HistoryId, InvoiceId};
-use inv_core::domain::invoice::{HistoryChannel, InvoiceStateHistory};
+use hop_top_inv_core::domain::ids::{HistoryId, InvoiceId};
+use hop_top_inv_core::domain::invoice::{HistoryChannel, InvoiceStateHistory};
 
 use super::invoice::{state_from_str, state_to_str};
 use super::{metadata_from_json, metadata_to_json, parse_ts, ts_to_string};

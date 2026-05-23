@@ -15,7 +15,7 @@ use thiserror::Error;
 pub enum PdfError {
     /// No PDF feature was enabled at build time.
     #[error(
-        "no PDF engine compiled in; rebuild inv-core with one of \
+        "no PDF engine compiled in; rebuild hop-top-inv-core with one of \
          `pdf-stub`, `pdf-typst`, `pdf-wkhtmltopdf`, `pdf-weasyprint`"
     )]
     NoEngine,

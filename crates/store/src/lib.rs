@@ -1,4 +1,4 @@
-//! inv-store — persistence: sql connection management, migrations,
+//! hop-top-inv-store — persistence: sql connection management, migrations,
 //! and repository structs.
 //!
 //! Wires `sqlx` into the inv workspace. Backends are gated by Cargo
@@ -7,7 +7,7 @@
 
 #[cfg(not(any(feature = "sqlite", feature = "postgres", feature = "tidb")))]
 compile_error!(
-    "inv-store requires at least one storage backend feature: `sqlite`, `postgres`, or `tidb`"
+    "hop-top-inv-store requires at least one storage backend feature: `sqlite`, `postgres`, or `tidb`"
 );
 
 pub mod blob;

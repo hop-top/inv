@@ -4,7 +4,7 @@
 //! in-memory sqlite DB (the default fallback) and an explicit
 //! `tax-tables/default.toml` so it works from any CWD. We assert on
 //! exit status + a few stable output fragments — full surface coverage
-//! lives in the per-subcommand unit tests inside `inv-cli`.
+//! lives in the per-subcommand unit tests inside `hop-top-inv-cli`.
 
 use assert_cmd::Command;
 use predicates::prelude::*;

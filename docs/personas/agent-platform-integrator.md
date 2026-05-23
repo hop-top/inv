@@ -13,7 +13,7 @@
   or alternatively `fin` consumes/emits on the bus and the agent observes
   side-effects via a separate event stream.
 - Auth posture varies. Some platforms use stdio (capabilities granted via
-  process boundary). Some need a long-lived HTTP transport — at v1 `inv-mcp`
+  process boundary). Some need a long-lived HTTP transport — at v1 `hop-top-inv-mcp`
   is **stdio only**; HTTP / SSE land in v1.1.
 - The integrator is not the end-user. They care about contract stability,
   predictable error surfaces, and replay semantics — not about which
@@ -57,7 +57,7 @@
 
 - **MCP transport is stdio only at v1.** Multi-tenant agent platforms that
   need HTTP/SSE must wait for v1.1. Workaround: shell out per session.
-- **`inv-mcp` send tool routes `link://` and `webhook://` through an
+- **`hop-top-inv-mcp` send tool routes `link://` and `webhook://` through an
   in-memory stdout sink.** Confirm in [reference/mcp.md](../reference/mcp.md#tools-20-total)
   before designing flows that depend on real link minting via MCP — at v1,
   the HTTP API is the right surface for `link://`.

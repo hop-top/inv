@@ -1,7 +1,7 @@
 //! Integration tests for the blob facade.
 //!
 //! The local backend is unconditionally available — no Cargo feature
-//! gates these tests beyond what `inv-store` already requires for its
+//! gates these tests beyond what `hop-top-inv-store` already requires for its
 //! sqlite default (which is irrelevant here; the blob module is
 //! storage-backend-agnostic).
 
@@ -11,7 +11,7 @@ use std::time::Duration;
 use serde::{Deserialize, Serialize};
 use tempfile::TempDir;
 
-use inv_store::blob::{BlobRef, BlobStore, LocalBlobStore};
+use hop_top_inv_store::blob::{BlobRef, BlobStore, LocalBlobStore};
 
 fn fresh_store() -> (TempDir, LocalBlobStore) {
     let dir = TempDir::new().expect("tempdir");

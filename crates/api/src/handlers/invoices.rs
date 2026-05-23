@@ -13,17 +13,17 @@ use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
-use inv_commands::{
+use hop_top_inv_commands::{
     draft_invoice, issue_invoice, mark_overdue_ticker, mark_paid, reminders_tick, schedules_tick,
     send_invoice, send_invoice_render, void_invoice, Actor, Channel, DraftInvoiceInput,
     DraftLineInput, IssueInvoiceInput, MarkPaidInput, SendInvoiceInput, SendInvoiceRenderInput,
     VoidInvoiceInput,
 };
-use inv_core::domain::ids::{CustomerId, InvoiceId};
-use inv_core::domain::invoice::{Invoice, InvoiceLine, InvoiceState, TaxCategory};
-use inv_core::domain::jurisdiction::Jurisdiction;
-use inv_core::domain::money::Currency;
-use inv_store::repo::invoice::{InvoiceFilter, InvoiceLineRepo, InvoiceRepo};
+use hop_top_inv_core::domain::ids::{CustomerId, InvoiceId};
+use hop_top_inv_core::domain::invoice::{Invoice, InvoiceLine, InvoiceState, TaxCategory};
+use hop_top_inv_core::domain::jurisdiction::Jurisdiction;
+use hop_top_inv_core::domain::money::Currency;
+use hop_top_inv_store::repo::invoice::{InvoiceFilter, InvoiceLineRepo, InvoiceRepo};
 
 use crate::error::ApiError;
 use crate::state::ApiState;
@@ -232,7 +232,7 @@ pub async fn list(
     let rows = InvoiceRepo::new(&state.ctx.db)
         .list(&filter)
         .await
-        .map_err(inv_commands::CoreError::from)?;
+        .map_err(hop_top_inv_commands::CoreError::from)?;
     Ok(Json(rows))
 }
 
@@ -250,12 +250,12 @@ pub async fn get(
     let invoice = repo
         .get(&id)
         .await
-        .map_err(inv_commands::CoreError::from)?
+        .map_err(hop_top_inv_commands::CoreError::from)?
         .ok_or_else(|| ApiError::NotFound(format!("invoice {id}")))?;
     let lines = InvoiceLineRepo::new(&state.ctx.db)
         .list_for_invoice(&id)
         .await
-        .map_err(inv_commands::CoreError::from)?;
+        .map_err(hop_top_inv_commands::CoreError::from)?;
     Ok(Json(json!({ "invoice": invoice, "lines": lines })))
 }
 
@@ -348,7 +348,7 @@ pub async fn send(
         let _ = repo
             .get(&invoice_id)
             .await
-            .map_err(inv_commands::CoreError::from)?
+            .map_err(hop_top_inv_commands::CoreError::from)?
             .ok_or_else(|| ApiError::NotFound(format!("invoice {invoice_id}")))?;
         let ttl = state.config.link_ttl.as_secs();
         let token =

@@ -12,7 +12,7 @@
 
 use chrono::Utc;
 
-use inv_store::repo::bus_inbox::{BusInboxRecord, BusInboxRepo};
+use hop_top_inv_store::repo::bus_inbox::{BusInboxRecord, BusInboxRepo};
 
 use crate::error::IngestError;
 

@@ -3,9 +3,9 @@
 use sqlx::Row;
 use std::str::FromStr;
 
-use inv_core::domain::ids::{CustomerId, ScheduleId};
-use inv_core::domain::money::Currency;
-use inv_core::domain::schedule::{Cadence, Schedule, ScheduleLine, ScheduleState};
+use hop_top_inv_core::domain::ids::{CustomerId, ScheduleId};
+use hop_top_inv_core::domain::money::Currency;
+use hop_top_inv_core::domain::schedule::{Cadence, Schedule, ScheduleLine, ScheduleState};
 
 use super::{metadata_from_json, metadata_to_json, parse_ts, ts_to_string};
 use crate::error::{Result, StoreError};

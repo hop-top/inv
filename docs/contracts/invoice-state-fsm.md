@@ -115,7 +115,7 @@ Additionally, `Pay` with `amount_paid <= 0` rejects with `NonPositivePayment`
 ## Channel uniformity
 
 Every channel (CLI / HTTP API / WS / MCP / bus consumer) routes through
-`inv-commands`, which calls into the same FSM. The same `(state, event)`
+`hop-top-inv-commands`, which calls into the same FSM. The same `(state, event)`
 pair is illegal everywhere — no channel-specific exceptions. The error
 manifests as:
 

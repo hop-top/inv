@@ -12,17 +12,17 @@ use std::str::FromStr;
 
 use rust_decimal::Decimal;
 
-use inv_commands::{
+use hop_top_inv_commands::{
     create_credit_note, draft_invoice, issue_credit_note, issue_invoice, mark_paid, void_invoice,
     Actor, Channel, CoreError, CreateCreditNoteInput, DraftInvoiceInput, DraftLineInput,
     IssueCreditNoteInput, IssueInvoiceInput, MarkPaidInput, VoidInvoiceInput,
 };
-use inv_core::domain::creditnote::CreditNoteState;
-use inv_core::domain::invoice::{InvoiceState, TaxCategory};
-use inv_core::domain::jurisdiction::Jurisdiction;
-use inv_core::domain::money::Currency;
-use inv_store::repo::credit_note::CreditNoteRepo;
-use inv_store::repo::invoice::InvoiceRepo;
+use hop_top_inv_core::domain::creditnote::CreditNoteState;
+use hop_top_inv_core::domain::invoice::{InvoiceState, TaxCategory};
+use hop_top_inv_core::domain::jurisdiction::Jurisdiction;
+use hop_top_inv_core::domain::money::Currency;
+use hop_top_inv_store::repo::credit_note::CreditNoteRepo;
+use hop_top_inv_store::repo::invoice::InvoiceRepo;
 
 #[tokio::test]
 async fn void_after_paid_rejected_and_credit_note_lifecycle() {

@@ -1,5 +1,5 @@
 [package]
-name = "inv-mcp"
+name = "hop-top-inv-mcp"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -25,22 +25,22 @@ async-trait = { workspace = true }
 
 # schemars is brought in via rmcp's `schemars` feature (v1.x) AND used
 # directly on tool input/output structs. Pin via workspace so the version
-# (+ chrono04 feature) matches what `inv-core[schema]` derives expect.
+# (+ chrono04 feature) matches what `hop-top-inv-core[schema]` derives expect.
 schemars = { workspace = true }
 
-# inv internal crates. `inv-core[schema]` turns on `JsonSchema` derives on
+# inv internal crates. `hop-top-inv-core[schema]` turns on `JsonSchema` derives on
 # every public domain type so we can use them directly in tool inputs
 # without local wire-form mirrors.
-inv-core = { workspace = true, features = ["schema"] }
-inv-store = { workspace = true }
-inv-commands = { workspace = true }
+hop-top-inv-core = { workspace = true, features = ["schema"] }
+hop-top-inv-store = { workspace = true }
+hop-top-inv-commands = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true }
 # Enable `client` for the in-process integration test client + `sqlite`
 # storage backend for the in-memory CoreCtx fixture.
 rmcp = { workspace = true, features = ["client", "transport-io", "schemars"] }
-inv-store = { workspace = true, features = ["sqlite"] }
+hop-top-inv-store = { workspace = true, features = ["sqlite"] }
 serde_json = { workspace = true }
 anyhow = { workspace = true }
 

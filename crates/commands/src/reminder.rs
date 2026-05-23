@@ -6,9 +6,9 @@
 use chrono::{DateTime, Utc};
 use serde_json::json;
 
-use inv_core::domain::ids::{InvoiceId, ReminderId};
-use inv_core::domain::reminder::{Reminder, ReminderChannel, ReminderState};
-use inv_store::repo::reminder::ReminderRepo;
+use hop_top_inv_core::domain::ids::{InvoiceId, ReminderId};
+use hop_top_inv_core::domain::reminder::{Reminder, ReminderChannel, ReminderState};
+use hop_top_inv_store::repo::reminder::ReminderRepo;
 
 use crate::ctx::{Actor, Channel, CoreCtx};
 use crate::draft::history_channel_str;

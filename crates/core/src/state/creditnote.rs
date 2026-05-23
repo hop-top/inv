@@ -27,7 +27,7 @@
 //! [`crate::state::transitions::TransitionError`] (the credit-note variant
 //! is local because the state type differs).
 //!
-//! No bus wiring lives here. T-0014 (`inv-bus`) consumes the event structs
+//! No bus wiring lives here. T-0014 (`hop-top-inv-bus`) consumes the event structs
 //! and runs the [`VetoError`] seam around
 //! [`crate::state::machine::StateMachine::propose`].
 
@@ -291,7 +291,7 @@ impl blocking::State<CnCtx> for StatigState {
     }
 
     fn call_entry_action(&mut self, _shared: &mut CnCtx, _ctx: &mut ()) {
-        // No-op at v1. T-0014 (`inv-bus`) hooks `.entered` emission here.
+        // No-op at v1. T-0014 (`hop-top-inv-bus`) hooks `.entered` emission here.
     }
 
     fn call_exit_action(&mut self, _shared: &mut CnCtx, _ctx: &mut ()) {

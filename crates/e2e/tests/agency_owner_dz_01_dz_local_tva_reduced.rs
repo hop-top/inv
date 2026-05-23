@@ -16,13 +16,13 @@ use std::str::FromStr;
 
 use rust_decimal::Decimal;
 
-use inv_commands::{
+use hop_top_inv_commands::{
     draft_invoice, issue_invoice, Actor, Channel, DraftInvoiceInput, DraftLineInput,
     IssueInvoiceInput,
 };
-use inv_core::domain::invoice::TaxCategory;
-use inv_core::domain::jurisdiction::Jurisdiction;
-use inv_core::domain::money::Currency;
+use hop_top_inv_core::domain::invoice::TaxCategory;
+use hop_top_inv_core::domain::jurisdiction::Jurisdiction;
+use hop_top_inv_core::domain::money::Currency;
 
 #[tokio::test]
 async fn dz_local_invoice_resolves_standard_and_reduced_tva() {

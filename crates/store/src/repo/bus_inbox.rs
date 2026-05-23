@@ -1,12 +1,12 @@
 //! Inbound bus-event de-dup table.
 //!
 //! No domain type for this row yet (T-0014 will likely add one to
-//! `inv-bus`); we ship a struct local to this crate.
+//! `hop-top-inv-bus`); we ship a struct local to this crate.
 
 use chrono::{DateTime, Utc};
 use sqlx::Row;
 
-use inv_core::domain::ids::InvoiceId;
+use hop_top_inv_core::domain::ids::InvoiceId;
 
 use super::{parse_ts, ts_to_string};
 use crate::error::{Result, StoreError};

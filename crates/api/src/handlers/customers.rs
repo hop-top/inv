@@ -1,6 +1,6 @@
 //! Customer routes — create / get / list.
 //!
-//! `inv-commands` does not ship a `customer_create` command (customers
+//! `hop-top-inv-commands` does not ship a `customer_create` command (customers
 //! are external references, not managed entities — see design §2.3).
 //! The API still needs a way to seed them, so this handler bypasses the
 //! command layer and writes through [`CustomerRepo`] directly.
@@ -15,10 +15,10 @@ use chrono::Utc;
 use serde::Deserialize;
 use serde_json::{json, Value};
 
-use inv_core::domain::address::Address;
-use inv_core::domain::customer::Customer;
-use inv_core::domain::ids::CustomerId;
-use inv_store::repo::customer::CustomerRepo;
+use hop_top_inv_core::domain::address::Address;
+use hop_top_inv_core::domain::customer::Customer;
+use hop_top_inv_core::domain::ids::CustomerId;
+use hop_top_inv_store::repo::customer::CustomerRepo;
 
 use crate::error::ApiError;
 use crate::state::ApiState;
@@ -63,7 +63,7 @@ pub async fn create(
     CustomerRepo::new(&state.ctx.db)
         .save(&customer)
         .await
-        .map_err(inv_commands::CoreError::from)?;
+        .map_err(hop_top_inv_commands::CoreError::from)?;
     Ok((StatusCode::CREATED, Json(customer)))
 }
 
@@ -82,7 +82,7 @@ pub async fn get(
     let c = CustomerRepo::new(&state.ctx.db)
         .get(&id)
         .await
-        .map_err(inv_commands::CoreError::from)?
+        .map_err(hop_top_inv_commands::CoreError::from)?
         .ok_or_else(|| ApiError::NotFound(format!("customer {id}")))?;
     Ok(Json(c))
 }
@@ -112,6 +112,6 @@ pub async fn list(
     let rows = CustomerRepo::new(&state.ctx.db)
         .list(limit, offset)
         .await
-        .map_err(inv_commands::CoreError::from)?;
+        .map_err(hop_top_inv_commands::CoreError::from)?;
     Ok(Json(json!({ "customers": rows })))
 }

@@ -13,17 +13,17 @@
 //! review or update on local changes:
 //!
 //! ```text
-//! cargo insta review -p inv-core
+//! cargo insta review -p hop-top-inv-core
 //! ```
 
 use chrono::{TimeZone, Utc};
-use inv_core::domain::address::Address;
-use inv_core::domain::customer::Customer;
-use inv_core::domain::ids::{CustomerId, InvoiceId, LineId};
-use inv_core::domain::invoice::{Invoice, InvoiceLine, InvoiceState, TaxCategory};
-use inv_core::domain::jurisdiction::Jurisdiction;
-use inv_core::domain::money::Currency;
-use inv_core::render::{render_html, RenderContext};
+use hop_top_inv_core::domain::address::Address;
+use hop_top_inv_core::domain::customer::Customer;
+use hop_top_inv_core::domain::ids::{CustomerId, InvoiceId, LineId};
+use hop_top_inv_core::domain::invoice::{Invoice, InvoiceLine, InvoiceState, TaxCategory};
+use hop_top_inv_core::domain::jurisdiction::Jurisdiction;
+use hop_top_inv_core::domain::money::Currency;
+use hop_top_inv_core::render::{render_html, RenderContext};
 use rust_decimal::Decimal;
 use std::collections::BTreeMap;
 use std::str::FromStr;
@@ -240,7 +240,7 @@ async fn pdf_stub_returns_html_bytes() {
     let (inv, cust, lines) = fixture_full();
     let ctx = RenderContext::new(inv, cust, lines);
     let html = render_html(None, &ctx).await.unwrap();
-    let pdf = inv_core::render::render_pdf(&html).await.unwrap();
+    let pdf = hop_top_inv_core::render::render_pdf(&html).await.unwrap();
     assert_eq!(pdf, html.as_bytes());
 }
 
@@ -251,5 +251,5 @@ fn tempdir_unique() -> std::path::PathBuf {
     static N: AtomicU64 = AtomicU64::new(0);
     let n = N.fetch_add(1, Ordering::Relaxed);
     let pid = std::process::id();
-    std::env::temp_dir().join(format!("inv-core-render-{pid}-{n}"))
+    std::env::temp_dir().join(format!("hop-top-inv-core-render-{pid}-{n}"))
 }

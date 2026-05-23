@@ -1,7 +1,7 @@
 //! FSM facade trait + a bare in-memory implementation.
 //!
 //! The trait is the contract every adapter (statig today, rust-fsm or any
-//! future variant later) implements. `inv-bus` wires the veto / emit hooks
+//! future variant later) implements. `hop-top-inv-bus` wires the veto / emit hooks
 //! around this trait in T-0014 — this module deliberately knows nothing
 //! about the bus.
 //!

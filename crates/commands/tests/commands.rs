@@ -1,9 +1,9 @@
-//! Integration tests for the inv-commands one-command-core layer.
+//! Integration tests for the hop-top-inv-commands one-command-core layer.
 //!
-//! Each test opens an in-memory sqlite pool, applies the inv-store
+//! Each test opens an in-memory sqlite pool, applies the hop-top-inv-store
 //! migrations, seeds a customer, and exercises one or more of
 //! `draft_invoice` / `issue_invoice` / `send_invoice`. The dev-dep
-//! `inv-store` is configured with the `sqlite` feature, so the in-memory
+//! `hop-top-inv-store` is configured with the `sqlite` feature, so the in-memory
 //! pool always works without a cfg guard.
 
 use std::collections::BTreeMap;
@@ -13,17 +13,17 @@ use std::sync::Arc;
 use chrono::{DateTime, TimeZone, Utc};
 use rust_decimal::Decimal;
 
-use inv_core::domain::address::Address;
-use inv_core::domain::customer::Customer;
-use inv_core::domain::ids::CustomerId;
-use inv_core::domain::invoice::{InvoiceState, TaxCategory};
-use inv_core::domain::jurisdiction::Jurisdiction;
-use inv_core::domain::money::Currency;
-use inv_core::state::TransitionError;
-use inv_core::tax::TaxTable;
+use hop_top_inv_core::domain::address::Address;
+use hop_top_inv_core::domain::customer::Customer;
+use hop_top_inv_core::domain::ids::CustomerId;
+use hop_top_inv_core::domain::invoice::{InvoiceState, TaxCategory};
+use hop_top_inv_core::domain::jurisdiction::Jurisdiction;
+use hop_top_inv_core::domain::money::Currency;
+use hop_top_inv_core::state::TransitionError;
+use hop_top_inv_core::tax::TaxTable;
 
-use inv_bus::InMemoryPublisher;
-use inv_commands::{
+use hop_top_inv_bus::InMemoryPublisher;
+use hop_top_inv_commands::{
     create_credit_note, draft_invoice, issue_credit_note, issue_invoice, mark_overdue_ticker,
     mark_paid, reminder_cancel, reminder_schedule, reminders_tick, schedule_cancel,
     schedule_create, schedule_pause, schedules_tick, send_invoice, void_invoice, Actor, Channel,
@@ -32,14 +32,14 @@ use inv_commands::{
     ReminderScheduleInput, ScheduleCreateInput, ScheduleLineInput, ScheduleStateChangeInput,
     SendInvoiceInput, VoidInvoiceInput,
 };
-use inv_core::domain::creditnote::CreditNoteState;
-use inv_core::domain::reminder::{ReminderChannel, ReminderState};
-use inv_core::domain::schedule::{Cadence, ScheduleState};
-use inv_store::blob::LocalBlobStore;
-use inv_store::pool::{connect, Pool};
-use inv_store::repo::history::InvoiceHistoryRepo;
-use inv_store::repo::{CreditNoteRepo, CustomerRepo, InvoiceRepo};
-use inv_store::run_migrations;
+use hop_top_inv_core::domain::creditnote::CreditNoteState;
+use hop_top_inv_core::domain::reminder::{ReminderChannel, ReminderState};
+use hop_top_inv_core::domain::schedule::{Cadence, ScheduleState};
+use hop_top_inv_store::blob::LocalBlobStore;
+use hop_top_inv_store::pool::{connect, Pool};
+use hop_top_inv_store::repo::history::InvoiceHistoryRepo;
+use hop_top_inv_store::repo::{CreditNoteRepo, CustomerRepo, InvoiceRepo};
+use hop_top_inv_store::run_migrations;
 
 /// Frozen-clock impl for deterministic tests.
 struct FrozenClock(DateTime<Utc>);
@@ -436,7 +436,7 @@ async fn send_file_writes_bytes_and_transitions_to_sent() {
     .unwrap();
 
     let dir = std::env::temp_dir().join(format!(
-        "inv-commands-test-{}-{}",
+        "hop-top-inv-commands-test-{}-{}",
         std::process::id(),
         chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0)
     ));
@@ -558,7 +558,10 @@ async fn send_unsupported_scheme_returns_not_implemented() {
 
 /// Helper: walk draft → issue and return the issued invoice id, ready
 /// for a send call.
-async fn drafted_then_issued(ctx: &CoreCtx, pool: &Pool) -> inv_core::domain::ids::InvoiceId {
+async fn drafted_then_issued(
+    ctx: &CoreCtx,
+    pool: &Pool,
+) -> hop_top_inv_core::domain::ids::InvoiceId {
     let cust = seed_customer(pool).await;
     let drafted = draft_invoice(ctx, draft_input(&cust, None)).await.unwrap();
     let issued = issue_invoice(
@@ -879,7 +882,7 @@ async fn mark_paid_rejects_non_positive_amount() {
     let err = mark_paid(
         &ctx,
         MarkPaidInput {
-            invoice_id: inv_core::domain::ids::InvoiceId::new(),
+            invoice_id: hop_top_inv_core::domain::ids::InvoiceId::new(),
             amount: Decimal::ZERO,
             received_at: None,
             idempotency_key: None,

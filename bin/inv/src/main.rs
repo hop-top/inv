@@ -1,3 +1,3 @@
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    inv_cli::run()
+    hop_top_inv_cli::run()
 }

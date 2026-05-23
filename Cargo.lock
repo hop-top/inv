@@ -1098,6 +1098,207 @@ dependencies = [
 ]
 
 [[package]]
+name = "hop-top-inv-api"
+version = "0.1.0-alpha.0"
+dependencies = [
+ "async-trait",
+ "axum",
+ "base64",
+ "chrono",
+ "hop-top-inv-bus",
+ "hop-top-inv-commands",
+ "hop-top-inv-core",
+ "hop-top-inv-store",
+ "reqwest",
+ "rust_decimal",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "subtle",
+ "tempfile",
+ "thiserror 2.0.18",
+ "tokio",
+ "tower",
+ "tower-http",
+ "tracing",
+]
+
+[[package]]
+name = "hop-top-inv-bus"
+version = "0.1.0-alpha.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "hop-top-inv-commands",
+ "hop-top-inv-core",
+ "hop-top-inv-store",
+ "rust_decimal",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "tempfile",
+ "thiserror 2.0.18",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "hop-top-inv-cli"
+version = "0.1.0-alpha.0"
+dependencies = [
+ "anyhow",
+ "axum",
+ "chrono",
+ "clap",
+ "hop-top-inv-api",
+ "hop-top-inv-bus",
+ "hop-top-inv-commands",
+ "hop-top-inv-core",
+ "hop-top-inv-mcp",
+ "hop-top-inv-store",
+ "hop-top-inv-ws",
+ "hop-top-kit",
+ "rust_decimal",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "toml",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "hop-top-inv-commands"
+version = "0.1.0-alpha.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "hop-top-inv-bus",
+ "hop-top-inv-core",
+ "hop-top-inv-store",
+ "rust_decimal",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "tempfile",
+ "thiserror 2.0.18",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "hop-top-inv-core"
+version = "0.1.0-alpha.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "hop-top-kit",
+ "hop-top-uri",
+ "insta",
+ "mti",
+ "rust_decimal",
+ "schemars",
+ "serde",
+ "serde_json",
+ "statig",
+ "tera",
+ "thiserror 2.0.18",
+ "tokio",
+ "toml",
+ "tracing",
+]
+
+[[package]]
+name = "hop-top-inv-e2e"
+version = "0.1.0-alpha.0"
+dependencies = [
+ "anyhow",
+ "axum",
+ "chrono",
+ "hop-top-inv-api",
+ "hop-top-inv-bus",
+ "hop-top-inv-cli",
+ "hop-top-inv-commands",
+ "hop-top-inv-core",
+ "hop-top-inv-mcp",
+ "hop-top-inv-store",
+ "hop-top-inv-ws",
+ "hop-top-xrr",
+ "reqwest",
+ "rmcp",
+ "rust_decimal",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "tempfile",
+ "tokio",
+ "tower",
+]
+
+[[package]]
+name = "hop-top-inv-mcp"
+version = "0.1.0-alpha.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "chrono",
+ "hop-top-inv-commands",
+ "hop-top-inv-core",
+ "hop-top-inv-store",
+ "rmcp",
+ "rust_decimal",
+ "schemars",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "hop-top-inv-store"
+version = "0.1.0-alpha.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "chrono",
+ "hop-top-inv-core",
+ "mti",
+ "rust_decimal",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "sqlx",
+ "tempfile",
+ "thiserror 2.0.18",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "hop-top-inv-ws"
+version = "0.1.0-alpha.0"
+dependencies = [
+ "async-trait",
+ "axum",
+ "chrono",
+ "futures-util",
+ "hop-top-inv-bus",
+ "hop-top-inv-commands",
+ "hop-top-inv-core",
+ "hop-top-inv-store",
+ "rust_decimal",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.18",
+ "tokio",
+ "tokio-tungstenite 0.24.0",
+ "tracing",
+]
+
+[[package]]
 name = "hop-top-kit"
 version = "0.4.0-experimental.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1445,209 +1646,8 @@ name = "inv"
 version = "0.1.0-alpha.0"
 dependencies = [
  "assert_cmd",
- "inv-cli",
+ "hop-top-inv-cli",
  "predicates",
-]
-
-[[package]]
-name = "inv-api"
-version = "0.1.0-alpha.0"
-dependencies = [
- "async-trait",
- "axum",
- "base64",
- "chrono",
- "inv-bus",
- "inv-commands",
- "inv-core",
- "inv-store",
- "reqwest",
- "rust_decimal",
- "serde",
- "serde_json",
- "sha2 0.10.9",
- "subtle",
- "tempfile",
- "thiserror 2.0.18",
- "tokio",
- "tower",
- "tower-http",
- "tracing",
-]
-
-[[package]]
-name = "inv-bus"
-version = "0.1.0-alpha.0"
-dependencies = [
- "async-trait",
- "chrono",
- "inv-commands",
- "inv-core",
- "inv-store",
- "rust_decimal",
- "serde",
- "serde_json",
- "sqlx",
- "tempfile",
- "thiserror 2.0.18",
- "tokio",
- "tracing",
-]
-
-[[package]]
-name = "inv-cli"
-version = "0.1.0-alpha.0"
-dependencies = [
- "anyhow",
- "axum",
- "chrono",
- "clap",
- "hop-top-kit",
- "inv-api",
- "inv-bus",
- "inv-commands",
- "inv-core",
- "inv-mcp",
- "inv-store",
- "inv-ws",
- "rust_decimal",
- "serde",
- "serde_json",
- "tempfile",
- "tokio",
- "toml",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
-name = "inv-commands"
-version = "0.1.0-alpha.0"
-dependencies = [
- "async-trait",
- "chrono",
- "inv-bus",
- "inv-core",
- "inv-store",
- "rust_decimal",
- "serde",
- "serde_json",
- "sqlx",
- "tempfile",
- "thiserror 2.0.18",
- "tokio",
- "tracing",
-]
-
-[[package]]
-name = "inv-core"
-version = "0.1.0-alpha.0"
-dependencies = [
- "anyhow",
- "chrono",
- "hop-top-kit",
- "hop-top-uri",
- "insta",
- "mti",
- "rust_decimal",
- "schemars",
- "serde",
- "serde_json",
- "statig",
- "tera",
- "thiserror 2.0.18",
- "tokio",
- "toml",
- "tracing",
-]
-
-[[package]]
-name = "inv-e2e"
-version = "0.1.0-alpha.0"
-dependencies = [
- "anyhow",
- "axum",
- "chrono",
- "hop-top-xrr",
- "inv-api",
- "inv-bus",
- "inv-cli",
- "inv-commands",
- "inv-core",
- "inv-mcp",
- "inv-store",
- "inv-ws",
- "reqwest",
- "rmcp",
- "rust_decimal",
- "serde",
- "serde_json",
- "sqlx",
- "tempfile",
- "tokio",
- "tower",
-]
-
-[[package]]
-name = "inv-mcp"
-version = "0.1.0-alpha.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "chrono",
- "inv-commands",
- "inv-core",
- "inv-store",
- "rmcp",
- "rust_decimal",
- "schemars",
- "serde",
- "serde_json",
- "thiserror 2.0.18",
- "tokio",
- "tracing",
-]
-
-[[package]]
-name = "inv-store"
-version = "0.1.0-alpha.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "chrono",
- "inv-core",
- "mti",
- "rust_decimal",
- "serde",
- "serde_json",
- "sha2 0.10.9",
- "sqlx",
- "tempfile",
- "thiserror 2.0.18",
- "tokio",
- "tracing",
-]
-
-[[package]]
-name = "inv-ws"
-version = "0.1.0-alpha.0"
-dependencies = [
- "async-trait",
- "axum",
- "chrono",
- "futures-util",
- "inv-bus",
- "inv-commands",
- "inv-core",
- "inv-store",
- "rust_decimal",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror 2.0.18",
- "tokio",
- "tokio-tungstenite 0.24.0",
- "tracing",
 ]
 
 [[package]]

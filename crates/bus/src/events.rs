@@ -1,11 +1,11 @@
 //! Typed payload structs for every domain event in design §4.2.
 //!
 //! The mechanic-event payloads (`InvoiceProposed`, `InvoiceTransitioned`,
-//! `InvoiceEntered` + the credit-note triplet) live in `inv-core::state`
+//! `InvoiceEntered` + the credit-note triplet) live in `hop-top-inv-core::state`
 //! and are re-exported from [`crate`]'s root — not duplicated here.
 //!
 //! All payloads round-trip through `serde_json` (Serialize + Deserialize).
-//! Field shapes mirror the JSON bodies that `inv-commands` builds inline
+//! Field shapes mirror the JSON bodies that `hop-top-inv-commands` builds inline
 //! today (see `crates/commands/src/{draft,issue,send,pay,void,credit,
 //! overdue,reminder,schedule}.rs`); when this crate publishes from the
 //! outbox it (re)builds the same shape from the persisted history row.

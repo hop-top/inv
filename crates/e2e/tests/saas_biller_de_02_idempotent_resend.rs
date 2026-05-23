@@ -24,15 +24,15 @@ use rust_decimal::Decimal;
 use serde_json::{json, Value};
 use tower::ServiceExt;
 
-use inv_api::router;
-use inv_commands::{
+use hop_top_inv_api::router;
+use hop_top_inv_commands::{
     draft_invoice, send_invoice, Actor, Channel, DraftInvoiceInput, DraftLineInput,
     SendInvoiceInput,
 };
-use inv_core::domain::invoice::TaxCategory;
-use inv_core::domain::jurisdiction::Jurisdiction;
-use inv_core::domain::money::Currency;
-use inv_store::repo::history::InvoiceHistoryRepo;
+use hop_top_inv_core::domain::invoice::TaxCategory;
+use hop_top_inv_core::domain::jurisdiction::Jurisdiction;
+use hop_top_inv_core::domain::money::Currency;
+use hop_top_inv_store::repo::history::InvoiceHistoryRepo;
 
 #[tokio::test]
 async fn draft_idempotency_key_replays() {
@@ -166,9 +166,9 @@ async fn send_idempotency_key_replays() {
     )
     .await
     .unwrap();
-    let issued = inv_commands::issue_invoice(
+    let issued = hop_top_inv_commands::issue_invoice(
         &ctx,
-        inv_commands::IssueInvoiceInput {
+        hop_top_inv_commands::IssueInvoiceInput {
             invoice_id: drafted.invoice.id.clone(),
             idempotency_key: None,
             actor: Actor::Cli { name: "jad".into() },
@@ -179,8 +179,8 @@ async fn send_idempotency_key_replays() {
     .unwrap();
 
     fn mk_send<'s>(
-        invoice_id: inv_core::domain::ids::InvoiceId,
-        sink: &'s mut dyn inv_commands::SendSink,
+        invoice_id: hop_top_inv_core::domain::ids::InvoiceId,
+        sink: &'s mut dyn hop_top_inv_commands::SendSink,
     ) -> SendInvoiceInput<'s> {
         SendInvoiceInput {
             invoice_id,
@@ -198,7 +198,7 @@ async fn send_idempotency_key_replays() {
         .expect("send1");
     assert_eq!(
         s1.invoice.state,
-        inv_core::domain::invoice::InvoiceState::Sent
+        hop_top_inv_core::domain::invoice::InvoiceState::Sent
     );
     assert!(!s1.idempotency_replay, "first call must NOT be a replay");
     let s1_delivered = s1.delivered_to.clone();

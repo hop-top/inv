@@ -12,11 +12,11 @@ use chrono::{DateTime, NaiveDate, Utc};
 use rust_decimal::Decimal;
 use serde_json::json;
 
-use inv_core::domain::ids::{CustomerId, ScheduleId};
-use inv_core::domain::invoice::TaxCategory;
-use inv_core::domain::money::Currency;
-use inv_core::domain::schedule::{Cadence, Schedule, ScheduleLine, ScheduleState};
-use inv_store::repo::schedule::ScheduleRepo;
+use hop_top_inv_core::domain::ids::{CustomerId, ScheduleId};
+use hop_top_inv_core::domain::invoice::TaxCategory;
+use hop_top_inv_core::domain::money::Currency;
+use hop_top_inv_core::domain::schedule::{Cadence, Schedule, ScheduleLine, ScheduleState};
+use hop_top_inv_store::repo::schedule::ScheduleRepo;
 
 use crate::ctx::{Actor, Channel, CoreCtx};
 use crate::draft::{
@@ -25,7 +25,7 @@ use crate::draft::{
 use crate::error::CoreError;
 use crate::issue::{issue_invoice, IssueInvoiceInput};
 use crate::publisher::try_publish;
-use inv_core::domain::ids::LineId;
+use hop_top_inv_core::domain::ids::LineId;
 
 // =============================================================================
 // schedule_create
@@ -299,7 +299,7 @@ pub async fn schedules_tick(ctx: &CoreCtx) -> Result<SchedulesTickOutput, CoreEr
             .collect();
         let draft_input = DraftInvoiceInput {
             customer_id: schedule.customer_id.clone(),
-            seller_jurisdiction: inv_core::domain::jurisdiction::Jurisdiction::QuebecCa,
+            seller_jurisdiction: hop_top_inv_core::domain::jurisdiction::Jurisdiction::QuebecCa,
             // TODO(T-0014): the schedule should carry the seller_jurisdiction.
             // For v1 we default to QuebecCa to keep tests + the default tax
             // table coherent. The schedule-create command will gain a

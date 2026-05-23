@@ -124,7 +124,7 @@ the bus, and marks them processed. It runs only inside `inv server`.
 - Start `inv server` (the relay runs on a 5s default interval; tunable via
   `--outbox-interval-secs`).
 - Or, in tests, drain manually:
-  `cargo run -p inv-bus --example drain_outbox` (helper TBD).
+  `cargo run -p hop-top-inv-bus --example drain_outbox` (helper TBD).
 
 In CLI-only / one-shot mode, the outbox is **persisted** but **not
 relayed** — by design. The history table is the durable audit log; you can

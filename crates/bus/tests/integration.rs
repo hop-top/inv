@@ -1,4 +1,4 @@
-//! Integration tests for `inv-bus`.
+//! Integration tests for `hop-top-inv-bus`.
 //!
 //! Covers:
 //! - [`LoggingPublisher`] / [`InMemoryPublisher`] basics.
@@ -15,24 +15,24 @@ use chrono::{DateTime, TimeZone, Utc};
 use rust_decimal::Decimal;
 use serde_json::json;
 
-use inv_bus::{
+use hop_top_inv_bus::{
     dispatch_inbound_event, remap_topic, run_outbox_relay, InMemoryPublisher, LoggingPublisher,
     Publisher, TopicMap, TOPIC_INVOICE_DRAFTED,
 };
-use inv_commands::{
+use hop_top_inv_commands::{
     draft_invoice, Actor, Channel, Clock, CoreCtx, DraftInvoiceInput, DraftLineInput,
 };
-use inv_core::domain::address::Address;
-use inv_core::domain::customer::Customer;
-use inv_core::domain::ids::CustomerId;
-use inv_core::domain::invoice::TaxCategory;
-use inv_core::domain::jurisdiction::Jurisdiction;
-use inv_core::domain::money::Currency;
-use inv_core::tax::TaxTable;
-use inv_store::pool::{connect, Pool};
-use inv_store::repo::bus_inbox::BusInboxRepo;
-use inv_store::repo::{CustomerRepo, InvoiceHistoryRepo};
-use inv_store::run_migrations;
+use hop_top_inv_core::domain::address::Address;
+use hop_top_inv_core::domain::customer::Customer;
+use hop_top_inv_core::domain::ids::CustomerId;
+use hop_top_inv_core::domain::invoice::TaxCategory;
+use hop_top_inv_core::domain::jurisdiction::Jurisdiction;
+use hop_top_inv_core::domain::money::Currency;
+use hop_top_inv_core::tax::TaxTable;
+use hop_top_inv_store::pool::{connect, Pool};
+use hop_top_inv_store::repo::bus_inbox::BusInboxRepo;
+use hop_top_inv_store::repo::{CustomerRepo, InvoiceHistoryRepo};
+use hop_top_inv_store::run_migrations;
 
 // =============================================================================
 // Test scaffolding
@@ -263,9 +263,9 @@ fn topic_remap_passes_through_unmapped() {
 // Consumer (T-0015)
 // =============================================================================
 
-use inv_bus::{Consumer, DispatchError, DispatchOutput};
-use inv_commands::{issue_invoice, IssueInvoiceInput};
-use inv_core::domain::invoice::InvoiceState;
+use hop_top_inv_bus::{Consumer, DispatchError, DispatchOutput};
+use hop_top_inv_commands::{issue_invoice, IssueInvoiceInput};
+use hop_top_inv_core::domain::invoice::InvoiceState;
 
 #[tokio::test]
 async fn consumer_charge_created_creates_draft() {

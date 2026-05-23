@@ -2,11 +2,11 @@
 //!
 //! Maps to design §10's MCP-column entries for the invoice lifecycle:
 //!
-//! - `inv_invoice_draft`  → [`inv_commands::draft_invoice`]
-//! - `inv_invoice_issue`  → [`inv_commands::issue_invoice`]
-//! - `inv_invoice_send`   → [`inv_commands::send_invoice`]
-//! - `inv_invoice_pay`    → [`inv_commands::mark_paid`]
-//! - `inv_invoice_void`   → [`inv_commands::void_invoice`]
+//! - `inv_invoice_draft`  → [`hop_top_inv_commands::draft_invoice`]
+//! - `inv_invoice_issue`  → [`hop_top_inv_commands::issue_invoice`]
+//! - `inv_invoice_send`   → [`hop_top_inv_commands::send_invoice`]
+//! - `inv_invoice_pay`    → [`hop_top_inv_commands::mark_paid`]
+//! - `inv_invoice_void`   → [`hop_top_inv_commands::void_invoice`]
 //! - `inv_invoice_show`   → `InvoiceRepo::get`
 //! - `inv_invoice_list`   → `InvoiceRepo::list`
 //! - `inv_customer_add`   → `CustomerRepo::save`
@@ -19,21 +19,21 @@ use rust_decimal::Decimal;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use inv_commands::{
+use hop_top_inv_commands::{
     draft_invoice, issue_invoice, mark_paid, void_invoice, DraftInvoiceInput, DraftLineInput,
     IssueInvoiceInput, MarkPaidInput, VoidInvoiceInput,
 };
-use inv_core::domain::address::Address;
-use inv_core::domain::customer::Customer;
-use inv_core::domain::ids::{CustomerId, InvoiceId};
-use inv_core::domain::invoice::{InvoiceState, TaxCategory};
-use inv_core::domain::jurisdiction::Jurisdiction;
-use inv_core::domain::money::Currency;
-use inv_store::repo::customer::CustomerRepo;
-use inv_store::repo::invoice::{InvoiceFilter, InvoiceLineRepo, InvoiceRepo};
+use hop_top_inv_core::domain::address::Address;
+use hop_top_inv_core::domain::customer::Customer;
+use hop_top_inv_core::domain::ids::{CustomerId, InvoiceId};
+use hop_top_inv_core::domain::invoice::{InvoiceState, TaxCategory};
+use hop_top_inv_core::domain::jurisdiction::Jurisdiction;
+use hop_top_inv_core::domain::money::Currency;
+use hop_top_inv_store::repo::customer::CustomerRepo;
+use hop_top_inv_store::repo::invoice::{InvoiceFilter, InvoiceLineRepo, InvoiceRepo};
 use std::collections::BTreeMap;
 
-use inv_commands::CoreCtx;
+use hop_top_inv_commands::CoreCtx;
 
 use crate::error::McpError;
 use crate::tools::common::{mcp_actor, mcp_channel};
@@ -65,7 +65,7 @@ pub struct InvoiceDraftInput {
     pub customer_id: String,
     /// Seller jurisdiction (drives tax resolution at issue). One of
     /// `CA-QC`, `US-DE`, `DZ-16` (see
-    /// `inv_core::domain::jurisdiction::Jurisdiction`).
+    /// `hop_top_inv_core::domain::jurisdiction::Jurisdiction`).
     pub seller_jurisdiction: Jurisdiction,
     /// ISO 4217 currency code (USD, CAD, or DZD at v1).
     pub currency: String,
@@ -88,8 +88,8 @@ pub struct InvoiceDraftInput {
 /// `ctx.publisher`; agents that need them should subscribe to the bus.
 #[derive(Debug, Serialize)]
 struct DraftOutputWire<'a> {
-    invoice: &'a inv_core::domain::invoice::Invoice,
-    lines: &'a [inv_core::domain::invoice::InvoiceLine],
+    invoice: &'a hop_top_inv_core::domain::invoice::Invoice,
+    lines: &'a [hop_top_inv_core::domain::invoice::InvoiceLine],
     idempotency_replay: bool,
 }
 
@@ -99,7 +99,7 @@ pub async fn draft(ctx: &CoreCtx, input: InvoiceDraftInput) -> Result<serde_json
         input
             .customer_id
             .parse()
-            .map_err(|e: inv_core::domain::ids::IdError| {
+            .map_err(|e: hop_top_inv_core::domain::ids::IdError| {
                 McpError::Decode(format!("customer_id: {e}"))
             })?;
     let currency =
@@ -152,8 +152,8 @@ pub struct InvoiceIssueInput {
 
 #[derive(Debug, Serialize)]
 struct IssueOutputWire<'a> {
-    invoice: &'a inv_core::domain::invoice::Invoice,
-    lines: &'a [inv_core::domain::invoice::InvoiceLine],
+    invoice: &'a hop_top_inv_core::domain::invoice::Invoice,
+    lines: &'a [hop_top_inv_core::domain::invoice::InvoiceLine],
     /// HTML body. Always present.
     html: &'a str,
     /// Length of the rendered PDF bytes (the stub engine emits HTML
@@ -168,7 +168,7 @@ pub async fn issue(ctx: &CoreCtx, input: InvoiceIssueInput) -> Result<serde_json
         input
             .invoice_id
             .parse()
-            .map_err(|e: inv_core::domain::ids::IdError| {
+            .map_err(|e: hop_top_inv_core::domain::ids::IdError| {
                 McpError::Decode(format!("invoice_id: {e}"))
             })?;
     let req = IssueInvoiceInput {
@@ -207,7 +207,7 @@ pub struct InvoiceSendInput {
 
 #[derive(Debug, Serialize)]
 struct SendOutputWire<'a> {
-    invoice: &'a inv_core::domain::invoice::Invoice,
+    invoice: &'a hop_top_inv_core::domain::invoice::Invoice,
     delivered_to: &'a str,
     bytes_written: usize,
 }
@@ -217,12 +217,12 @@ struct SendOutputWire<'a> {
 /// v1; sending to stdout in a stdio-transported MCP server would
 /// corrupt the JSON-RPC stream).
 pub async fn send(ctx: &CoreCtx, input: InvoiceSendInput) -> Result<serde_json::Value, McpError> {
-    use inv_commands::SendInvoiceInput;
+    use hop_top_inv_commands::SendInvoiceInput;
     let invoice_id: InvoiceId =
         input
             .invoice_id
             .parse()
-            .map_err(|e: inv_core::domain::ids::IdError| {
+            .map_err(|e: hop_top_inv_core::domain::ids::IdError| {
                 McpError::Decode(format!("invoice_id: {e}"))
             })?;
     let mut sink: Vec<u8> = Vec::new();
@@ -234,7 +234,7 @@ pub async fn send(ctx: &CoreCtx, input: InvoiceSendInput) -> Result<serde_json::
         channel: mcp_channel(),
         sink: Some(&mut sink),
     };
-    let out = inv_commands::send_invoice(ctx, cmd_input).await?;
+    let out = hop_top_inv_commands::send_invoice(ctx, cmd_input).await?;
     let wire = SendOutputWire {
         invoice: &out.invoice,
         delivered_to: &out.delivered_to,
@@ -268,7 +268,7 @@ pub struct InvoicePayInput {
 
 #[derive(Debug, Serialize)]
 struct PayOutputWire<'a> {
-    invoice: &'a inv_core::domain::invoice::Invoice,
+    invoice: &'a hop_top_inv_core::domain::invoice::Invoice,
     fully_paid: bool,
 }
 
@@ -278,7 +278,7 @@ pub async fn pay(ctx: &CoreCtx, input: InvoicePayInput) -> Result<serde_json::Va
         input
             .invoice_id
             .parse()
-            .map_err(|e: inv_core::domain::ids::IdError| {
+            .map_err(|e: hop_top_inv_core::domain::ids::IdError| {
                 McpError::Decode(format!("invoice_id: {e}"))
             })?;
     let req = MarkPaidInput {
@@ -321,7 +321,7 @@ pub async fn void(ctx: &CoreCtx, input: InvoiceVoidInput) -> Result<serde_json::
         input
             .invoice_id
             .parse()
-            .map_err(|e: inv_core::domain::ids::IdError| {
+            .map_err(|e: hop_top_inv_core::domain::ids::IdError| {
                 McpError::Decode(format!("invoice_id: {e}"))
             })?;
     let req = VoidInvoiceInput {
@@ -354,12 +354,13 @@ pub struct InvoiceShowInput {
 /// Serialised via [`crate::resources::InvoiceResourceBody`] — the same
 /// wrapper the resource handler uses.
 pub async fn show(ctx: &CoreCtx, input: InvoiceShowInput) -> Result<serde_json::Value, McpError> {
-    let id: InvoiceId = input
-        .invoice_id
-        .parse()
-        .map_err(|e: inv_core::domain::ids::IdError| {
-            McpError::Decode(format!("invoice_id: {e}"))
-        })?;
+    let id: InvoiceId =
+        input
+            .invoice_id
+            .parse()
+            .map_err(|e: hop_top_inv_core::domain::ids::IdError| {
+                McpError::Decode(format!("invoice_id: {e}"))
+            })?;
     let inv = InvoiceRepo::new(&ctx.db)
         .get(&id)
         .await?
@@ -397,7 +398,7 @@ pub async fn list(ctx: &CoreCtx, input: InvoiceListInput) -> Result<serde_json::
         .as_deref()
         .map(|s| {
             s.parse::<CustomerId>()
-                .map_err(|e: inv_core::domain::ids::IdError| {
+                .map_err(|e: hop_top_inv_core::domain::ids::IdError| {
                     McpError::Decode(format!("customer_id: {e}"))
                 })
         })
@@ -437,11 +438,12 @@ pub async fn customer_add(
     input: CustomerAddInput,
 ) -> Result<serde_json::Value, McpError> {
     let id = match input.customer_id {
-        Some(s) => s
-            .parse::<CustomerId>()
-            .map_err(|e: inv_core::domain::ids::IdError| {
-                McpError::Decode(format!("customer_id: {e}"))
-            })?,
+        Some(s) => {
+            s.parse::<CustomerId>()
+                .map_err(|e: hop_top_inv_core::domain::ids::IdError| {
+                    McpError::Decode(format!("customer_id: {e}"))
+                })?
+        }
         None => CustomerId::new(),
     };
     let now = ctx.clock.now();
@@ -474,7 +476,7 @@ pub async fn customer_show(
         input
             .customer_id
             .parse()
-            .map_err(|e: inv_core::domain::ids::IdError| {
+            .map_err(|e: hop_top_inv_core::domain::ids::IdError| {
                 McpError::Decode(format!("customer_id: {e}"))
             })?;
     let c = CustomerRepo::new(&ctx.db)

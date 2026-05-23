@@ -10,7 +10,7 @@ use clap::{ArgMatches, Command};
 use hop_top_kit::output::ColumnSpec;
 use serde_json::json;
 
-use inv_commands::CoreCtx;
+use hop_top_inv_commands::CoreCtx;
 
 use crate::render::render_list;
 

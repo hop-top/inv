@@ -1,4 +1,4 @@
-//! MCP tools — one per `inv-commands` operation.
+//! MCP tools — one per `hop-top-inv-commands` operation.
 //!
 //! Each submodule wraps a command-layer function as an MCP tool with a
 //! JSON-schema'd input and a `serde_json::Value` output. The

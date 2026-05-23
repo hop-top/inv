@@ -3,10 +3,10 @@
 use chrono::Utc;
 use sqlx::Row;
 
-use inv_core::domain::creditnote::{CreditNote, CreditNoteState, CreditNoteStateHistory};
-use inv_core::domain::ids::{CreditNoteId, HistoryId, InvoiceId};
-use inv_core::domain::invoice::HistoryChannel;
-use inv_core::domain::money::Currency;
+use hop_top_inv_core::domain::creditnote::{CreditNote, CreditNoteState, CreditNoteStateHistory};
+use hop_top_inv_core::domain::ids::{CreditNoteId, HistoryId, InvoiceId};
+use hop_top_inv_core::domain::invoice::HistoryChannel;
+use hop_top_inv_core::domain::money::Currency;
 
 use super::{
     decimal_to_string, metadata_from_json, metadata_to_json, parse_decimal, parse_ts, ts_to_string,

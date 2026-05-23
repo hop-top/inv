@@ -3,7 +3,7 @@
 //! [`BroadcastPublisher`] is a [`Publisher`] backed by a Tokio
 //! `broadcast::Sender<BusMessage>`. Every call to [`Publisher::publish`]
 //! fans the message out to every live [`BroadcastSubscriber`]. Used by
-//! the WebSocket adapter (`inv-ws`) so per-connection forwarders can
+//! the WebSocket adapter (`hop-top-inv-ws`) so per-connection forwarders can
 //! pull the same event stream the outbox relay emits.
 //!
 //! Unlike [`crate::LoggingPublisher`] / [`crate::InMemoryPublisher`],

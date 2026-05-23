@@ -1,22 +1,22 @@
 //! Recurring-schedule tools.
 //!
-//! - `inv_schedule_create` → [`inv_commands::schedule_create`]
-//! - `inv_schedule_pause`  → [`inv_commands::schedule_pause`]
-//! - `inv_schedule_cancel` → [`inv_commands::schedule_cancel`]
+//! - `inv_schedule_create` → [`hop_top_inv_commands::schedule_create`]
+//! - `inv_schedule_pause`  → [`hop_top_inv_commands::schedule_pause`]
+//! - `inv_schedule_cancel` → [`hop_top_inv_commands::schedule_cancel`]
 
 use chrono::NaiveDate;
 use rust_decimal::Decimal;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use inv_commands::{
+use hop_top_inv_commands::{
     schedule_cancel, schedule_create, schedule_pause, CoreCtx, ScheduleCreateInput,
     ScheduleLineInput, ScheduleStateChangeInput,
 };
-use inv_core::domain::ids::{CustomerId, ScheduleId};
-use inv_core::domain::invoice::TaxCategory;
-use inv_core::domain::money::Currency;
-use inv_core::domain::schedule::Cadence;
+use hop_top_inv_core::domain::ids::{CustomerId, ScheduleId};
+use hop_top_inv_core::domain::invoice::TaxCategory;
+use hop_top_inv_core::domain::money::Currency;
+use hop_top_inv_core::domain::schedule::Cadence;
 
 use crate::error::McpError;
 use crate::tools::common::{mcp_actor, mcp_channel};
@@ -67,7 +67,7 @@ pub async fn create(
         input
             .customer_id
             .parse()
-            .map_err(|e: inv_core::domain::ids::IdError| {
+            .map_err(|e: hop_top_inv_core::domain::ids::IdError| {
                 McpError::Decode(format!("customer_id: {e}"))
             })?;
     let currency =
@@ -76,7 +76,7 @@ pub async fn create(
         input
             .cadence
             .parse()
-            .map_err(|e: inv_core::domain::schedule::CadenceError| {
+            .map_err(|e: hop_top_inv_core::domain::schedule::CadenceError| {
                 McpError::Decode(format!("cadence: {e}"))
             })?;
     let template_lines = input
@@ -120,7 +120,7 @@ pub async fn pause(
         input
             .schedule_id
             .parse()
-            .map_err(|e: inv_core::domain::ids::IdError| {
+            .map_err(|e: hop_top_inv_core::domain::ids::IdError| {
                 McpError::Decode(format!("schedule_id: {e}"))
             })?;
     let req = ScheduleStateChangeInput {
@@ -141,7 +141,7 @@ pub async fn cancel(
         input
             .schedule_id
             .parse()
-            .map_err(|e: inv_core::domain::ids::IdError| {
+            .map_err(|e: hop_top_inv_core::domain::ids::IdError| {
                 McpError::Decode(format!("schedule_id: {e}"))
             })?;
     let req = ScheduleStateChangeInput {

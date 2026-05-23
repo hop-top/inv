@@ -1,4 +1,4 @@
-//! Integration tests for inv-ws.
+//! Integration tests for hop-top-inv-ws.
 //!
 //! Each test spins up an axum server bound to `127.0.0.1:0`, opens a
 //! tokio-tungstenite client at the resulting `ws://127.0.0.1:PORT/ws`,
@@ -15,18 +15,18 @@ use serde_json::Value;
 use tokio::net::TcpListener;
 use tokio_tungstenite::tungstenite::Message as WsMessage;
 
-use inv_commands::{Clock, CoreCtx};
-use inv_core::domain::address::Address;
-use inv_core::domain::customer::Customer;
-use inv_core::domain::ids::CustomerId;
-use inv_core::tax::TaxTable;
-use inv_store::pool::{connect, Pool};
-use inv_store::repo::CustomerRepo;
-use inv_store::run_migrations;
+use hop_top_inv_commands::{Clock, CoreCtx};
+use hop_top_inv_core::domain::address::Address;
+use hop_top_inv_core::domain::customer::Customer;
+use hop_top_inv_core::domain::ids::CustomerId;
+use hop_top_inv_core::tax::TaxTable;
+use hop_top_inv_store::pool::{connect, Pool};
+use hop_top_inv_store::repo::CustomerRepo;
+use hop_top_inv_store::run_migrations;
 
-use inv_bus::Publisher;
-use inv_ws::router;
-use inv_ws::{BroadcastPublisher, SharedPublisher};
+use hop_top_inv_bus::Publisher;
+use hop_top_inv_ws::router;
+use hop_top_inv_ws::{BroadcastPublisher, SharedPublisher};
 
 // ---------------------------------------------------------------------
 // Test scaffolding

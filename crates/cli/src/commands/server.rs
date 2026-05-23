@@ -11,9 +11,9 @@
 //!   inv server
 //!     │
 //!     ├─► HTTP+WS server (axum on 127.0.0.1:7400 by default)
-//!     │     ├─► /v1/*    (inv-api routes, bearer-auth-gated)
+//!     │     ├─► /v1/*    (hop-top-inv-api routes, bearer-auth-gated)
 //!     │     ├─► /v/:token (signed-link view, public)
-//!     │     ├─► /ws        (inv-ws upgrade)
+//!     │     ├─► /ws        (hop-top-inv-ws upgrade)
 //!     │     └─► /healthz
 //!     │
 //!     ├─► outbox relay  (periodic, drains invoice_state_history +
@@ -36,8 +36,8 @@ use std::time::Duration;
 
 use anyhow::{anyhow, Context};
 use clap::{ArgMatches, Command};
-use inv_api::{ApiConfig, ApiState};
-use inv_commands::{mark_overdue_ticker, reminders_tick, schedules_tick, CoreCtx};
+use hop_top_inv_api::{ApiConfig, ApiState};
+use hop_top_inv_commands::{mark_overdue_ticker, reminders_tick, schedules_tick, CoreCtx};
 use tokio::net::TcpListener;
 use tokio::signal;
 use tokio::time::interval;
@@ -97,25 +97,27 @@ pub async fn dispatch(ctx: &CoreCtx, m: &ArgMatches) -> anyhow::Result<()> {
 
     // ----- Build adapter routers ----------------------------------------
     // Outbox relay publisher: writes every drained event to tracing.
-    let publisher: Arc<inv_bus::LoggingPublisher> = Arc::new(inv_bus::LoggingPublisher);
+    let publisher: Arc<hop_top_inv_bus::LoggingPublisher> =
+        Arc::new(hop_top_inv_bus::LoggingPublisher);
 
     // WS + synchronous-publish publisher: a single broadcast channel so
     // the api `/v/{token}` view route's synchronous publish (T-0031),
     // every per-connection ws subscriber, and the outbox relay all see
     // the same event stream.
-    let ws_publisher: inv_ws::SharedPublisher = Arc::new(inv_bus::BroadcastPublisher::new(1024));
+    let ws_publisher: hop_top_inv_ws::SharedPublisher =
+        Arc::new(hop_top_inv_bus::BroadcastPublisher::new(1024));
 
     // Attach the broadcast publisher to CoreCtx so view-route emits land
     // immediately. The history outbox stays the canonical delivery path
     // — synchronous publish is a real-time fanout shortcut.
     let mut ctx_with_pub = ctx.clone();
-    ctx_with_pub.publisher = Some(ws_publisher.clone() as Arc<dyn inv_commands::Publisher>);
+    ctx_with_pub.publisher = Some(ws_publisher.clone() as Arc<dyn hop_top_inv_commands::Publisher>);
     let ctx_arc = Arc::new(ctx_with_pub);
 
     let api_state = Arc::new(ApiState::new(ctx_arc.clone(), ApiConfig::default()));
-    let api_router = inv_api::router(api_state);
+    let api_router = hop_top_inv_api::router(api_state);
 
-    let ws_router = inv_ws::router(ctx_arc.clone(), ws_publisher);
+    let ws_router = hop_top_inv_ws::router(ctx_arc.clone(), ws_publisher);
 
     let app = api_router.merge(ws_router);
 
@@ -141,7 +143,7 @@ pub async fn dispatch(ctx: &CoreCtx, m: &ArgMatches) -> anyhow::Result<()> {
     let mcp_handle = if mcp {
         let ctx_mcp = ctx_arc.clone();
         Some(tokio::spawn(async move {
-            if let Err(e) = inv_mcp::run_stdio(ctx_mcp).await {
+            if let Err(e) = hop_top_inv_mcp::run_stdio(ctx_mcp).await {
                 tracing::error!(error = %e, "mcp stdio exited");
             }
         }))
@@ -177,7 +179,7 @@ fn parse_secs(m: &ArgMatches, key: &str) -> anyhow::Result<u64> {
 
 fn spawn_outbox_loop(
     ctx: Arc<CoreCtx>,
-    publisher: Arc<inv_bus::LoggingPublisher>,
+    publisher: Arc<hop_top_inv_bus::LoggingPublisher>,
     interval_secs: u64,
 ) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
@@ -185,7 +187,7 @@ fn spawn_outbox_loop(
         ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
         loop {
             ticker.tick().await;
-            match inv_bus::run_outbox_relay(&ctx.db, publisher.as_ref(), 100).await {
+            match hop_top_inv_bus::run_outbox_relay(&ctx.db, publisher.as_ref(), 100).await {
                 Ok(stats) => {
                     if stats.events_published > 0 {
                         tracing::info!(

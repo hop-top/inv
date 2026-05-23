@@ -5,14 +5,14 @@ use clap::{Arg, ArgAction, ArgMatches, Command};
 use hop_top_kit::output::ColumnSpec;
 use serde_json::json;
 
-use inv_commands::{
+use hop_top_inv_commands::{
     schedule_cancel, schedule_create, schedule_pause, Actor, Channel, CoreCtx, ScheduleCreateInput,
     ScheduleLineInput, ScheduleStateChangeInput,
 };
-use inv_core::domain::invoice::TaxCategory;
-use inv_core::domain::money::Currency;
-use inv_core::domain::schedule::{Cadence, ScheduleState};
-use inv_store::repo::schedule::{ScheduleFilter, ScheduleRepo};
+use hop_top_inv_core::domain::invoice::TaxCategory;
+use hop_top_inv_core::domain::money::Currency;
+use hop_top_inv_core::domain::schedule::{Cadence, ScheduleState};
+use hop_top_inv_store::repo::schedule::{ScheduleFilter, ScheduleRepo};
 
 use super::parse::{parse_customer_id, parse_date, parse_line, parse_schedule_id, LineSpec};
 use crate::render::{render_list, render_value};
@@ -233,7 +233,7 @@ fn build_state_change_input(matches: &ArgMatches) -> Result<ScheduleStateChangeI
 
 fn render_transition(
     matches: &ArgMatches,
-    output: inv_commands::ScheduleStateChangeOutput,
+    output: hop_top_inv_commands::ScheduleStateChangeOutput,
 ) -> Result<()> {
     let value = json!({
         "schedule": output.schedule,

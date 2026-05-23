@@ -33,16 +33,16 @@
 use serde_json::{json, Value};
 use tracing::{debug, warn};
 
-use inv_core::domain::creditnote::{CreditNoteState, CreditNoteStateHistory};
-use inv_core::domain::invoice::{HistoryChannel, InvoiceState, InvoiceStateHistory};
-use inv_core::state::creditnote::{
+use hop_top_inv_core::domain::creditnote::{CreditNoteState, CreditNoteStateHistory};
+use hop_top_inv_core::domain::invoice::{HistoryChannel, InvoiceState, InvoiceStateHistory};
+use hop_top_inv_core::state::creditnote::{
     CreditNoteEntered, CreditNoteEvent, CreditNoteProposed, CreditNoteTransitioned,
 };
-use inv_core::state::events::{InvoiceEntered, InvoiceProposed, InvoiceTransitioned};
-use inv_core::state::transitions::InvoiceEvent;
-use inv_store::repo::credit_note::CreditNoteHistoryRepo;
-use inv_store::repo::history::InvoiceHistoryRepo;
-use inv_store::Pool;
+use hop_top_inv_core::state::events::{InvoiceEntered, InvoiceProposed, InvoiceTransitioned};
+use hop_top_inv_core::state::transitions::InvoiceEvent;
+use hop_top_inv_store::repo::credit_note::CreditNoteHistoryRepo;
+use hop_top_inv_store::repo::history::InvoiceHistoryRepo;
+use hop_top_inv_store::Pool;
 
 use crate::error::RelayError;
 use crate::events::{
@@ -117,7 +117,7 @@ fn invoice_row_to_events(row: &InvoiceStateHistory) -> Vec<(String, Value)> {
     // Self-edges don't write history rows under v1; defensive skip.
     if row.from_state == Some(row.to_state) {
         debug!(
-            target: "inv_bus::outbox",
+            target: "hop_top_inv_bus::outbox",
             history_id = %row.id,
             "skip mechanic triplet for self-edge history row"
         );
@@ -154,20 +154,20 @@ fn invoice_row_to_events(row: &InvoiceStateHistory) -> Vec<(String, Value)> {
             );
 
             out.push((
-                inv_core::state::events::TOPIC_PROPOSED.to_string(),
+                hop_top_inv_core::state::events::TOPIC_PROPOSED.to_string(),
                 serde_json::to_value(&proposed).unwrap_or_else(|_| json!({})),
             ));
             out.push((
-                inv_core::state::events::TOPIC_TRANSITIONED.to_string(),
+                hop_top_inv_core::state::events::TOPIC_TRANSITIONED.to_string(),
                 serde_json::to_value(&transitioned).unwrap_or_else(|_| json!({})),
             ));
             out.push((
-                inv_core::state::events::TOPIC_ENTERED.to_string(),
+                hop_top_inv_core::state::events::TOPIC_ENTERED.to_string(),
                 serde_json::to_value(&entered).unwrap_or_else(|_| json!({})),
             ));
         } else {
             warn!(
-                target: "inv_bus::outbox",
+                target: "hop_top_inv_bus::outbox",
                 event = %row.event,
                 to_state = ?row.to_state,
                 "unknown invoice history event tag; skipping mechanic triplet"
@@ -180,7 +180,7 @@ fn invoice_row_to_events(row: &InvoiceStateHistory) -> Vec<(String, Value)> {
         out.push((topic.to_string(), invoice_domain_payload(row)));
     } else {
         warn!(
-            target: "inv_bus::outbox",
+            target: "hop_top_inv_bus::outbox",
             event = %row.event,
             to_state = ?row.to_state,
             "no domain topic mapping for invoice history row"
@@ -293,15 +293,15 @@ fn credit_note_row_to_events(row: &CreditNoteStateHistory) -> Vec<(String, Value
             row.occurred_at,
         );
         out.push((
-            inv_core::state::creditnote::TOPIC_PROPOSED.to_string(),
+            hop_top_inv_core::state::creditnote::TOPIC_PROPOSED.to_string(),
             serde_json::to_value(&proposed).unwrap_or_else(|_| json!({})),
         ));
         out.push((
-            inv_core::state::creditnote::TOPIC_TRANSITIONED.to_string(),
+            hop_top_inv_core::state::creditnote::TOPIC_TRANSITIONED.to_string(),
             serde_json::to_value(&transitioned).unwrap_or_else(|_| json!({})),
         ));
         out.push((
-            inv_core::state::creditnote::TOPIC_ENTERED.to_string(),
+            hop_top_inv_core::state::creditnote::TOPIC_ENTERED.to_string(),
             serde_json::to_value(&entered).unwrap_or_else(|_| json!({})),
         ));
     }
@@ -310,7 +310,7 @@ fn credit_note_row_to_events(row: &CreditNoteStateHistory) -> Vec<(String, Value
         out.push((topic.to_string(), credit_note_domain_payload(row)));
     } else {
         warn!(
-            target: "inv_bus::outbox",
+            target: "hop_top_inv_bus::outbox",
             event = %row.event,
             to_state = ?row.to_state,
             "no domain topic mapping for credit-note history row"
@@ -377,7 +377,7 @@ fn channel_str(c: HistoryChannel) -> &'static str {
 mod tests {
     use super::*;
     use chrono::Utc;
-    use inv_core::domain::ids::{HistoryId, InvoiceId};
+    use hop_top_inv_core::domain::ids::{HistoryId, InvoiceId};
     use std::collections::BTreeMap;
 
     fn invoice_row(
@@ -414,9 +414,12 @@ mod tests {
         let row = invoice_row("issue", Some(InvoiceState::Draft), InvoiceState::Issued);
         let events = invoice_row_to_events(&row);
         assert_eq!(events.len(), 4);
-        assert_eq!(events[0].0, inv_core::state::events::TOPIC_PROPOSED);
-        assert_eq!(events[1].0, inv_core::state::events::TOPIC_TRANSITIONED);
-        assert_eq!(events[2].0, inv_core::state::events::TOPIC_ENTERED);
+        assert_eq!(events[0].0, hop_top_inv_core::state::events::TOPIC_PROPOSED);
+        assert_eq!(
+            events[1].0,
+            hop_top_inv_core::state::events::TOPIC_TRANSITIONED
+        );
+        assert_eq!(events[2].0, hop_top_inv_core::state::events::TOPIC_ENTERED);
         assert_eq!(events[3].0, TOPIC_INVOICE_ISSUED);
     }
 

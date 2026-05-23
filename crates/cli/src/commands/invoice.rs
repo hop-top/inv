@@ -5,16 +5,16 @@ use clap::{value_parser, Arg, ArgAction, ArgMatches, Command};
 use hop_top_kit::output::ColumnSpec;
 use serde_json::{json, Value};
 
-use inv_commands::send::StdoutSink;
-use inv_commands::{
+use hop_top_inv_commands::send::StdoutSink;
+use hop_top_inv_commands::{
     draft_invoice, issue_invoice, mark_paid, send_invoice, void_invoice, Actor, Channel, CoreCtx,
     DraftInvoiceInput, DraftLineInput, IssueInvoiceInput, MarkPaidInput, SendInvoiceInput,
     VoidInvoiceInput,
 };
-use inv_core::domain::invoice::{InvoiceState, TaxCategory};
-use inv_core::domain::jurisdiction::Jurisdiction;
-use inv_core::domain::money::Currency;
-use inv_store::repo::invoice::{InvoiceFilter, InvoiceLineRepo, InvoiceRepo};
+use hop_top_inv_core::domain::invoice::{InvoiceState, TaxCategory};
+use hop_top_inv_core::domain::jurisdiction::Jurisdiction;
+use hop_top_inv_core::domain::money::Currency;
+use hop_top_inv_store::repo::invoice::{InvoiceFilter, InvoiceLineRepo, InvoiceRepo};
 
 use super::parse::{parse_customer_id, parse_decimal, parse_invoice_id, parse_line, LineSpec};
 use crate::render::{render_list, render_value};
@@ -334,7 +334,7 @@ async fn run_send(ctx: &CoreCtx, matches: &ArgMatches) -> Result<()> {
         idempotency_key: None,
         actor: cli_actor(),
         channel: Channel::Cli,
-        sink: Some(&mut stdout_sink as &mut dyn inv_commands::SendSink),
+        sink: Some(&mut stdout_sink as &mut dyn hop_top_inv_commands::SendSink),
     };
     let output = send_invoice(ctx, input)
         .await

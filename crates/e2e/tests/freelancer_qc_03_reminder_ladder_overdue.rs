@@ -1,6 +1,6 @@
 //! Story freelancer-qc-03: reminder ladder + overdue ticker.
 //!
-//! Surfaces: CLI (in-process via inv-commands), tickers (reminders +
+//! Surfaces: CLI (in-process via hop-top-inv-commands), tickers (reminders +
 //! overdue), store (reminders + invoice_state_history), bus events.
 //!
 //! No xrr — pure in-process, frozen-clock advance.
@@ -13,16 +13,16 @@ use std::sync::Arc;
 use chrono::{TimeZone, Utc};
 use rust_decimal::Decimal;
 
-use inv_commands::{
+use hop_top_inv_commands::{
     draft_invoice, issue_invoice, mark_overdue_ticker, reminder_schedule, reminders_tick,
     send_invoice, Actor, Channel, DraftInvoiceInput, DraftLineInput, IssueInvoiceInput,
     ReminderScheduleInput, SendInvoiceInput,
 };
-use inv_core::domain::invoice::{InvoiceState, TaxCategory};
-use inv_core::domain::jurisdiction::Jurisdiction;
-use inv_core::domain::money::Currency;
-use inv_core::domain::reminder::{ReminderChannel, ReminderState};
-use inv_store::repo::invoice::InvoiceRepo;
+use hop_top_inv_core::domain::invoice::{InvoiceState, TaxCategory};
+use hop_top_inv_core::domain::jurisdiction::Jurisdiction;
+use hop_top_inv_core::domain::money::Currency;
+use hop_top_inv_core::domain::reminder::{ReminderChannel, ReminderState};
+use hop_top_inv_store::repo::invoice::InvoiceRepo;
 
 #[tokio::test]
 async fn reminder_ladder_dispatches_and_overdue_flags() {

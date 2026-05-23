@@ -21,16 +21,16 @@ use rust_decimal::Decimal;
 
 use hop_top_xrr::adapters::exec::{ExecAdapter, ExecRequest, ExecResponse};
 
-use inv_bus::{dispatch_inbound_event, Consumer, DispatchOutput};
-use inv_commands::{
+use hop_top_inv_bus::{dispatch_inbound_event, Consumer, DispatchOutput};
+use hop_top_inv_commands::{
     draft_invoice, issue_invoice, send_invoice, Actor, Channel, DraftInvoiceInput, DraftLineInput,
     IssueInvoiceInput, SendInvoiceInput,
 };
-use inv_core::domain::invoice::{InvoiceState, TaxCategory};
-use inv_core::domain::jurisdiction::Jurisdiction;
-use inv_core::domain::money::Currency;
-use inv_store::repo::bus_inbox::BusInboxRepo;
-use inv_store::repo::invoice::InvoiceRepo;
+use hop_top_inv_core::domain::invoice::{InvoiceState, TaxCategory};
+use hop_top_inv_core::domain::jurisdiction::Jurisdiction;
+use hop_top_inv_core::domain::money::Currency;
+use hop_top_inv_store::repo::bus_inbox::BusInboxRepo;
+use hop_top_inv_store::repo::invoice::InvoiceRepo;
 
 const TEST_NAME: &str = "saas_biller_de_03_fin_stripe_payment_paid";
 

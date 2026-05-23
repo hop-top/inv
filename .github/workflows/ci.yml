@@ -3,7 +3,7 @@
 # Strategy:
 #   - lint          : fmt + clippy --all-features --all-targets, warnings as errors
 #   - test-sqlite   : `cargo test --workspace` (sqlite is the default backend)
-#   - test-postgres : `cargo test` with `--no-default-features --features inv-store/postgres` (push-only; PRs skip)
+#   - test-postgres : `cargo test` with `--no-default-features --features hop-top-inv-store/postgres` (push-only; PRs skip)
 #   - build-release : optimised workspace build; uploads `inv` artifact on push to main
 #
 # Matrix:
@@ -89,7 +89,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
 
       - name: cargo test (postgres)
-        run: cargo test --workspace --no-default-features --features inv-store/postgres
+        run: cargo test --workspace --no-default-features --features hop-top-inv-store/postgres
 
   build-release:
     name: Build (release)

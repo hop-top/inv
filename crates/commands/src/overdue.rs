@@ -13,8 +13,8 @@
 use chrono::{DateTime, Utc};
 use serde_json::{json, Value};
 
-use inv_core::domain::invoice::{Invoice, InvoiceState};
-use inv_store::repo::invoice::{InvoiceFilter, InvoiceRepo};
+use hop_top_inv_core::domain::invoice::{Invoice, InvoiceState};
+use hop_top_inv_store::repo::invoice::{InvoiceFilter, InvoiceRepo};
 
 use crate::ctx::CoreCtx;
 use crate::error::CoreError;

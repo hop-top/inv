@@ -1,9 +1,9 @@
 //! Op dispatcher — maps a string op name + JSON payload onto the
-//! matching `inv-commands` function.
+//! matching `hop-top-inv-commands` function.
 //!
 //! The wire-shape inputs use serde-derived structs that mirror the
 //! command-layer `*Input` types one-for-one. We deliberately keep this
-//! a separate set of structs (not the `inv_commands::*Input` types
+//! a separate set of structs (not the `hop_top_inv_commands::*Input` types
 //! directly) so the wire shape can evolve independently — e.g. a
 //! command Input might gain an internal-only field that we don't want
 //! to expose, or vice versa.
@@ -15,7 +15,7 @@ use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
-use inv_commands::{
+use hop_top_inv_commands::{
     create_credit_note, draft_invoice, issue_credit_note, issue_invoice, mark_overdue_ticker,
     mark_paid, reminder_cancel, reminder_schedule, reminders_tick, schedule_cancel,
     schedule_create, schedule_pause, schedules_tick, send_invoice, void_invoice, Actor, Channel,
@@ -24,12 +24,12 @@ use inv_commands::{
     ReminderScheduleInput, ScheduleCreateInput, ScheduleLineInput, ScheduleStateChangeInput,
     SendInvoiceInput, VoidInvoiceInput,
 };
-use inv_core::domain::ids::{CreditNoteId, CustomerId, InvoiceId, ReminderId, ScheduleId};
-use inv_core::domain::invoice::TaxCategory;
-use inv_core::domain::jurisdiction::Jurisdiction;
-use inv_core::domain::money::Currency;
-use inv_core::domain::reminder::ReminderChannel;
-use inv_core::domain::schedule::Cadence;
+use hop_top_inv_core::domain::ids::{CreditNoteId, CustomerId, InvoiceId, ReminderId, ScheduleId};
+use hop_top_inv_core::domain::invoice::TaxCategory;
+use hop_top_inv_core::domain::jurisdiction::Jurisdiction;
+use hop_top_inv_core::domain::money::Currency;
+use hop_top_inv_core::domain::reminder::ReminderChannel;
+use hop_top_inv_core::domain::schedule::Cadence;
 
 use crate::frames::ErrorBody;
 

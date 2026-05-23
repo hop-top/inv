@@ -14,7 +14,7 @@
 //! }
 //! ```
 //!
-//! Mapping from [`inv_commands::CoreError`] follows the task spec:
+//! Mapping from [`hop_top_inv_commands::CoreError`] follows the task spec:
 //!
 //! | CoreError variant     | HTTP status |
 //! |-----------------------|------------:|
@@ -33,7 +33,7 @@ use axum::response::{IntoResponse, Response};
 use axum::Json;
 use serde::Serialize;
 
-use inv_commands::CoreError;
+use hop_top_inv_commands::CoreError;
 
 /// All errors surfaced by api handlers.
 #[derive(Debug, thiserror::Error)]
@@ -202,7 +202,7 @@ impl IntoResponse for ApiError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use inv_core::state::TransitionError;
+    use hop_top_inv_core::state::TransitionError;
 
     #[test]
     fn validation_maps_to_400() {
@@ -214,7 +214,7 @@ mod tests {
     #[test]
     fn fsm_maps_to_409() {
         let e: ApiError = CoreError::FsmTransition(TransitionError::Illegal {
-            state: inv_core::domain::invoice::InvoiceState::Issued,
+            state: hop_top_inv_core::domain::invoice::InvoiceState::Issued,
             event: "issue",
         })
         .into();

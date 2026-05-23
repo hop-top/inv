@@ -24,20 +24,20 @@ use rust_decimal::Decimal;
 use serde_json::json;
 use sqlx::Row;
 
-use inv_core::domain::ids::{HistoryId, InvoiceId};
-use inv_core::domain::invoice::{
+use hop_top_inv_core::domain::ids::{HistoryId, InvoiceId};
+use hop_top_inv_core::domain::invoice::{
     HistoryChannel, Invoice, InvoiceLine, InvoiceState, InvoiceStateHistory,
 };
-use inv_core::render::{render_html, render_pdf, RenderContext};
-use inv_core::state::transitions::{next_state, InvoiceEvent};
-use inv_core::state::{
+use hop_top_inv_core::render::{render_html, render_pdf, RenderContext};
+use hop_top_inv_core::state::transitions::{next_state, InvoiceEvent};
+use hop_top_inv_core::state::{
     InvoiceEntered, InvoiceProposed, InvoiceTransitioned, TOPIC_ENTERED, TOPIC_PROPOSED,
     TOPIC_TRANSITIONED,
 };
-use inv_core::tax::{resolve_tax, NexusFigures};
-use inv_store::repo::customer::CustomerRepo;
-use inv_store::repo::history::InvoiceHistoryRepo;
-use inv_store::repo::invoice::{InvoiceLineRepo, InvoiceRepo};
+use hop_top_inv_core::tax::{resolve_tax, NexusFigures};
+use hop_top_inv_store::repo::customer::CustomerRepo;
+use hop_top_inv_store::repo::history::InvoiceHistoryRepo;
+use hop_top_inv_store::repo::invoice::{InvoiceLineRepo, InvoiceRepo};
 
 use crate::ctx::{Actor, Channel, CoreCtx};
 use crate::draft::history_channel_str;
@@ -197,11 +197,17 @@ pub async fn issue_invoice(
         metadata: BTreeMap::new(),
     };
     {
-        let mut tx = ctx.db.begin().await.map_err(inv_store::StoreError::from)?;
+        let mut tx = ctx
+            .db
+            .begin()
+            .await
+            .map_err(hop_top_inv_store::StoreError::from)?;
         InvoiceRepo::save_in_tx(&mut tx, &invoice).await?;
         InvoiceLineRepo::replace_for_invoice_in_tx(&mut tx, &invoice.id, &lines).await?;
         InvoiceHistoryRepo::save_in_tx(&mut tx, &history).await?;
-        tx.commit().await.map_err(inv_store::StoreError::from)?;
+        tx.commit()
+            .await
+            .map_err(hop_top_inv_store::StoreError::from)?;
     }
 
     // 9. Synchronously publish the mechanic triplet + domain `.issued`
@@ -242,8 +248,10 @@ async fn count_invoices_issued_in_year(ctx: &CoreCtx, year: i32) -> Result<u32, 
     .bind(to)
     .fetch_one(&ctx.db)
     .await
-    .map_err(inv_store::StoreError::from)?;
-    let c: i64 = row.try_get("c").map_err(inv_store::StoreError::from)?;
+    .map_err(hop_top_inv_store::StoreError::from)?;
+    let c: i64 = row
+        .try_get("c")
+        .map_err(hop_top_inv_store::StoreError::from)?;
     Ok(c.max(0) as u32)
 }
 

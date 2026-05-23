@@ -1,9 +1,9 @@
 //! `inv customer …` subcommand tree.
 //!
-//! Customers don't have a dedicated `inv-commands` function — they're
+//! Customers don't have a dedicated `hop-top-inv-commands` function — they're
 //! treated as external references (design §5). The CLI wires
 //! `CustomerRepo` directly so operators can seed customers without
-//! invoking a sister service. When `inv-commands` later grows a
+//! invoking a sister service. When `hop-top-inv-commands` later grows a
 //! `customer_create` command (e.g. for bus-driven onboarding) this
 //! module collapses to a thin wrapper around it.
 
@@ -14,11 +14,11 @@ use chrono::Utc;
 use clap::{value_parser, Arg, ArgMatches, Command};
 use hop_top_kit::output::ColumnSpec;
 
-use inv_commands::CoreCtx;
-use inv_core::domain::address::Address;
-use inv_core::domain::customer::Customer;
-use inv_core::domain::ids::CustomerId;
-use inv_store::repo::customer::CustomerRepo;
+use hop_top_inv_commands::CoreCtx;
+use hop_top_inv_core::domain::address::Address;
+use hop_top_inv_core::domain::customer::Customer;
+use hop_top_inv_core::domain::ids::CustomerId;
+use hop_top_inv_store::repo::customer::CustomerRepo;
 
 use super::parse::parse_customer_id;
 use crate::render::{render_list, render_value};

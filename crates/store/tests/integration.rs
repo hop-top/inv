@@ -1,4 +1,4 @@
-//! Integration tests for inv-store against an in-memory sqlite pool.
+//! Integration tests for hop-top-inv-store against an in-memory sqlite pool.
 //!
 //! Each `#[tokio::test]` opens its own pool (sqlite `:memory:` is
 //! per-connection, but the pool's single connection variant means we
@@ -12,33 +12,33 @@ use std::str::FromStr;
 use chrono::{NaiveDate, TimeZone, Utc};
 use rust_decimal::Decimal;
 
-use inv_core::domain::address::Address;
-use inv_core::domain::creditnote::{CreditNote, CreditNoteState};
-use inv_core::domain::customer::Customer;
-use inv_core::domain::ids::{
+use hop_top_inv_core::domain::address::Address;
+use hop_top_inv_core::domain::creditnote::{CreditNote, CreditNoteState};
+use hop_top_inv_core::domain::customer::Customer;
+use hop_top_inv_core::domain::ids::{
     CreditNoteId, CustomerId, HistoryId, InvoiceId, LineId, ReminderId, ScheduleId,
 };
-use inv_core::domain::invoice::{
+use hop_top_inv_core::domain::invoice::{
     HistoryChannel, Invoice, InvoiceLine, InvoiceState, InvoiceStateHistory, TaxCategory,
 };
-use inv_core::domain::jurisdiction::Jurisdiction;
-use inv_core::domain::money::Currency;
-use inv_core::domain::reminder::{Reminder, ReminderChannel, ReminderState};
-use inv_core::domain::schedule::{Cadence, Schedule, ScheduleLine, ScheduleState};
+use hop_top_inv_core::domain::jurisdiction::Jurisdiction;
+use hop_top_inv_core::domain::money::Currency;
+use hop_top_inv_core::domain::reminder::{Reminder, ReminderChannel, ReminderState};
+use hop_top_inv_core::domain::schedule::{Cadence, Schedule, ScheduleLine, ScheduleState};
 
-use inv_store::pool::{backend_of, connect, Backend};
-use inv_store::repo::bus_inbox::BusInboxRecord;
-use inv_store::repo::credit_note::CreditNoteFilter;
-use inv_store::repo::invoice::InvoiceFilter;
-use inv_store::repo::schedule::ScheduleFilter;
-use inv_store::repo::{
+use hop_top_inv_store::pool::{backend_of, connect, Backend};
+use hop_top_inv_store::repo::bus_inbox::BusInboxRecord;
+use hop_top_inv_store::repo::credit_note::CreditNoteFilter;
+use hop_top_inv_store::repo::invoice::InvoiceFilter;
+use hop_top_inv_store::repo::schedule::ScheduleFilter;
+use hop_top_inv_store::repo::{
     BusInboxRepo, CreditNoteRepo, CustomerRepo, InvoiceHistoryRepo, InvoiceLineRepo, InvoiceRepo,
     ReminderRepo, ScheduleRepo,
 };
-use inv_store::run_migrations;
+use hop_top_inv_store::run_migrations;
 
 /// Open an in-memory sqlite pool, apply migrations.
-async fn fresh_pool() -> inv_store::pool::Pool {
+async fn fresh_pool() -> hop_top_inv_store::pool::Pool {
     let pool = connect("sqlite::memory:").await.expect("connect");
     assert_eq!(backend_of(&pool).await.unwrap(), Backend::Sqlite);
     run_migrations(&pool).await.expect("migrate");

@@ -12,7 +12,7 @@
 use chrono::{DateTime, Utc};
 use sqlx::Row;
 
-use inv_core::domain::ids::{HistoryId, InvoiceId};
+use hop_top_inv_core::domain::ids::{HistoryId, InvoiceId};
 
 use super::{parse_ts, ts_to_string};
 use crate::error::{Result, StoreError};

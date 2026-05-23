@@ -1,5 +1,5 @@
 //! Bus consumer: route inbound `fin.billing.*` (and similar) events to
-//! the matching `inv-commands` function.
+//! the matching `hop-top-inv-commands` function.
 //!
 //! The consumer is just another channel adapter — same shape as CLI /
 //! HTTP / WS / MCP. The only difference is that the request decode reads
@@ -43,15 +43,15 @@ use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use inv_commands::{
+use hop_top_inv_commands::{
     create_credit_note, draft_invoice, mark_paid, Actor, Channel, CoreCtx, CoreError,
     CreateCreditNoteInput, CreateCreditNoteOutput, DraftInvoiceInput, DraftInvoiceOutput,
     DraftLineInput, MarkPaidInput, MarkPaidOutput,
 };
-use inv_core::domain::ids::{CustomerId, InvoiceId};
-use inv_core::domain::invoice::TaxCategory;
-use inv_core::domain::jurisdiction::Jurisdiction;
-use inv_core::domain::money::Currency;
+use hop_top_inv_core::domain::ids::{CustomerId, InvoiceId};
+use hop_top_inv_core::domain::invoice::TaxCategory;
+use hop_top_inv_core::domain::jurisdiction::Jurisdiction;
+use hop_top_inv_core::domain::money::Currency;
 
 use crate::topic_map::{remap_topic, TopicMap};
 

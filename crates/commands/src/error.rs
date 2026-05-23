@@ -23,12 +23,12 @@
 
 use thiserror::Error;
 
-use inv_core::render::{PdfError, RenderError};
-use inv_core::state::TransitionError;
-use inv_core::tax::TaxError;
-use inv_store::StoreError;
+use hop_top_inv_core::render::{PdfError, RenderError};
+use hop_top_inv_core::state::TransitionError;
+use hop_top_inv_core::tax::TaxError;
+use hop_top_inv_store::StoreError;
 
-/// Errors surfaced by every command in `inv-commands`.
+/// Errors surfaced by every command in `hop-top-inv-commands`.
 #[derive(Debug, Error)]
 pub enum CoreError {
     /// Input failed validation up front (before the DB or FSM was touched).

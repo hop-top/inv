@@ -1,4 +1,4 @@
-//! [`Publisher`] trait (re-exported from `inv-commands` since T-0031) +
+//! [`Publisher`] trait (re-exported from `hop-top-inv-commands` since T-0031) +
 //! the two concrete impls that ship at v1 (kit-backed publisher lands
 //! when `poly-kit#sdk-rs-runtime` does).
 //!
@@ -15,11 +15,11 @@ use tracing::info;
 
 use crate::error::PublishError;
 
-// The canonical `Publisher` trait lives in `inv-commands` so
+// The canonical `Publisher` trait lives in `hop-top-inv-commands` so
 // `CoreCtx.publisher` can reference it without a dep cycle (this crate
-// already depends on `inv-commands`). Re-exporting keeps every existing
-// `inv_bus::Publisher` import compiling unchanged.
-pub use inv_commands::Publisher;
+// already depends on `hop-top-inv-commands`). Re-exporting keeps every existing
+// `hop_top_inv_bus::Publisher` import compiling unchanged.
+pub use hop_top_inv_commands::Publisher;
 
 // =============================================================================
 // LoggingPublisher
@@ -49,7 +49,7 @@ impl Publisher for LoggingPublisher {
         occurred_at: DateTime<Utc>,
     ) -> Result<(), PublishError> {
         info!(
-            target: "inv_bus::publish",
+            target: "hop_top_inv_bus::publish",
             topic = topic,
             occurred_at = %occurred_at,
             payload = %payload,

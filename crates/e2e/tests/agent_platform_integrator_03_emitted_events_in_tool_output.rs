@@ -18,11 +18,11 @@ use std::sync::Arc;
 
 use chrono::{DateTime, TimeZone, Utc};
 
-use inv_bus::{run_outbox_relay, InMemoryPublisher, Publisher};
-use inv_commands::{Clock, CoreCtx};
-use inv_core::tax::TaxTable;
-use inv_mcp::InvMcpServer;
-use inv_store::pool::Pool;
+use hop_top_inv_bus::{run_outbox_relay, InMemoryPublisher, Publisher};
+use hop_top_inv_commands::{Clock, CoreCtx};
+use hop_top_inv_core::tax::TaxTable;
+use hop_top_inv_mcp::InvMcpServer;
+use hop_top_inv_store::pool::Pool;
 
 use rmcp::model::CallToolRequestParams;
 use rmcp::service::ServiceExt;
@@ -187,7 +187,7 @@ async fn fsm_violation_returns_error_with_no_emissions() {
         )
         .await
         .unwrap();
-    let hist_after_first = inv_store::repo::history::InvoiceHistoryRepo::new(&pool)
+    let hist_after_first = hop_top_inv_store::repo::history::InvoiceHistoryRepo::new(&pool)
         .list_for_invoice(&inv_id.parse().unwrap())
         .await
         .unwrap();
@@ -213,7 +213,7 @@ async fn fsm_violation_returns_error_with_no_emissions() {
         "expected FSM error, got: {err}"
     );
 
-    let hist_after_second = inv_store::repo::history::InvoiceHistoryRepo::new(&pool)
+    let hist_after_second = hop_top_inv_store::repo::history::InvoiceHistoryRepo::new(&pool)
         .list_for_invoice(&inv_id.parse().unwrap())
         .await
         .unwrap();

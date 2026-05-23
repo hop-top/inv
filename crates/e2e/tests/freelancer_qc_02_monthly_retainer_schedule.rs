@@ -1,6 +1,6 @@
 //! Story freelancer-qc-02: materialise monthly retainer from schedule.
 //!
-//! Surfaces: CLI (in-process via inv-commands), store
+//! Surfaces: CLI (in-process via hop-top-inv-commands), store
 //! (schedules + invoices + invoice_state_history), render at auto-issue.
 //!
 //! No xrr — every step is in-process. Clock is frozen + advanced
@@ -14,14 +14,14 @@ use std::sync::Arc;
 use chrono::{NaiveDate, TimeZone, Utc};
 use rust_decimal::Decimal;
 
-use inv_commands::{
+use hop_top_inv_commands::{
     schedule_cancel, schedule_create, schedules_tick, Actor, Channel, ScheduleCreateInput,
     ScheduleLineInput, ScheduleStateChangeInput,
 };
-use inv_core::domain::invoice::{InvoiceState, TaxCategory};
-use inv_core::domain::money::Currency;
-use inv_core::domain::schedule::{Cadence, ScheduleState};
-use inv_store::repo::invoice::InvoiceRepo;
+use hop_top_inv_core::domain::invoice::{InvoiceState, TaxCategory};
+use hop_top_inv_core::domain::money::Currency;
+use hop_top_inv_core::domain::schedule::{Cadence, ScheduleState};
+use hop_top_inv_store::repo::invoice::InvoiceRepo;
 
 #[tokio::test]
 async fn schedule_create_then_tick_materialises_and_auto_issues() {

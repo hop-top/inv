@@ -1,6 +1,6 @@
 # HTTP API reference
 
-Every route exposed by `inv-api`. Authored from
+Every route exposed by `hop-top-inv-api`. Authored from
 [`crates/api/src/lib.rs`](../../crates/api/src/lib.rs) and
 [`crates/api/src/handlers/`](../../crates/api/src/handlers/).
 

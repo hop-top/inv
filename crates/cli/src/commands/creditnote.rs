@@ -5,12 +5,12 @@ use clap::{Arg, ArgMatches, Command};
 use hop_top_kit::output::ColumnSpec;
 use serde_json::json;
 
-use inv_commands::{
+use hop_top_inv_commands::{
     create_credit_note, issue_credit_note, Actor, Channel, CoreCtx, CreateCreditNoteInput,
     IssueCreditNoteInput,
 };
-use inv_core::domain::creditnote::CreditNoteState;
-use inv_store::repo::credit_note::{CreditNoteFilter, CreditNoteRepo};
+use hop_top_inv_core::domain::creditnote::CreditNoteState;
+use hop_top_inv_store::repo::credit_note::{CreditNoteFilter, CreditNoteRepo};
 
 use super::parse::{parse_credit_note_id, parse_decimal, parse_invoice_id};
 use crate::render::{render_list, render_value};

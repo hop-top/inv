@@ -78,19 +78,19 @@ Invariants (FSM guards, idempotency, tax calculation, validation, audit) live in
 inv/
 ├─ Cargo.toml                  # workspace
 ├─ crates/
-│  ├─ core/                    # domain types, FSM facade, tax, render — crate inv-core
+│  ├─ core/                    # domain types, FSM facade, tax, render — crate hop-top-inv-core
 │  │  └─ src/
 │  │     ├─ domain/            # invoice.rs, creditnote.rs, schedule.rs, customer.rs, …
 │  │     ├─ state/             # FSM facade + statig adapter; bus event shapes
 │  │     ├─ tax/               # tables, jurisdiction inference, nexus rules
 │  │     └─ render/            # HTML → PDF; bundled template; configurable template path
-│  ├─ commands/                # one function per operation — crate inv-commands
-│  ├─ bus/                     # event types; kit bus integration; outbox relay; inbox dedup — crate inv-bus
-│  ├─ store/                   # kit sqlstore wiring; migrations; kit blob wiring — crate inv-store
-│  ├─ cli/                     # clap adapter + `inv server` composition — crate inv-cli
-│  ├─ api/                     # axum adapter — crate inv-api
-│  ├─ ws/                      # tokio-tungstenite adapter — crate inv-ws
-│  └─ mcp/                     # MCP server adapter — crate inv-mcp
+│  ├─ commands/                # one function per operation — crate hop-top-inv-commands
+│  ├─ bus/                     # event types; kit bus integration; outbox relay; inbox dedup — crate hop-top-inv-bus
+│  ├─ store/                   # kit sqlstore wiring; migrations; kit blob wiring — crate hop-top-inv-store
+│  ├─ cli/                     # clap adapter + `inv server` composition — crate hop-top-inv-cli
+│  ├─ api/                     # axum adapter — crate hop-top-inv-api
+│  ├─ ws/                      # tokio-tungstenite adapter — crate hop-top-inv-ws
+│  └─ mcp/                     # MCP server adapter — crate hop-top-inv-mcp
 ├─ templates/
 │  └─ default/                 # bundled invoice template (HTML + CSS)
 ├─ tax-tables/
@@ -99,11 +99,11 @@ inv/
 └─ tests/
 ```
 
-Adding a new channel = new crate that depends on `inv-core`. Zero changes to the core.
+Adding a new channel = new crate that depends on `hop-top-inv-core`. Zero changes to the core.
 
 ### 3.3 FSM facade
 
-Rust has no in-tree equivalent of kit's `core/stage`. The most active community state-machine crates are `statig` (hierarchical, async-aware, derive-based) and `rust-fsm` (flat, declarative-macro). v1 ships a facade that wraps `statig` behind an `inv-core` API:
+Rust has no in-tree equivalent of kit's `core/stage`. The most active community state-machine crates are `statig` (hierarchical, async-aware, derive-based) and `rust-fsm` (flat, declarative-macro). v1 ships a facade that wraps `statig` behind an `hop-top-inv-core` API:
 
 ```
 crates/core/src/state/
@@ -384,7 +384,7 @@ bus_inbox (                              -- idempotent inbound event handling
 )
 ```
 
-Migrations are versioned and shipped via `inv-store`. The schema is identical across sqlite / postgres / tidb modulo column-type translation (`TEXT` ↔ `NUMERIC(20,8)` for Decimal columns).
+Migrations are versioned and shipped via `hop-top-inv-store`. The schema is identical across sqlite / postgres / tidb modulo column-type translation (`TEXT` ↔ `NUMERIC(20,8)` for Decimal columns).
 
 ## 6. Tax engine
 
@@ -502,9 +502,9 @@ A `send` command takes a destination URI. v1 schemes:
 | `stdout` | Render PDF, write to stdout. Useful for piping. |
 | `bus://` | Emit `inv.billing.invoice.sent` with the rendered document inline as base64 payload. Default fallback — every successful send also emits this event regardless of scheme. |
 | `webhook://example.com/hook` | POST JSON: `{ invoice, pdf_url, signature }` to the URL. `pdf_url` resolves through the same signed-link mechanism. |
-| `link://` | Generate a signed URL (HMAC + expiry). Returning it is the response. The URL is served by `inv-api`'s public-view route; fetching the URL renders the invoice and emits `inv.billing.invoice.viewed`. |
+| `link://` | Generate a signed URL (HMAC + expiry). Returning it is the response. The URL is served by `hop-top-inv-api`'s public-view route; fetching the URL renders the invoice and emits `inv.billing.invoice.viewed`. |
 
-The signed-link route requires `inv-api` to expose a public-readable endpoint (no auth, but URL is unguessable + expires). View tracking emits `viewed` exactly once per signed token; subsequent fetches with the same token re-render but do not re-emit.
+The signed-link route requires `hop-top-inv-api` to expose a public-readable endpoint (no auth, but URL is unguessable + expires). View tracking emits `viewed` exactly once per signed token; subsequent fetches with the same token re-render but do not re-emit.
 
 ## 8. Recurring schedules
 
@@ -530,7 +530,7 @@ An internal ticker runs daily (configurable). For every `active` schedule with `
 3. If `auto_issue = true`, run `commands::issue_invoice` immediately and emit `inv.billing.invoice.issued`.
 4. Advance `next_run` and `last_run`.
 
-The ticker is composed by `inv server` (in the `inv-cli` crate) and can be disabled to run `inv` as a pure on-demand library if desired.
+The ticker is composed by `inv server` (in the `hop-top-inv-cli` crate) and can be disabled to run `inv` as a pure on-demand library if desired.
 
 ## 9. Reminders
 
@@ -540,7 +540,7 @@ Reminders never advance the invoice FSM (the invoice stays in `sent` or `viewed`
 
 ## 10. Channel-specific surfaces
 
-Each adapter exposes the same operation set under its native idiom. The operation set is one-to-one with `inv_commands::*`.
+Each adapter exposes the same operation set under its native idiom. The operation set is one-to-one with `hop_top_inv_commands::*`.
 
 | Operation | CLI | HTTP API | WebSocket | MCP tool |
 |---|---|---|---|---|
@@ -607,7 +607,7 @@ These are deliberately deferred to the planning step — they affect *how* but n
 
 - PDF engine choice between `wkhtmltopdf` (mature, system binary), `weasyprint` (Python sidecar), and `printpdf` / `typst` (pure Rust). Recommendation: ship behind a Cargo feature; default to whichever works without a system dependency.
 - Migration tool: `refinery` vs `sqlx::migrate!`. kit's `sqlstore` may already prefer one — check during planning.
-- Authentication for `inv-api` / `inv-ws`. Out of scope at v1 surface decisions; pluggable middleware in the adapter.
+- Authentication for `hop-top-inv-api` / `hop-top-inv-ws`. Out of scope at v1 surface decisions; pluggable middleware in the adapter.
 - Concrete `Actor` enum shape and the auth → actor decoding for each adapter.
 
 ## 13. References

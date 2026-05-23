@@ -16,7 +16,7 @@
 //! - [`events`] — bus event shapes for the `.proposed` / `.transitioned`
 //!   / `.entered` mechanic-event triplet.
 //!
-//! No bus wiring lives here. T-0014 (`inv-bus`) consumes the
+//! No bus wiring lives here. T-0014 (`hop-top-inv-bus`) consumes the
 //! [`events`] structs and runs the [`machine::VetoError`] seam around
 //! [`machine::StateMachine::propose`].
 
@@ -26,7 +26,7 @@ pub mod events;
 pub mod machine;
 pub mod transitions;
 
-// Re-exports for ergonomic `use inv_core::state::*;`.
+// Re-exports for ergonomic `use hop_top_inv_core::state::*;`.
 pub use adapter_statig::StatigAdapter;
 pub use events::{
     InvoiceEntered, InvoiceProposed, InvoiceTransitioned, TOPIC_ENTERED, TOPIC_PROPOSED,

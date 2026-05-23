@@ -10,11 +10,11 @@
 //! | `inv.billing.invoice.entered` | post (after commit) | no |
 //!
 //! **Domain** events (`drafted`, `issued`, `sent`, `paid`, etc.) describe
-//! *what happened in business terms* and live in `inv-bus` (T-0014). This
+//! *what happened in business terms* and live in `hop-top-inv-bus` (T-0014). This
 //! module only carries the mechanic-event payloads — the seam kit's
 //! `core/stage` provides for generic observers and veto subscribers.
 //!
-//! No bus wiring lives here. T-0014 (`inv-bus`) consumes these structs,
+//! No bus wiring lives here. T-0014 (`hop-top-inv-bus`) consumes these structs,
 //! attaches metadata (event_id, timestamps, source), and publishes via
 //! `hop-top-kit`'s bus.
 

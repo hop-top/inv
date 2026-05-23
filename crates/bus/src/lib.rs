@@ -1,4 +1,4 @@
-//! inv-bus — bus event types, publisher/consumer adapters, transactional
+//! hop-top-inv-bus — bus event types, publisher/consumer adapters, transactional
 //! outbox relay, idempotent inbox.
 //!
 //! ## Why a local facade
@@ -17,7 +17,7 @@
 //!   `partially_paid`, `overdue`, `voided`, `creditnote.drafted` /
 //!   `.issued`, reminder + schedule lifecycle). Mechanic-event payloads
 //!   (`InvoiceProposed` / `InvoiceTransitioned` / `InvoiceEntered` and
-//!   the credit-note triplet) are re-exported from `inv-core::state`.
+//!   the credit-note triplet) are re-exported from `hop-top-inv-core::state`.
 //! - [`publisher`] — [`Publisher`] trait + [`LoggingPublisher`] (boot
 //!   default) + [`InMemoryPublisher`] (tests).
 //! - [`broadcast`] — [`BroadcastPublisher`] — in-process fanout
@@ -61,15 +61,15 @@ pub use outbox::{run_outbox_relay, OutboxStats};
 pub use publisher::{InMemoryPublisher, LoggingPublisher, Publisher};
 pub use topic_map::{remap_topic, TopicMap};
 
-// Mechanic-event payloads + topic constants are owned by inv-core::state;
-// re-export so consumers of inv-bus get the full domain+mechanic surface
+// Mechanic-event payloads + topic constants are owned by hop-top-inv-core::state;
+// re-export so consumers of hop-top-inv-bus get the full domain+mechanic surface
 // from one crate.
-pub use inv_core::state::creditnote::{
+pub use hop_top_inv_core::state::creditnote::{
     CreditNoteEntered, CreditNoteProposed, CreditNoteTransitioned,
     TOPIC_ENTERED as TOPIC_CREDITNOTE_ENTERED, TOPIC_PROPOSED as TOPIC_CREDITNOTE_PROPOSED,
     TOPIC_TRANSITIONED as TOPIC_CREDITNOTE_TRANSITIONED,
 };
-pub use inv_core::state::events::{
+pub use hop_top_inv_core::state::events::{
     InvoiceEntered, InvoiceProposed, InvoiceTransitioned, TOPIC_ENTERED as TOPIC_INVOICE_ENTERED,
     TOPIC_PROPOSED as TOPIC_INVOICE_PROPOSED, TOPIC_TRANSITIONED as TOPIC_INVOICE_TRANSITIONED,
 };

@@ -1,14 +1,14 @@
 //! Ticker tools — drain the recurring/notification queues.
 //!
-//! - `inv_tick_schedules` → [`inv_commands::schedules_tick`]
-//! - `inv_tick_reminders` → [`inv_commands::reminders_tick`]
-//! - `inv_tick_overdue`   → [`inv_commands::mark_overdue_ticker`]
+//! - `inv_tick_schedules` → [`hop_top_inv_commands::schedules_tick`]
+//! - `inv_tick_reminders` → [`hop_top_inv_commands::reminders_tick`]
+//! - `inv_tick_overdue`   → [`hop_top_inv_commands::mark_overdue_ticker`]
 //!
 //! T-0043 dropped the per-tool `emitted_events` field: tickers publish
 //! every event via `ctx.publisher`, so subscribers (and the outbox
 //! relay) are the source of truth for event history.
 
-use inv_commands::{mark_overdue_ticker, reminders_tick, schedules_tick, CoreCtx};
+use hop_top_inv_commands::{mark_overdue_ticker, reminders_tick, schedules_tick, CoreCtx};
 
 use crate::error::McpError;
 

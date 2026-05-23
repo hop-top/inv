@@ -11,15 +11,15 @@ use rust_decimal::Decimal;
 use serde::Deserialize;
 use serde_json::{json, Value};
 
-use inv_commands::{
+use hop_top_inv_commands::{
     schedule_cancel, schedule_create, schedule_pause, Actor, Channel, ScheduleCreateInput,
     ScheduleLineInput, ScheduleStateChangeInput,
 };
-use inv_core::domain::ids::{CustomerId, ScheduleId};
-use inv_core::domain::invoice::TaxCategory;
-use inv_core::domain::money::Currency;
-use inv_core::domain::schedule::{Cadence, ScheduleState};
-use inv_store::repo::schedule::{ScheduleFilter, ScheduleRepo};
+use hop_top_inv_core::domain::ids::{CustomerId, ScheduleId};
+use hop_top_inv_core::domain::invoice::TaxCategory;
+use hop_top_inv_core::domain::money::Currency;
+use hop_top_inv_core::domain::schedule::{Cadence, ScheduleState};
+use hop_top_inv_store::repo::schedule::{ScheduleFilter, ScheduleRepo};
 
 use crate::error::ApiError;
 use crate::state::ApiState;
@@ -171,7 +171,7 @@ pub async fn get(
     let s = ScheduleRepo::new(&state.ctx.db)
         .get(&id)
         .await
-        .map_err(inv_commands::CoreError::from)?
+        .map_err(hop_top_inv_commands::CoreError::from)?
         .ok_or_else(|| ApiError::NotFound(format!("schedule {id}")))?;
     Ok(Json(json!({ "schedule": s })))
 }
@@ -222,7 +222,7 @@ pub async fn list(
     let rows = ScheduleRepo::new(&state.ctx.db)
         .list(&filter)
         .await
-        .map_err(inv_commands::CoreError::from)?;
+        .map_err(hop_top_inv_commands::CoreError::from)?;
     Ok(Json(json!({ "schedules": rows })))
 }
 

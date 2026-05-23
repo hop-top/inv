@@ -46,8 +46,8 @@ inv/
 ```
 
 Adding a new channel = a new crate that depends on `crates/commands`. Zero
-changes to the core. The crate names in source are `inv-core`, `inv-store`,
-`inv-commands`, `inv-bus`, `inv-cli`, `inv-api`, `inv-ws`, `inv-mcp`
+changes to the core. The crate names in source are `hop-top-inv-core`, `hop-top-inv-store`,
+`hop-top-inv-commands`, `hop-top-inv-bus`, `hop-top-inv-cli`, `hop-top-inv-api`, `hop-top-inv-ws`, `hop-top-inv-mcp`
 (workspace path → crate name mapping).
 
 ## Cross-cutting invariants (design §3.5)

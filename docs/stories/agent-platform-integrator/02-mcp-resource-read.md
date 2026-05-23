@@ -45,7 +45,7 @@ call followed by per-id resource reads.
 
 - MCP — `resources/read`, `resources/list`, the `inv://<kind>/<id>` template
   set (invoice / creditnote / schedule / reminder / customer).
-- Commands — read-only repo access via `inv-commands`.
+- Commands — read-only repo access via `hop-top-inv-commands`.
 - Store — `invoices`, `invoice_lines` (read).
 
 ## Out of scope for this story

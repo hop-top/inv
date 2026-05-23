@@ -1,25 +1,25 @@
-//! Integration tests for the inv-mcp adapter.
+//! Integration tests for the hop-top-inv-mcp adapter.
 //!
 //! Spins up an in-memory MCP client connected to an
-//! [`InvMcpServer`][inv_mcp::InvMcpServer] over a tokio duplex pipe.
+//! [`InvMcpServer`][hop_top_inv_mcp::InvMcpServer] over a tokio duplex pipe.
 //! The client side is rmcp's default `()`-based `ClientHandler`. The
 //! server side is backed by an in-memory sqlite [`CoreCtx`] with the
-//! same QC tax-fixture used by inv-commands tests.
+//! same QC tax-fixture used by hop-top-inv-commands tests.
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use chrono::{DateTime, TimeZone, Utc};
 
-use inv_commands::{Clock, CoreCtx};
-use inv_core::domain::address::Address;
-use inv_core::domain::customer::Customer;
-use inv_core::domain::ids::CustomerId;
-use inv_core::tax::TaxTable;
-use inv_mcp::InvMcpServer;
-use inv_store::pool::{connect, Pool};
-use inv_store::repo::customer::CustomerRepo;
-use inv_store::run_migrations;
+use hop_top_inv_commands::{Clock, CoreCtx};
+use hop_top_inv_core::domain::address::Address;
+use hop_top_inv_core::domain::customer::Customer;
+use hop_top_inv_core::domain::ids::CustomerId;
+use hop_top_inv_core::tax::TaxTable;
+use hop_top_inv_mcp::InvMcpServer;
+use hop_top_inv_store::pool::{connect, Pool};
+use hop_top_inv_store::repo::customer::CustomerRepo;
+use hop_top_inv_store::run_migrations;
 
 use rmcp::model::{CallToolRequestParams, ReadResourceRequestParams};
 use rmcp::service::ServiceExt;
@@ -437,7 +437,7 @@ async fn resource_read_unknown_invoice_returns_error() {
     // (rmcp invalid_params per error.rs).
     let (ctx, _pool) = fresh_ctx().await;
     let client = spawn_pair(ctx).await;
-    let bogus = inv_core::domain::ids::InvoiceId::new();
+    let bogus = hop_top_inv_core::domain::ids::InvoiceId::new();
     let err = client
         .peer()
         .read_resource(ReadResourceRequestParams::new(format!(

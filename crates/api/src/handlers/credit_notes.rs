@@ -9,13 +9,13 @@ use rust_decimal::Decimal;
 use serde::Deserialize;
 use serde_json::{json, Value};
 
-use inv_commands::{
+use hop_top_inv_commands::{
     create_credit_note, issue_credit_note, Actor, Channel, CreateCreditNoteInput,
     IssueCreditNoteInput,
 };
-use inv_core::domain::creditnote::CreditNoteState;
-use inv_core::domain::ids::{CreditNoteId, InvoiceId};
-use inv_store::repo::credit_note::{CreditNoteFilter, CreditNoteRepo};
+use hop_top_inv_core::domain::creditnote::CreditNoteState;
+use hop_top_inv_core::domain::ids::{CreditNoteId, InvoiceId};
+use hop_top_inv_store::repo::credit_note::{CreditNoteFilter, CreditNoteRepo};
 
 use crate::error::ApiError;
 use crate::state::ApiState;
@@ -110,7 +110,7 @@ pub async fn get(
     let cn = CreditNoteRepo::new(&state.ctx.db)
         .get(&id)
         .await
-        .map_err(inv_commands::CoreError::from)?
+        .map_err(hop_top_inv_commands::CoreError::from)?
         .ok_or_else(|| ApiError::NotFound(format!("credit note {id}")))?;
     Ok(Json(json!({ "credit_note": cn })))
 }
@@ -161,7 +161,7 @@ pub async fn list(
     let rows = CreditNoteRepo::new(&state.ctx.db)
         .list(&filter)
         .await
-        .map_err(inv_commands::CoreError::from)?;
+        .map_err(hop_top_inv_commands::CoreError::from)?;
     Ok(Json(json!({ "credit_notes": rows })))
 }
 

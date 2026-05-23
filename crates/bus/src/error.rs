@@ -1,12 +1,12 @@
 //! Error types for publish, relay, and inbox ingest.
 //!
-//! `PublishError` lives in `inv-commands` (T-0031) so [`inv_commands::CoreCtx`]
+//! `PublishError` lives in `hop-top-inv-commands` (T-0031) so [`hop_top_inv_commands::CoreCtx`]
 //! can hold an `Option<Arc<dyn Publisher>>` without a dep cycle. This crate
 //! re-exports it from its root for backwards compatibility.
 
 use thiserror::Error;
 
-pub use inv_commands::PublishError;
+pub use hop_top_inv_commands::PublishError;
 
 /// Error returned by [`crate::run_outbox_relay`].
 #[derive(Debug, Error)]
@@ -17,7 +17,7 @@ pub enum RelayError {
 
     /// Underlying store error (query, mark-published, …).
     #[error("store: {0}")]
-    Store(#[from] inv_store::StoreError),
+    Store(#[from] hop_top_inv_store::StoreError),
 }
 
 /// Error returned by [`crate::dispatch_inbound_event`].
@@ -25,5 +25,5 @@ pub enum RelayError {
 pub enum IngestError {
     /// Underlying store error (insert, dedup lookup).
     #[error("store: {0}")]
-    Store(#[from] inv_store::StoreError),
+    Store(#[from] hop_top_inv_store::StoreError),
 }

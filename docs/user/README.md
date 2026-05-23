@@ -36,7 +36,7 @@ For operators and integrators running `inv` end-to-end. If you want to know
 | Event bus | Consumes `fin.billing.*`, emits `inv.billing.*`, see [reference/event-bus.md](../reference/event-bus.md) |
 
 Pick whichever channel matches your context — they're behaviour-identical, all
-backed by the same `inv-commands` core.
+backed by the same `hop-top-inv-commands` core.
 
 ## Conventions in the user guide
 

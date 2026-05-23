@@ -18,7 +18,7 @@ use rmcp::model::{
 use rmcp::service::RequestContext;
 use rmcp::{tool, tool_handler, tool_router, ErrorData as RmcpError, RoleServer, ServerHandler};
 
-use inv_commands::CoreCtx;
+use hop_top_inv_commands::CoreCtx;
 
 use crate::resources;
 use crate::tools::credit_notes::{CreditNoteDraftInput, CreditNoteIssueInput};
@@ -351,13 +351,14 @@ impl ServerHandler for InvMcpServer {
             .enable_tool_list_changed()
             .enable_resources()
             .build();
-        let server_info = rmcp::model::Implementation::new("inv-mcp", env!("CARGO_PKG_VERSION"))
-            .with_title("inv MCP server");
+        let server_info =
+            rmcp::model::Implementation::new("hop-top-inv-mcp", env!("CARGO_PKG_VERSION"))
+                .with_title("inv MCP server");
         ServerInfo::new(capabilities)
             .with_protocol_version(ProtocolVersion::default())
             .with_server_info(server_info)
             .with_instructions(
-                "inv MCP server. Tools expose the inv-commands invoice lifecycle; \
+                "inv MCP server. Tools expose the hop-top-inv-commands invoice lifecycle; \
                  resources expose read-only views via inv://<kind>/<id>.",
             )
     }

@@ -1,8 +1,8 @@
-//! inv-cli — CLI channel adapter.
+//! hop-top-inv-cli — CLI channel adapter.
 //!
 //! Library shape (shape-1 workspace): `bin/inv/` is the thin binary;
 //! everything lives here. Decodes clap arguments → command inputs and
-//! calls into `inv-commands` for every operation in design §10. Output
+//! calls into `hop-top-inv-commands` for every operation in design §10. Output
 //! flows through the kit `output` flag suite — every show/list as well
 //! as single-row mutation outputs render via the same `dispatch`.
 
@@ -110,7 +110,7 @@ mod tests {
     use rust_decimal::Decimal;
     use std::str::FromStr;
 
-    use inv_commands::{Actor, Channel};
+    use hop_top_inv_commands::{Actor, Channel};
 
     use super::build_cli;
     use crate::commands::invoice::{build_draft_input, build_issue_input, build_pay_input};
@@ -168,7 +168,7 @@ mod tests {
     fn issue_input_maps_clap_args() {
         // We can't trivially mint a real typeid here, but the parser
         // does the typeid round-trip; reuse a freshly-minted one.
-        use inv_core::domain::ids::InvoiceId;
+        use hop_top_inv_core::domain::ids::InvoiceId;
         let id = InvoiceId::new();
         let id_s = id.to_string();
         let m = parse(&["inv", "invoice", "issue", &id_s]);
@@ -183,7 +183,7 @@ mod tests {
 
     #[test]
     fn pay_input_maps_clap_args() {
-        use inv_core::domain::ids::InvoiceId;
+        use hop_top_inv_core::domain::ids::InvoiceId;
         let id = InvoiceId::new();
         let id_s = id.to_string();
         let m = parse(&[

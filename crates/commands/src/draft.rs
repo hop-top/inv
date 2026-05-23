@@ -1,6 +1,6 @@
 //! `draft_invoice` command.
 //!
-//! Creates a new invoice in the [`Draft`](inv_core::domain::invoice::InvoiceState::Draft)
+//! Creates a new invoice in the [`Draft`](hop_top_inv_core::domain::invoice::InvoiceState::Draft)
 //! state, computes a pre-tax subtotal, writes the invoice + its lines +
 //! a `drafted` row in `invoice_state_history`, all in a single sqlx
 //! transaction. Tax is NOT resolved here — it's snapshotted at issue
@@ -20,14 +20,14 @@ use chrono::{DateTime, Utc};
 use rust_decimal::Decimal;
 use serde_json::json;
 
-use inv_core::domain::ids::{CustomerId, HistoryId, InvoiceId, LineId, ScheduleId};
-use inv_core::domain::invoice::{
+use hop_top_inv_core::domain::ids::{CustomerId, HistoryId, InvoiceId, LineId, ScheduleId};
+use hop_top_inv_core::domain::invoice::{
     HistoryChannel, Invoice, InvoiceLine, InvoiceState, InvoiceStateHistory, TaxCategory,
 };
-use inv_core::domain::jurisdiction::Jurisdiction;
-use inv_core::domain::money::Currency;
-use inv_store::repo::history::InvoiceHistoryRepo;
-use inv_store::repo::invoice::{InvoiceLineRepo, InvoiceRepo};
+use hop_top_inv_core::domain::jurisdiction::Jurisdiction;
+use hop_top_inv_core::domain::money::Currency;
+use hop_top_inv_store::repo::history::InvoiceHistoryRepo;
+use hop_top_inv_store::repo::invoice::{InvoiceLineRepo, InvoiceRepo};
 
 use crate::ctx::{Actor, Channel, CoreCtx};
 use crate::error::CoreError;
@@ -233,11 +233,17 @@ pub async fn draft_invoice(
     // row (design §3.5). Each repo exposes a `save_in_tx` variant that
     // accepts a borrowed `&mut Transaction`. See T-0024.
     {
-        let mut tx = ctx.db.begin().await.map_err(inv_store::StoreError::from)?;
+        let mut tx = ctx
+            .db
+            .begin()
+            .await
+            .map_err(hop_top_inv_store::StoreError::from)?;
         InvoiceRepo::save_in_tx(&mut tx, &invoice).await?;
         InvoiceLineRepo::replace_for_invoice_in_tx(&mut tx, &invoice_id, &lines).await?;
         InvoiceHistoryRepo::save_in_tx(&mut tx, &history).await?;
-        tx.commit().await.map_err(inv_store::StoreError::from)?;
+        tx.commit()
+            .await
+            .map_err(hop_top_inv_store::StoreError::from)?;
     }
 
     // 5. Best-effort synchronous publish (T-0043). The history-row

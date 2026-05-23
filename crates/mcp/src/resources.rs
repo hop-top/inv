@@ -1,4 +1,4 @@
-//! Read-only MCP resources exposed by `inv-mcp`.
+//! Read-only MCP resources exposed by `hop-top-inv-mcp`.
 //!
 //! Every readable entity in the store gets an MCP-resource URI:
 //!
@@ -19,14 +19,14 @@ use rmcp::model::{
 };
 use serde::Serialize;
 
-use inv_commands::CoreCtx;
-use inv_core::domain::ids::{CreditNoteId, CustomerId, InvoiceId, ReminderId, ScheduleId};
-use inv_core::domain::invoice::{Invoice, InvoiceLine};
-use inv_store::repo::credit_note::CreditNoteRepo;
-use inv_store::repo::customer::CustomerRepo;
-use inv_store::repo::invoice::{InvoiceLineRepo, InvoiceRepo};
-use inv_store::repo::reminder::ReminderRepo;
-use inv_store::repo::schedule::ScheduleRepo;
+use hop_top_inv_commands::CoreCtx;
+use hop_top_inv_core::domain::ids::{CreditNoteId, CustomerId, InvoiceId, ReminderId, ScheduleId};
+use hop_top_inv_core::domain::invoice::{Invoice, InvoiceLine};
+use hop_top_inv_store::repo::credit_note::CreditNoteRepo;
+use hop_top_inv_store::repo::customer::CustomerRepo;
+use hop_top_inv_store::repo::invoice::{InvoiceLineRepo, InvoiceRepo};
+use hop_top_inv_store::repo::reminder::ReminderRepo;
+use hop_top_inv_store::repo::schedule::ScheduleRepo;
 
 use crate::error::McpError;
 
@@ -54,7 +54,7 @@ pub(crate) struct InvoiceResourceBody<'a> {
     pub(crate) lines: &'a [InvoiceLine],
 }
 
-/// URI scheme used by all `inv-mcp` resources.
+/// URI scheme used by all `hop-top-inv-mcp` resources.
 pub const URI_SCHEME: &str = "inv";
 
 /// MIME type for every resource body — they're all JSON documents.

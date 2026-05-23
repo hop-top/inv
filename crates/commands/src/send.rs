@@ -43,20 +43,20 @@ use std::path::PathBuf;
 use chrono::{DateTime, Utc};
 use serde_json::json;
 
-use inv_core::domain::ids::{HistoryId, InvoiceId};
-use inv_core::domain::invoice::{
+use hop_top_inv_core::domain::ids::{HistoryId, InvoiceId};
+use hop_top_inv_core::domain::invoice::{
     HistoryChannel, Invoice, InvoiceLine, InvoiceState, InvoiceStateHistory,
 };
-use inv_core::render::{render_html, render_pdf, RenderContext};
-use inv_core::state::transitions::{next_state, InvoiceEvent};
-use inv_core::state::{
+use hop_top_inv_core::render::{render_html, render_pdf, RenderContext};
+use hop_top_inv_core::state::transitions::{next_state, InvoiceEvent};
+use hop_top_inv_core::state::{
     InvoiceEntered, InvoiceProposed, InvoiceTransitioned, TOPIC_ENTERED, TOPIC_PROPOSED,
     TOPIC_TRANSITIONED,
 };
-use inv_store::repo::customer::CustomerRepo;
-use inv_store::repo::history::InvoiceHistoryRepo;
-use inv_store::repo::invoice::{InvoiceLineRepo, InvoiceRepo};
-use inv_store::repo::send_idempotency::{SendIdempotencyRecord, SendIdempotencyRepo};
+use hop_top_inv_store::repo::customer::CustomerRepo;
+use hop_top_inv_store::repo::history::InvoiceHistoryRepo;
+use hop_top_inv_store::repo::invoice::{InvoiceLineRepo, InvoiceRepo};
+use hop_top_inv_store::repo::send_idempotency::{SendIdempotencyRecord, SendIdempotencyRepo};
 
 use crate::ctx::{Actor, Channel, CoreCtx};
 use crate::draft::history_channel_str;
@@ -273,7 +273,7 @@ pub async fn send_invoice(
 /// the entry point channel adapters use for transports the command
 /// layer doesn't speak natively — `webhook://...` (HTTP POST owned by
 /// the api adapter), `link://` (signed-link minting), `bus://...`
-/// (publisher owned by inv-bus).
+/// (publisher owned by hop-top-inv-bus).
 #[tracing::instrument(skip_all, fields(
     invoice_id = %input.invoice_id,
     destination = %input.destination_uri
@@ -348,7 +348,7 @@ async fn prepare_send(
         InvoiceState::Sent => InvoiceState::Sent,
         other => {
             return Err(CoreError::FsmTransition(
-                inv_core::state::TransitionError::Illegal {
+                hop_top_inv_core::state::TransitionError::Illegal {
                     state: other,
                     event: "send",
                 },
@@ -431,7 +431,11 @@ async fn finalize_send(
         },
     };
     {
-        let mut tx = ctx.db.begin().await.map_err(inv_store::StoreError::from)?;
+        let mut tx = ctx
+            .db
+            .begin()
+            .await
+            .map_err(hop_top_inv_store::StoreError::from)?;
         InvoiceRepo::save_in_tx(&mut tx, &invoice).await?;
         InvoiceHistoryRepo::save_in_tx(&mut tx, &history).await?;
         if let Some(key) = idempotency_key {
@@ -447,7 +451,9 @@ async fn finalize_send(
             )
             .await?;
         }
-        tx.commit().await.map_err(inv_store::StoreError::from)?;
+        tx.commit()
+            .await
+            .map_err(hop_top_inv_store::StoreError::from)?;
     }
 
     publish_sent_events(

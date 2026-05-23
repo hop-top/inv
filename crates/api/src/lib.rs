@@ -1,6 +1,6 @@
-//! inv-api — HTTP API channel adapter (axum 0.8).
+//! hop-top-inv-api — HTTP API channel adapter (axum 0.8).
 //!
-//! Exposes the [`inv_commands`] operation surface as a REST API per design
+//! Exposes the [`hop_top_inv_commands`] operation surface as a REST API per design
 //! §10 and ships the supporting plumbing every adapter needs:
 //!
 //! - RFC 9457 problem-detail responses ([`error::ApiError`]).
@@ -15,7 +15,7 @@
 //!
 //! Channel adapters in this codebase stay deliberately thin: every route
 //! parses its body, hands a typed input to the matching command, and maps
-//! the result back to JSON. Business logic lives in `inv-commands`.
+//! the result back to JSON. Business logic lives in `hop-top-inv-commands`.
 
 #![deny(missing_docs)]
 

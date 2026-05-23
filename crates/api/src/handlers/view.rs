@@ -6,7 +6,7 @@
 //! before we touch the store so a 404 leaks nothing.
 //!
 //! View tracking + bus emission is best-effort on the publisher side:
-//! when the [`inv_commands::CoreCtx`] doesn't carry a bus publisher we
+//! when the [`hop_top_inv_commands::CoreCtx`] doesn't carry a bus publisher we
 //! still update the row in the store (the history row doubles as the
 //! outbox and the relay will pick it up next tick). The adapter does
 //! NOT depend on the publisher to serve content.
@@ -19,13 +19,13 @@ use axum::http::{header, HeaderMap, HeaderValue};
 use axum::response::IntoResponse;
 use chrono::Utc;
 
-use inv_bus::{InvoiceViewed, TOPIC_INVOICE_VIEWED};
-use inv_core::domain::ids::{HistoryId, InvoiceId};
-use inv_core::domain::invoice::{HistoryChannel, InvoiceState, InvoiceStateHistory};
-use inv_core::render::{render_html, RenderContext};
-use inv_store::repo::customer::CustomerRepo;
-use inv_store::repo::history::InvoiceHistoryRepo;
-use inv_store::repo::invoice::{InvoiceLineRepo, InvoiceRepo};
+use hop_top_inv_bus::{InvoiceViewed, TOPIC_INVOICE_VIEWED};
+use hop_top_inv_core::domain::ids::{HistoryId, InvoiceId};
+use hop_top_inv_core::domain::invoice::{HistoryChannel, InvoiceState, InvoiceStateHistory};
+use hop_top_inv_core::render::{render_html, RenderContext};
+use hop_top_inv_store::repo::customer::CustomerRepo;
+use hop_top_inv_store::repo::history::InvoiceHistoryRepo;
+use hop_top_inv_store::repo::invoice::{InvoiceLineRepo, InvoiceRepo};
 
 use crate::error::ApiError;
 use crate::signed_link;
@@ -55,16 +55,16 @@ pub async fn view_invoice(
     let mut invoice = inv_repo
         .get(&invoice_id)
         .await
-        .map_err(inv_commands::CoreError::from)?
+        .map_err(hop_top_inv_commands::CoreError::from)?
         .ok_or(ApiError::InvalidLink)?;
     let lines = InvoiceLineRepo::new(&state.ctx.db)
         .list_for_invoice(&invoice_id)
         .await
-        .map_err(inv_commands::CoreError::from)?;
+        .map_err(hop_top_inv_commands::CoreError::from)?;
     let customer = CustomerRepo::new(&state.ctx.db)
         .get(&invoice.customer_id)
         .await
-        .map_err(inv_commands::CoreError::from)?
+        .map_err(hop_top_inv_commands::CoreError::from)?
         .ok_or(ApiError::InvalidLink)?;
 
     // Render HTML. Templates that hold `null` for tax fields still work
@@ -73,7 +73,7 @@ pub async fn view_invoice(
     let template_path = invoice.template_path.as_deref().map(std::path::Path::new);
     let html = render_html(template_path, &render_ctx)
         .await
-        .map_err(inv_commands::CoreError::from)?;
+        .map_err(hop_top_inv_commands::CoreError::from)?;
 
     // Advance Sent → Viewed if we're in Sent. Multiple views are
     // idempotent — once we're in Viewed we just re-render.
@@ -99,21 +99,18 @@ pub async fn view_invoice(
             metadata: BTreeMap::new(),
         };
 
-        let mut tx = state
-            .ctx
-            .db
-            .begin()
-            .await
-            .map_err(|e| inv_commands::CoreError::Repo(inv_store::StoreError::from(e)))?;
+        let mut tx = state.ctx.db.begin().await.map_err(|e| {
+            hop_top_inv_commands::CoreError::Repo(hop_top_inv_store::StoreError::from(e))
+        })?;
         InvoiceRepo::save_in_tx(&mut tx, &invoice)
             .await
-            .map_err(inv_commands::CoreError::from)?;
+            .map_err(hop_top_inv_commands::CoreError::from)?;
         InvoiceHistoryRepo::save_in_tx(&mut tx, &history)
             .await
-            .map_err(inv_commands::CoreError::from)?;
-        tx.commit()
-            .await
-            .map_err(|e| inv_commands::CoreError::Repo(inv_store::StoreError::from(e)))?;
+            .map_err(hop_top_inv_commands::CoreError::from)?;
+        tx.commit().await.map_err(|e| {
+            hop_top_inv_commands::CoreError::Repo(hop_top_inv_store::StoreError::from(e))
+        })?;
 
         // Emit `inv.billing.invoice.viewed`. The history row is the
         // canonical outbox entry (the relay will publish it on its next

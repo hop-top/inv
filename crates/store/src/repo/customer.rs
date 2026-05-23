@@ -2,9 +2,9 @@
 
 use sqlx::Row;
 
-use inv_core::domain::address::Address;
-use inv_core::domain::customer::Customer;
-use inv_core::domain::ids::CustomerId;
+use hop_top_inv_core::domain::address::Address;
+use hop_top_inv_core::domain::customer::Customer;
+use hop_top_inv_core::domain::ids::CustomerId;
 
 use super::{metadata_from_json, metadata_to_json, parse_ts, ts_to_string};
 use crate::error::{Result, StoreError};

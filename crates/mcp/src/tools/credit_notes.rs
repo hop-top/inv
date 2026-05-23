@@ -1,16 +1,16 @@
 //! Credit-note tools.
 //!
-//! - `inv_creditnote_draft` → [`inv_commands::create_credit_note`]
-//! - `inv_creditnote_issue` → [`inv_commands::issue_credit_note`]
+//! - `inv_creditnote_draft` → [`hop_top_inv_commands::create_credit_note`]
+//! - `inv_creditnote_issue` → [`hop_top_inv_commands::issue_credit_note`]
 
 use rust_decimal::Decimal;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use inv_commands::{
+use hop_top_inv_commands::{
     create_credit_note, issue_credit_note, CoreCtx, CreateCreditNoteInput, IssueCreditNoteInput,
 };
-use inv_core::domain::ids::{CreditNoteId, InvoiceId};
+use hop_top_inv_core::domain::ids::{CreditNoteId, InvoiceId};
 
 use crate::error::McpError;
 use crate::tools::common::{mcp_actor, mcp_channel};
@@ -43,7 +43,7 @@ pub async fn draft(
         input
             .invoice_id
             .parse()
-            .map_err(|e: inv_core::domain::ids::IdError| {
+            .map_err(|e: hop_top_inv_core::domain::ids::IdError| {
                 McpError::Decode(format!("invoice_id: {e}"))
             })?;
     let req = CreateCreditNoteInput {
@@ -78,7 +78,7 @@ pub async fn issue(
         input
             .credit_note_id
             .parse()
-            .map_err(|e: inv_core::domain::ids::IdError| {
+            .map_err(|e: hop_top_inv_core::domain::ids::IdError| {
                 McpError::Decode(format!("credit_note_id: {e}"))
             })?;
     let req = IssueCreditNoteInput {

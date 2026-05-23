@@ -1,5 +1,5 @@
 [package]
-name = "inv-e2e"
+name = "hop-top-inv-e2e"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -9,7 +9,7 @@ description = "inv: end-to-end story-driven tests (one file per user story)"
 publish = false
 
 # Empty lib target — this crate carries integration tests only. The lib
-# itself is a placeholder so `cargo test -p inv-e2e --test <name>` works
+# itself is a placeholder so `cargo test -p hop-top-inv-e2e --test <name>` works
 # uniformly across the workspace.
 
 [dependencies]
@@ -17,14 +17,14 @@ publish = false
 [dev-dependencies]
 # inv crates under test — pull in every adapter so stories that exercise
 # multiple surfaces (CLI + bus, HTTP + store) live in one crate.
-inv-core = { workspace = true, features = ["schema"] }
-inv-commands = { workspace = true }
-inv-store = { workspace = true, features = ["sqlite"] }
-inv-bus = { workspace = true }
-inv-api = { workspace = true }
-inv-cli = { workspace = true }
-inv-mcp = { workspace = true }
-inv-ws = { workspace = true }
+hop-top-inv-core = { workspace = true, features = ["schema"] }
+hop-top-inv-commands = { workspace = true }
+hop-top-inv-store = { workspace = true, features = ["sqlite"] }
+hop-top-inv-bus = { workspace = true }
+hop-top-inv-api = { workspace = true }
+hop-top-inv-cli = { workspace = true }
+hop-top-inv-mcp = { workspace = true }
+hop-top-inv-ws = { workspace = true }
 
 # xrr — published on crates.io as hop-top-xrr. Kept crate-local (not a
 # workspace dep) since it's a test-only dep with a specific alpha pin;

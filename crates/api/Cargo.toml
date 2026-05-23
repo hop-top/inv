@@ -1,5 +1,5 @@
 [package]
-name = "inv-api"
+name = "hop-top-inv-api"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -31,23 +31,23 @@ sha2 = { workspace = true }
 subtle = { workspace = true }
 
 # base64url encoding for the public signed-link token + outbound webhook
-# delivery (handled inside the adapter so the inv-commands surface stays
+# delivery (handled inside the adapter so the hop-top-inv-commands surface stays
 # transport-agnostic).
 base64 = { workspace = true }
 reqwest = { workspace = true }
 
 # inv crates we adapt over.
-inv-core     = { workspace = true }
-inv-store    = { workspace = true }
-inv-commands = { workspace = true }
-inv-bus      = { workspace = true }
+hop-top-inv-core     = { workspace = true }
+hop-top-inv-store    = { workspace = true }
+hop-top-inv-commands = { workspace = true }
+hop-top-inv-bus      = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true }
 tower = { workspace = true }
 tempfile = { workspace = true }
-# Enable the sqlite backend on inv-store for the integration test pool.
-inv-store = { workspace = true, features = ["sqlite"] }
+# Enable the sqlite backend on hop-top-inv-store for the integration test pool.
+hop-top-inv-store = { workspace = true, features = ["sqlite"] }
 
 [lints]
 workspace = true

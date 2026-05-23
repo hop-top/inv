@@ -1,5 +1,5 @@
-//! inv-mcp — MCP server channel adapter. Thin shell over
-//! `inv-commands`.
+//! hop-top-inv-mcp — MCP server channel adapter. Thin shell over
+//! `hop-top-inv-commands`.
 //!
 //! Per design §10, the MCP channel exposes every command as a tool and
 //! every readable entity (invoice, credit note, schedule, reminder,
@@ -11,10 +11,10 @@
 //!
 //! ```no_run
 //! use std::sync::Arc;
-//! use inv_commands::CoreCtx;
+//! use hop_top_inv_commands::CoreCtx;
 //!
 //! # async fn run(ctx: Arc<CoreCtx>) -> anyhow::Result<()> {
-//! inv_mcp::run_stdio(ctx).await?;
+//! hop_top_inv_mcp::run_stdio(ctx).await?;
 //! # Ok(())
 //! # }
 //! ```
@@ -26,7 +26,7 @@
 //!   proc-macros (rmcp 1.7 idiomatic surface).
 //! - [`tools`] — one submodule per command grouping. Each tool decodes
 //!   a JSON-schema'd input struct (derived via `schemars::JsonSchema`)
-//!   into the matching `inv_commands` typed input.
+//!   into the matching `hop_top_inv_commands` typed input.
 //! - [`resources`] — `inv://invoice/<id>` etc. resolvers.
 //! - [`error`] — [`McpError`] + conversions to rmcp's wire-level error.
 
@@ -42,7 +42,7 @@ pub use server::InvMcpServer;
 
 use std::sync::Arc;
 
-use inv_commands::CoreCtx;
+use hop_top_inv_commands::CoreCtx;
 
 /// Boot the MCP server on the stdio transport.
 ///

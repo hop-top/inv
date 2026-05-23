@@ -21,7 +21,7 @@ in [reference/mcp.md#invoice](../../reference/mcp.md#invoice): `customer_id`,
 `currency`, `seller_jurisdiction?`, `lines[]`, `due_at?`,
 `idempotency_key?`, `template_path?`. Field names use snake_case, money
 fields are quoted decimal strings, and the schema is derivable from the
-matching `DraftInvoiceInput` type in `inv-commands`.
+matching `DraftInvoiceInput` type in `hop-top-inv-commands`.
 
 **Given** the agent calls
 ```json

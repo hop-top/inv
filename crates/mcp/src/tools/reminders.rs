@@ -1,17 +1,17 @@
 //! Reminder tools.
 //!
-//! - `inv_reminder_schedule` → [`inv_commands::reminder_schedule`]
-//! - `inv_reminder_cancel`   → [`inv_commands::reminder_cancel`]
+//! - `inv_reminder_schedule` → [`hop_top_inv_commands::reminder_schedule`]
+//! - `inv_reminder_cancel`   → [`hop_top_inv_commands::reminder_cancel`]
 
 use chrono::{DateTime, Utc};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use inv_commands::{
+use hop_top_inv_commands::{
     reminder_cancel, reminder_schedule, CoreCtx, ReminderCancelInput, ReminderScheduleInput,
 };
-use inv_core::domain::ids::{InvoiceId, ReminderId};
-use inv_core::domain::reminder::ReminderChannel;
+use hop_top_inv_core::domain::ids::{InvoiceId, ReminderId};
+use hop_top_inv_core::domain::reminder::ReminderChannel;
 
 use crate::error::McpError;
 use crate::tools::common::{mcp_actor, mcp_channel};
@@ -36,7 +36,7 @@ pub async fn schedule(
         input
             .invoice_id
             .parse()
-            .map_err(|e: inv_core::domain::ids::IdError| {
+            .map_err(|e: hop_top_inv_core::domain::ids::IdError| {
                 McpError::Decode(format!("invoice_id: {e}"))
             })?;
     let req = ReminderScheduleInput {
@@ -66,7 +66,7 @@ pub async fn cancel(
         input
             .reminder_id
             .parse()
-            .map_err(|e: inv_core::domain::ids::IdError| {
+            .map_err(|e: hop_top_inv_core::domain::ids::IdError| {
                 McpError::Decode(format!("reminder_id: {e}"))
             })?;
     let req = ReminderCancelInput {

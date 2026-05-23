@@ -8,7 +8,7 @@
 //! xrr: NOT used. The "external boundary" (the customer's webhook
 //! endpoint) is replaced by an in-process TcpListener — same pattern as
 //! crates/api/tests/integration.rs::webhook_send_signs_outbound_body.
-//! xrr would have to intercept inv-api's reqwest::Client, which lives
+//! xrr would have to intercept hop-top-inv-api's reqwest::Client, which lives
 //! inside ApiState and is not a stable seam at this version.
 
 mod common;
@@ -24,9 +24,9 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
 use tower::ServiceExt;
 
-use inv_api::router;
-use inv_core::domain::ids::InvoiceId;
-use inv_store::repo::history::InvoiceHistoryRepo;
+use hop_top_inv_api::router;
+use hop_top_inv_core::domain::ids::InvoiceId;
+use hop_top_inv_store::repo::history::InvoiceHistoryRepo;
 
 #[tokio::test]
 async fn webhook_send_records_realised_url_and_signs_body() {
@@ -110,7 +110,8 @@ async fn webhook_send_records_realised_url_and_signs_body() {
         .clone()
         .expect("X-Inv-Signature missing");
     let body = captured_body.lock().await.clone();
-    let expected = inv_api::webhook::signature_header(&body, &state.config.webhook_signing_key);
+    let expected =
+        hop_top_inv_api::webhook::signature_header(&body, &state.config.webhook_signing_key);
     assert_eq!(sig, expected, "signature header mismatch");
     assert!(!body.is_empty());
 
@@ -130,7 +131,7 @@ async fn webhook_send_records_realised_url_and_signs_body() {
         "history row must record the real webhook URL",
     );
     // Also: channel = api.
-    use inv_core::domain::invoice::HistoryChannel;
+    use hop_top_inv_core::domain::invoice::HistoryChannel;
     assert_eq!(send_row.channel, HistoryChannel::Api);
 
     // Quiet timeout helper.
