@@ -137,6 +137,26 @@ impl<'p> InvoiceRepo<'p> {
         row.as_ref().map(row_to_invoice).transpose()
     }
 
+    /// Indexed lookup by `idempotency_key`.
+    ///
+    /// Used by command-layer dedupe (e.g. `draft_invoice`'s
+    /// idempotency-replay path). The column has a UNIQUE constraint at
+    /// schema level so the query is O(1) — `LIMIT 1` is belt-and-braces.
+    pub async fn find_by_idempotency_key(&self, key: &str) -> Result<Option<Invoice>> {
+        let row = sqlx::query(
+            "SELECT id, number, customer_id, seller_jur, currency, state, \
+                    issued_at, due_at, sent_at, viewed_at, paid_at, voided_at, \
+                    subtotal, tax_total, total, amount_paid, \
+                    schedule_id, template_path, pdf_blob_ref, idempotency_key, \
+                    nexus_review, metadata, created_at, updated_at \
+             FROM invoices WHERE idempotency_key = ? LIMIT 1",
+        )
+        .bind(key)
+        .fetch_optional(self.pool)
+        .await?;
+        row.as_ref().map(row_to_invoice).transpose()
+    }
+
     /// List with filters.
     pub async fn list(&self, filter: &InvoiceFilter) -> Result<Vec<Invoice>> {
         // Build the WHERE dynamically. Each placeholder is `?` (sqlite's

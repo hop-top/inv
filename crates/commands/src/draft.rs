@@ -27,7 +27,7 @@ use inv_core::domain::invoice::{
 use inv_core::domain::jurisdiction::Jurisdiction;
 use inv_core::domain::money::Currency;
 use inv_store::repo::history::InvoiceHistoryRepo;
-use inv_store::repo::invoice::{InvoiceFilter, InvoiceLineRepo, InvoiceRepo};
+use inv_store::repo::invoice::{InvoiceLineRepo, InvoiceRepo};
 
 use crate::ctx::{Actor, Channel, CoreCtx};
 use crate::error::CoreError;
@@ -144,8 +144,13 @@ pub async fn draft_invoice(
     input.validate()?;
 
     // 2. Idempotency check (design §3.5: BEFORE mutating).
+    //    Indexed lookup via the UNIQUE constraint on
+    //    `invoices.idempotency_key` (T-0040).
     if let Some(key) = input.idempotency_key.as_deref() {
-        if let Some(existing) = find_invoice_by_idempotency_key(ctx, key).await? {
+        if let Some(existing) = InvoiceRepo::new(&ctx.db)
+            .find_by_idempotency_key(key)
+            .await?
+        {
             let lines = InvoiceLineRepo::new(&ctx.db)
                 .list_for_invoice(&existing.id)
                 .await?;
@@ -259,33 +264,6 @@ pub async fn draft_invoice(
         emitted_events: vec![drafted_event],
         idempotency_replay: false,
     })
-}
-
-/// Look up an existing invoice by its idempotency key.
-///
-/// Linear scan of invoices for v1 — the index lives on the column at
-/// schema level (UNIQUE) but the repo doesn't expose a direct lookup.
-/// At typical v1 throughput (dozens of drafts/day per operator) the
-/// scan is bounded by `list()`'s default ordering and is dominated by
-/// SQL planner overhead either way.
-async fn find_invoice_by_idempotency_key(
-    ctx: &CoreCtx,
-    key: &str,
-) -> Result<Option<Invoice>, CoreError> {
-    let inv_repo = InvoiceRepo::new(&ctx.db);
-    let list = inv_repo
-        .list(&InvoiceFilter {
-            customer_id: None,
-            state: None,
-            limit: None,
-            offset: None,
-        })
-        .await?;
-    Ok(list.into_iter().find(|i| {
-        i.idempotency_key
-            .as_deref()
-            .is_some_and(|k| k == key)
-    }))
 }
 
 /// Stringify the [`HistoryChannel`] for the event payload.

@@ -659,6 +659,41 @@ async fn credit_note_list_filters_and_pages() {
 }
 
 #[tokio::test]
+async fn invoice_find_by_idempotency_key_indexed_lookup() {
+    // T-0040: `find_by_idempotency_key` does an indexed `SELECT ...
+    // WHERE idempotency_key = ?` instead of scanning. Cover hit, miss,
+    // and the empty-string boundary (column is nullable; no invoice
+    // here has an empty key, so the empty lookup must miss too).
+    let pool = fresh_pool().await;
+    let cust_repo = CustomerRepo::new(&pool);
+    let inv_repo = InvoiceRepo::new(&pool);
+
+    let c = sample_customer();
+    cust_repo.save(&c).await.unwrap();
+
+    let mut with_key = sample_invoice(&c.id);
+    with_key.idempotency_key = Some("foo".into());
+    inv_repo.save(&with_key).await.unwrap();
+
+    // No-key invoice (NULL idempotency_key) must not collide with the
+    // empty-string lookup.
+    let no_key = sample_invoice(&c.id);
+    inv_repo.save(&no_key).await.unwrap();
+
+    let hit = inv_repo.find_by_idempotency_key("foo").await.unwrap();
+    assert!(hit.is_some(), "key 'foo' should hit");
+    assert_eq!(hit.unwrap().id, with_key.id);
+
+    let miss = inv_repo.find_by_idempotency_key("bar").await.unwrap();
+    assert!(miss.is_none(), "key 'bar' must miss");
+
+    // Empty-string lookup: schema allows storing "" (column is just
+    // `TEXT UNIQUE`), but no invoice here has one, so this must miss.
+    let empty = inv_repo.find_by_idempotency_key("").await.unwrap();
+    assert!(empty.is_none(), "empty key must miss (no inv has '')");
+}
+
+#[tokio::test]
 async fn customer_save_does_not_fk_violate_when_referenced() {
     let pool = fresh_pool().await;
     let repo = CustomerRepo::new(&pool);
