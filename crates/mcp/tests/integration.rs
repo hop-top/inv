@@ -17,9 +17,9 @@ use hop_top_inv_core::domain::customer::Customer;
 use hop_top_inv_core::domain::ids::CustomerId;
 use hop_top_inv_core::tax::TaxTable;
 use hop_top_inv_mcp::InvMcpServer;
-use hop_top_inv_store::pool::{connect, Pool};
+use hop_top_inv_store::connect_for_tests;
+use hop_top_inv_store::pool::Pool;
 use hop_top_inv_store::repo::customer::CustomerRepo;
-use hop_top_inv_store::run_migrations;
 
 use rmcp::model::{CallToolRequestParams, ReadResourceRequestParams};
 use rmcp::service::ServiceExt;
@@ -57,8 +57,7 @@ fn frozen_now() -> DateTime<Utc> {
 }
 
 async fn fresh_ctx() -> (Arc<CoreCtx>, Pool) {
-    let pool = connect("sqlite::memory:").await.expect("connect");
-    run_migrations(&pool).await.expect("migrate");
+    let pool = connect_for_tests().await.expect("connect_for_tests");
     let (table, nexus) = TaxTable::load_from_str(FIXTURE_TOML).expect("tax fixture");
     let ctx =
         CoreCtx::new(pool.clone(), table, nexus).with_clock(Arc::new(FrozenClock(frozen_now())));

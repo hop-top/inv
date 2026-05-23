@@ -26,9 +26,9 @@ use hop_top_inv_core::domain::customer::Customer;
 use hop_top_inv_core::domain::ids::CustomerId;
 use hop_top_inv_core::tax::TaxTable;
 use hop_top_inv_store::blob::LocalBlobStore;
-use hop_top_inv_store::pool::{connect, Pool};
+use hop_top_inv_store::connect_for_tests;
+use hop_top_inv_store::pool::Pool;
 use hop_top_inv_store::repo::customer::CustomerRepo;
-use hop_top_inv_store::run_migrations;
 
 use hop_top_xrr::{FileCassette, Mode, Session};
 
@@ -110,11 +110,12 @@ effective_from = "2017-01-01"
 // CoreCtx + Pool fixtures
 // =============================================================================
 
-/// Build a fresh in-memory sqlite pool with migrations applied.
+/// Build a fresh test pool (sqlite `:memory:` by default, postgres if
+/// `DATABASE_URL` is set) with migrations applied. See
+/// `hop_top_inv_store::test_fixtures` for the per-test isolation
+/// strategy.
 pub async fn fresh_pool() -> Pool {
-    let pool = connect("sqlite::memory:").await.expect("connect");
-    run_migrations(&pool).await.expect("migrate");
-    pool
+    connect_for_tests().await.expect("connect_for_tests")
 }
 
 /// Build a fresh CoreCtx wired with: frozen clock, local blob store

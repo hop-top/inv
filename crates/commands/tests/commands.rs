@@ -36,10 +36,10 @@ use hop_top_inv_core::domain::creditnote::CreditNoteState;
 use hop_top_inv_core::domain::reminder::{ReminderChannel, ReminderState};
 use hop_top_inv_core::domain::schedule::{Cadence, ScheduleState};
 use hop_top_inv_store::blob::LocalBlobStore;
-use hop_top_inv_store::pool::{connect, Pool};
+use hop_top_inv_store::connect_for_tests;
+use hop_top_inv_store::pool::Pool;
 use hop_top_inv_store::repo::history::InvoiceHistoryRepo;
 use hop_top_inv_store::repo::{CreditNoteRepo, CustomerRepo, InvoiceRepo};
-use hop_top_inv_store::run_migrations;
 
 /// Frozen-clock impl for deterministic tests.
 struct FrozenClock(DateTime<Utc>);
@@ -101,8 +101,7 @@ async fn fresh_ctx_inner(
     Arc<InMemoryPublisher>,
     Option<tempfile::TempDir>,
 ) {
-    let pool = connect("sqlite::memory:").await.expect("connect");
-    run_migrations(&pool).await.expect("migrate");
+    let pool = connect_for_tests().await.expect("connect_for_tests");
     let (table, nexus) = TaxTable::load_from_str(FIXTURE_TOML).expect("tax fixture");
     let publisher: Arc<InMemoryPublisher> = Arc::new(InMemoryPublisher::new());
     let mut ctx = CoreCtx::new(pool.clone(), table, nexus)

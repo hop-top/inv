@@ -1,10 +1,10 @@
-//! Integration tests for hop-top-inv-store against an in-memory sqlite pool.
+//! Integration tests for hop-top-inv-store.
 //!
-//! Each `#[tokio::test]` opens its own pool (sqlite `:memory:` is
-//! per-connection, but the pool's single connection variant means we
-//! get a stable, isolated db per test).
-
-#![cfg(feature = "sqlite")]
+//! Each `#[tokio::test]` opens its own pool via `connect_for_tests()`,
+//! which reads `DATABASE_URL` or falls back to `sqlite::memory:`. The
+//! sqlite default gives every test a fresh in-memory db; postgres mode
+//! resets the `public` schema before applying migrations (see
+//! `hop_top_inv_store::test_fixtures`).
 
 use std::collections::BTreeMap;
 use std::str::FromStr;
@@ -26,7 +26,7 @@ use hop_top_inv_core::domain::money::Currency;
 use hop_top_inv_core::domain::reminder::{Reminder, ReminderChannel, ReminderState};
 use hop_top_inv_core::domain::schedule::{Cadence, Schedule, ScheduleLine, ScheduleState};
 
-use hop_top_inv_store::pool::{backend_of, connect, Backend};
+use hop_top_inv_store::connect_for_tests;
 use hop_top_inv_store::repo::bus_inbox::BusInboxRecord;
 use hop_top_inv_store::repo::credit_note::CreditNoteFilter;
 use hop_top_inv_store::repo::invoice::InvoiceFilter;
@@ -37,12 +37,11 @@ use hop_top_inv_store::repo::{
 };
 use hop_top_inv_store::run_migrations;
 
-/// Open an in-memory sqlite pool, apply migrations.
+/// Open a pool via the shared `connect_for_tests` helper (sqlite
+/// in-memory by default; postgres if `DATABASE_URL` is set). Migrations
+/// are applied by the helper.
 async fn fresh_pool() -> hop_top_inv_store::pool::Pool {
-    let pool = connect("sqlite::memory:").await.expect("connect");
-    assert_eq!(backend_of(&pool).await.unwrap(), Backend::Sqlite);
-    run_migrations(&pool).await.expect("migrate");
-    pool
+    connect_for_tests().await.expect("connect_for_tests")
 }
 
 fn sample_customer() -> Customer {

@@ -32,8 +32,10 @@ sqlx = { workspace = true, features = ["any"] }
 
 [dev-dependencies]
 tokio = { workspace = true }
-# Enable the sqlite backend on hop-top-inv-store for the integration test pool.
-hop-top-inv-store = { workspace = true, features = ["sqlite"] }
+# Enable the sqlite backend + the shared `connect_for_tests` helper on
+# hop-top-inv-store for the integration test pool. Postgres is opted in
+# by CI via `--features hop-top-inv-store/postgres`.
+hop-top-inv-store = { workspace = true, features = ["sqlite", "test-fixtures"] }
 # Tempdir used as the LocalBlobStore root for the blob-wiring tests.
 tempfile = { workspace = true }
 # `InMemoryPublisher` for capturing bus emissions in tests (T-0043

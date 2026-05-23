@@ -19,7 +19,7 @@ publish = false
 # multiple surfaces (CLI + bus, HTTP + store) live in one crate.
 hop-top-inv-core = { workspace = true, features = ["schema"] }
 hop-top-inv-commands = { workspace = true }
-hop-top-inv-store = { workspace = true, features = ["sqlite"] }
+hop-top-inv-store = { workspace = true, features = ["sqlite", "test-fixtures"] }
 hop-top-inv-bus = { workspace = true }
 hop-top-inv-api = { workspace = true }
 hop-top-inv-cli = { workspace = true }

@@ -16,6 +16,12 @@ pub mod migrate;
 pub mod pool;
 pub mod repo;
 
+#[cfg(feature = "test-fixtures")]
+pub mod test_fixtures;
+
 pub use error::{Result, StoreError};
 pub use migrate::run_migrations;
 pub use pool::{connect, Pool};
+
+#[cfg(feature = "test-fixtures")]
+pub use test_fixtures::connect_for_tests;

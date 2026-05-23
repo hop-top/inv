@@ -38,9 +38,11 @@ hop-top-inv-commands = { workspace = true }
 [dev-dependencies]
 tokio = { workspace = true }
 # Enable `client` for the in-process integration test client + `sqlite`
-# storage backend for the in-memory CoreCtx fixture.
+# storage backend for the in-memory CoreCtx fixture. `test-fixtures`
+# brings in `connect_for_tests`. Postgres is opted in by CI via
+# `--features hop-top-inv-store/postgres`.
 rmcp = { workspace = true, features = ["client", "transport-io", "schemars"] }
-hop-top-inv-store = { workspace = true, features = ["sqlite"] }
+hop-top-inv-store = { workspace = true, features = ["sqlite", "test-fixtures"] }
 serde_json = { workspace = true }
 anyhow = { workspace = true }
 

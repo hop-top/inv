@@ -45,9 +45,16 @@ tidb = ["sqlx/mysql"]
 # Real S3 implementation lands in v1.1.
 s3 = []
 
+# Cross-crate test helpers (`connect_for_tests`). Gated so production
+# builds don't pull the helper in. Consumer crates enable this in
+# their `[dev-dependencies]` only — see src/test_fixtures.rs.
+test-fixtures = []
+
 [dev-dependencies]
 tokio = { workspace = true }
 tempfile = { workspace = true }
+# Pull in `connect_for_tests` for this crate's own integration suite.
+hop-top-inv-store = { path = ".", features = ["test-fixtures"] }
 
 [lints]
 workspace = true

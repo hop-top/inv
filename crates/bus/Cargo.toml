@@ -35,7 +35,10 @@ sqlx = { workspace = true, features = ["any"] }
 tokio = { workspace = true }
 tempfile = { workspace = true }
 rust_decimal = { workspace = true }
-hop-top-inv-store = { workspace = true, features = ["sqlite"] }
+# Enable the sqlite backend + the shared `connect_for_tests` helper on
+# hop-top-inv-store for the integration test pool. Postgres is opted in
+# by CI via `--features hop-top-inv-store/postgres`.
+hop-top-inv-store = { workspace = true, features = ["sqlite", "test-fixtures"] }
 
 [lints]
 workspace = true

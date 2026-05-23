@@ -1264,6 +1264,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "hop-top-inv-core",
+ "hop-top-inv-store",
  "mti",
  "rust_decimal",
  "serde",
