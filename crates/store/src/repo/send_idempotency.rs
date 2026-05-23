@@ -17,6 +17,7 @@ use hop_top_inv_core::domain::ids::{HistoryId, InvoiceId};
 use super::{parse_ts, ts_to_string};
 use crate::error::{Result, StoreError};
 use crate::pool::Pool;
+use crate::sql::{portable_sql, portable_sql_for_tx};
 
 /// One row in `send_idempotency`.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -53,14 +54,17 @@ impl<'p> SendIdempotencyRepo<'p> {
         invoice_id: &InvoiceId,
         idempotency_key: &str,
     ) -> Result<Option<SendIdempotencyRecord>> {
-        let row = sqlx::query(
+        let sql = portable_sql(
+            self.pool,
             "SELECT invoice_id, idempotency_key, history_id, delivered_to, created_at \
              FROM send_idempotency WHERE invoice_id = ? AND idempotency_key = ?",
         )
-        .bind(invoice_id.to_string())
-        .bind(idempotency_key)
-        .fetch_optional(self.pool)
         .await?;
+        let row = sqlx::query(&sql)
+            .bind(invoice_id.to_string())
+            .bind(idempotency_key)
+            .fetch_optional(self.pool)
+            .await?;
         row.as_ref().map(row_to_record).transpose()
     }
 
@@ -71,18 +75,20 @@ impl<'p> SendIdempotencyRepo<'p> {
         tx: &mut sqlx::Transaction<'_, sqlx::Any>,
         rec: &SendIdempotencyRecord,
     ) -> Result<()> {
-        sqlx::query(
+        let sql = portable_sql_for_tx(
+            tx,
             "INSERT INTO send_idempotency \
              (invoice_id, idempotency_key, history_id, delivered_to, created_at) \
              VALUES (?, ?, ?, ?, ?)",
-        )
-        .bind(rec.invoice_id.to_string())
-        .bind(&rec.idempotency_key)
-        .bind(rec.history_id.to_string())
-        .bind(&rec.delivered_to)
-        .bind(ts_to_string(&rec.created_at))
-        .execute(&mut **tx)
-        .await?;
+        );
+        sqlx::query(&sql)
+            .bind(rec.invoice_id.to_string())
+            .bind(&rec.idempotency_key)
+            .bind(rec.history_id.to_string())
+            .bind(&rec.delivered_to)
+            .bind(ts_to_string(&rec.created_at))
+            .execute(&mut **tx)
+            .await?;
         Ok(())
     }
 }

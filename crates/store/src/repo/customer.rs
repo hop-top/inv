@@ -9,6 +9,7 @@ use hop_top_inv_core::domain::ids::CustomerId;
 use super::{metadata_from_json, metadata_to_json, parse_ts, ts_to_string};
 use crate::error::{Result, StoreError};
 use crate::pool::Pool;
+use crate::sql::{portable_sql, portable_sql_for_tx};
 
 /// Customer repository.
 #[derive(Debug, Clone)]
@@ -37,7 +38,8 @@ impl<'p> CustomerRepo<'p> {
     pub async fn save_in_tx(tx: &mut sqlx::Transaction<'_, sqlx::Any>, c: &Customer) -> Result<()> {
         let address_json = serde_json::to_string(&c.address)?;
         let metadata = metadata_to_json(&c.metadata)?;
-        sqlx::query(
+        let sql = portable_sql_for_tx(
+            tx,
             "INSERT INTO customers \
              (id, display_name, email, address_json, jurisdiction, metadata, created_at, updated_at) \
              VALUES (?, ?, ?, ?, ?, ?, ?, ?) \
@@ -48,29 +50,33 @@ impl<'p> CustomerRepo<'p> {
               jurisdiction = excluded.jurisdiction, \
               metadata = excluded.metadata, \
               updated_at = excluded.updated_at",
-        )
-        .bind(c.id.to_string())
-        .bind(&c.display_name)
-        .bind(c.email.clone())
-        .bind(address_json)
-        .bind(None::<String>) // jurisdiction is inferred from address; column reserved.
-        .bind(metadata)
-        .bind(ts_to_string(&c.created_at))
-        .bind(ts_to_string(&c.updated_at))
-        .execute(&mut **tx)
-        .await?;
+        );
+        sqlx::query(&sql)
+            .bind(c.id.to_string())
+            .bind(&c.display_name)
+            .bind(c.email.clone())
+            .bind(address_json)
+            .bind(None::<String>) // jurisdiction is inferred from address; column reserved.
+            .bind(metadata)
+            .bind(ts_to_string(&c.created_at))
+            .bind(ts_to_string(&c.updated_at))
+            .execute(&mut **tx)
+            .await?;
         Ok(())
     }
 
     /// Fetch by id.
     pub async fn get(&self, id: &CustomerId) -> Result<Option<Customer>> {
-        let row = sqlx::query(
+        let sql = portable_sql(
+            self.pool,
             "SELECT id, display_name, email, address_json, metadata, created_at, updated_at \
              FROM customers WHERE id = ?",
         )
-        .bind(id.to_string())
-        .fetch_optional(self.pool)
         .await?;
+        let row = sqlx::query(&sql)
+            .bind(id.to_string())
+            .fetch_optional(self.pool)
+            .await?;
 
         match row {
             None => Ok(None),
@@ -80,14 +86,17 @@ impl<'p> CustomerRepo<'p> {
 
     /// List all customers (basic pagination via SQL LIMIT/OFFSET).
     pub async fn list(&self, limit: i64, offset: i64) -> Result<Vec<Customer>> {
-        let rows = sqlx::query(
+        let sql = portable_sql(
+            self.pool,
             "SELECT id, display_name, email, address_json, metadata, created_at, updated_at \
              FROM customers ORDER BY created_at ASC LIMIT ? OFFSET ?",
         )
-        .bind(limit)
-        .bind(offset)
-        .fetch_all(self.pool)
         .await?;
+        let rows = sqlx::query(&sql)
+            .bind(limit)
+            .bind(offset)
+            .fetch_all(self.pool)
+            .await?;
 
         rows.iter().map(row_to_customer).collect()
     }

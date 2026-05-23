@@ -8,6 +8,7 @@ use hop_top_inv_core::domain::reminder::{Reminder, ReminderChannel, ReminderStat
 use super::{parse_ts, ts_to_string};
 use crate::error::{Result, StoreError};
 use crate::pool::Pool;
+use crate::sql::{portable_sql, portable_sql_for_tx};
 
 /// Reminder repository.
 #[derive(Debug, Clone)]
@@ -31,7 +32,8 @@ impl<'p> ReminderRepo<'p> {
 
     /// Upsert inside a caller-owned transaction (see [`InvoiceRepo::save_in_tx`]).
     pub async fn save_in_tx(tx: &mut sqlx::Transaction<'_, sqlx::Any>, r: &Reminder) -> Result<()> {
-        sqlx::query(
+        let sql = portable_sql_for_tx(
+            tx,
             "INSERT INTO reminders (id, invoice_id, scheduled_at, sent_at, channel, state) \
              VALUES (?, ?, ?, ?, ?, ?) \
              ON CONFLICT (id) DO UPDATE SET \
@@ -40,52 +42,62 @@ impl<'p> ReminderRepo<'p> {
               sent_at = excluded.sent_at, \
               channel = excluded.channel, \
               state = excluded.state",
-        )
-        .bind(r.id.to_string())
-        .bind(r.invoice_id.to_string())
-        .bind(ts_to_string(&r.scheduled_at))
-        .bind(r.sent_at.as_ref().map(ts_to_string))
-        .bind(channel_to_str(r.channel))
-        .bind(state_to_str(r.state))
-        .execute(&mut **tx)
-        .await?;
+        );
+        sqlx::query(&sql)
+            .bind(r.id.to_string())
+            .bind(r.invoice_id.to_string())
+            .bind(ts_to_string(&r.scheduled_at))
+            .bind(r.sent_at.as_ref().map(ts_to_string))
+            .bind(channel_to_str(r.channel))
+            .bind(state_to_str(r.state))
+            .execute(&mut **tx)
+            .await?;
         Ok(())
     }
 
     /// Get by id.
     pub async fn get(&self, id: &ReminderId) -> Result<Option<Reminder>> {
-        let row = sqlx::query(
+        let sql = portable_sql(
+            self.pool,
             "SELECT id, invoice_id, scheduled_at, sent_at, channel, state \
              FROM reminders WHERE id = ?",
         )
-        .bind(id.to_string())
-        .fetch_optional(self.pool)
         .await?;
+        let row = sqlx::query(&sql)
+            .bind(id.to_string())
+            .fetch_optional(self.pool)
+            .await?;
         row.as_ref().map(row_to_reminder).transpose()
     }
 
     /// List reminders for a given invoice.
     pub async fn list_for_invoice(&self, invoice_id: &InvoiceId) -> Result<Vec<Reminder>> {
-        let rows = sqlx::query(
+        let sql = portable_sql(
+            self.pool,
             "SELECT id, invoice_id, scheduled_at, sent_at, channel, state \
              FROM reminders WHERE invoice_id = ? ORDER BY scheduled_at ASC",
         )
-        .bind(invoice_id.to_string())
-        .fetch_all(self.pool)
         .await?;
+        let rows = sqlx::query(&sql)
+            .bind(invoice_id.to_string())
+            .fetch_all(self.pool)
+            .await?;
         rows.iter().map(row_to_reminder).collect()
     }
 
     /// Pending reminders ready for dispatch (scheduled AND scheduled_at <= cutoff).
     pub async fn due(&self, cutoff: chrono::DateTime<chrono::Utc>) -> Result<Vec<Reminder>> {
-        let rows = sqlx::query(
+        let sql = portable_sql(
+            self.pool,
             "SELECT id, invoice_id, scheduled_at, sent_at, channel, state \
              FROM reminders WHERE state = 'scheduled' AND scheduled_at <= ? \
              ORDER BY scheduled_at ASC",
         )
-        .bind(ts_to_string(&cutoff))
-        .fetch_all(self.pool)
         .await?;
+        let rows = sqlx::query(&sql)
+            .bind(ts_to_string(&cutoff))
+            .fetch_all(self.pool)
+            .await?;
         rows.iter().map(row_to_reminder).collect()
     }
 }

@@ -10,6 +10,7 @@ use hop_top_inv_core::domain::schedule::{Cadence, Schedule, ScheduleLine, Schedu
 use super::{metadata_from_json, metadata_to_json, parse_ts, ts_to_string};
 use crate::error::{Result, StoreError};
 use crate::pool::Pool;
+use crate::sql::{portable_sql, portable_sql_for_tx};
 
 /// Filter for listing schedules.
 #[derive(Debug, Default, Clone)]
@@ -48,7 +49,8 @@ impl<'p> ScheduleRepo<'p> {
     pub async fn save_in_tx(tx: &mut sqlx::Transaction<'_, sqlx::Any>, s: &Schedule) -> Result<()> {
         let metadata = metadata_to_json(&s.metadata)?;
         let template_lines = serde_json::to_string(&s.template_lines)?;
-        sqlx::query(
+        let sql = portable_sql_for_tx(
+            tx,
             "INSERT INTO schedules \
              (id, customer_id, template_lines, currency, cadence, start_date, end_date, \
               auto_issue, next_run, last_run, state, metadata, created_at, updated_at) \
@@ -66,44 +68,49 @@ impl<'p> ScheduleRepo<'p> {
               state = excluded.state, \
               metadata = excluded.metadata, \
               updated_at = excluded.updated_at",
-        )
-        .bind(s.id.to_string())
-        .bind(s.customer_id.to_string())
-        .bind(template_lines)
-        .bind(s.currency.to_string())
-        .bind(s.cadence.to_string())
-        .bind(s.start_date.to_string())
-        .bind(s.end_date.as_ref().map(|d| d.to_string()))
-        .bind(i64::from(s.auto_issue))
-        .bind(s.next_run.to_string())
-        .bind(s.last_run.as_ref().map(|d| d.to_string()))
-        .bind(state_to_str(s.state))
-        .bind(metadata)
-        .bind(ts_to_string(&s.created_at))
-        .bind(ts_to_string(&s.updated_at))
-        .execute(&mut **tx)
-        .await?;
+        );
+        sqlx::query(&sql)
+            .bind(s.id.to_string())
+            .bind(s.customer_id.to_string())
+            .bind(template_lines)
+            .bind(s.currency.to_string())
+            .bind(s.cadence.to_string())
+            .bind(s.start_date.to_string())
+            .bind(s.end_date.as_ref().map(|d| d.to_string()))
+            .bind(i64::from(s.auto_issue))
+            .bind(s.next_run.to_string())
+            .bind(s.last_run.as_ref().map(|d| d.to_string()))
+            .bind(state_to_str(s.state))
+            .bind(metadata)
+            .bind(ts_to_string(&s.created_at))
+            .bind(ts_to_string(&s.updated_at))
+            .execute(&mut **tx)
+            .await?;
         Ok(())
     }
 
     /// Get by id.
     pub async fn get(&self, id: &ScheduleId) -> Result<Option<Schedule>> {
-        let row = sqlx::query(
+        let sql = portable_sql(
+            self.pool,
             "SELECT id, customer_id, template_lines, currency, cadence, start_date, end_date, \
                     auto_issue, next_run, last_run, state, metadata, created_at, updated_at \
              FROM schedules WHERE id = ?",
         )
-        .bind(id.to_string())
-        .fetch_optional(self.pool)
         .await?;
+        let row = sqlx::query(&sql)
+            .bind(id.to_string())
+            .fetch_optional(self.pool)
+            .await?;
         row.as_ref().map(row_to_schedule).transpose()
     }
 
     /// List with filters. With no filter set, returns every schedule
     /// across all customers ordered by `created_at ASC`.
     pub async fn list(&self, filter: &ScheduleFilter) -> Result<Vec<Schedule>> {
-        // Build the WHERE dynamically. Each placeholder is `?` (sqlite's
-        // form; sqlx::Any rewrites to the native form per backend).
+        // Build the WHERE dynamically. The SQL is assembled in sqlite's
+        // `?` form, then [`portable_sql`] rewrites to `$N` for postgres
+        // immediately before query() consumes it.
         let mut sql = String::from(
             "SELECT id, customer_id, template_lines, currency, cadence, start_date, end_date, \
                     auto_issue, next_run, last_run, state, metadata, created_at, updated_at \
@@ -122,6 +129,7 @@ impl<'p> ScheduleRepo<'p> {
         if filter.offset.is_some() {
             sql.push_str(" OFFSET ?");
         }
+        let sql = portable_sql(self.pool, &sql).await?;
 
         let mut q = sqlx::query(&sql);
         if let Some(c) = filter.customer_id.as_ref() {
@@ -152,15 +160,18 @@ impl<'p> ScheduleRepo<'p> {
     /// Active schedules whose `next_run` is on or before `cutoff` (a date
     /// string in `YYYY-MM-DD` form). Useful for the ticker.
     pub async fn due(&self, cutoff: chrono::NaiveDate) -> Result<Vec<Schedule>> {
-        let rows = sqlx::query(
+        let sql = portable_sql(
+            self.pool,
             "SELECT id, customer_id, template_lines, currency, cadence, start_date, end_date, \
                     auto_issue, next_run, last_run, state, metadata, created_at, updated_at \
              FROM schedules WHERE state = 'active' AND next_run <= ? \
              ORDER BY next_run ASC",
         )
-        .bind(cutoff.to_string())
-        .fetch_all(self.pool)
         .await?;
+        let rows = sqlx::query(&sql)
+            .bind(cutoff.to_string())
+            .fetch_all(self.pool)
+            .await?;
         rows.iter().map(row_to_schedule).collect()
     }
 }

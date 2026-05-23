@@ -10,6 +10,7 @@ use super::invoice::{state_from_str, state_to_str};
 use super::{metadata_from_json, metadata_to_json, parse_ts, ts_to_string};
 use crate::error::{Result, StoreError};
 use crate::pool::Pool;
+use crate::sql::{portable_sql, portable_sql_for_tx};
 
 /// Invoice history repository.
 #[derive(Debug, Clone)]
@@ -39,26 +40,28 @@ impl<'p> InvoiceHistoryRepo<'p> {
         h: &InvoiceStateHistory,
     ) -> Result<()> {
         let metadata = metadata_to_json(&h.metadata)?;
-        sqlx::query(
+        let sql = portable_sql_for_tx(
+            tx,
             "INSERT INTO invoice_state_history \
              (id, invoice_id, from_state, to_state, event, actor, channel, \
               bus_event_id, reason, occurred_at, published_at, metadata) \
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        )
-        .bind(h.id.to_string())
-        .bind(h.invoice_id.to_string())
-        .bind(h.from_state.map(state_to_str))
-        .bind(state_to_str(h.to_state))
-        .bind(&h.event)
-        .bind(h.actor.clone())
-        .bind(channel_to_str(h.channel))
-        .bind(h.bus_event_id.clone())
-        .bind(h.reason.clone())
-        .bind(ts_to_string(&h.occurred_at))
-        .bind(h.published_at.as_ref().map(ts_to_string))
-        .bind(metadata)
-        .execute(&mut **tx)
-        .await?;
+        );
+        sqlx::query(&sql)
+            .bind(h.id.to_string())
+            .bind(h.invoice_id.to_string())
+            .bind(h.from_state.map(state_to_str))
+            .bind(state_to_str(h.to_state))
+            .bind(&h.event)
+            .bind(h.actor.clone())
+            .bind(channel_to_str(h.channel))
+            .bind(h.bus_event_id.clone())
+            .bind(h.reason.clone())
+            .bind(ts_to_string(&h.occurred_at))
+            .bind(h.published_at.as_ref().map(ts_to_string))
+            .bind(metadata)
+            .execute(&mut **tx)
+            .await?;
         Ok(())
     }
 
@@ -67,34 +70,42 @@ impl<'p> InvoiceHistoryRepo<'p> {
         &self,
         invoice_id: &InvoiceId,
     ) -> Result<Vec<InvoiceStateHistory>> {
-        let rows = sqlx::query(
+        let sql = portable_sql(
+            self.pool,
             "SELECT id, invoice_id, from_state, to_state, event, actor, channel, \
                     bus_event_id, reason, occurred_at, published_at, metadata \
              FROM invoice_state_history WHERE invoice_id = ? ORDER BY occurred_at ASC",
         )
-        .bind(invoice_id.to_string())
-        .fetch_all(self.pool)
         .await?;
+        let rows = sqlx::query(&sql)
+            .bind(invoice_id.to_string())
+            .fetch_all(self.pool)
+            .await?;
         rows.iter().map(row_to_history).collect()
     }
 
     /// Outbox query: pending rows that need bus publication.
     pub async fn pending_outbox(&self, limit: i64) -> Result<Vec<InvoiceStateHistory>> {
-        let rows = sqlx::query(
+        let sql = portable_sql(
+            self.pool,
             "SELECT id, invoice_id, from_state, to_state, event, actor, channel, \
                     bus_event_id, reason, occurred_at, published_at, metadata \
              FROM invoice_state_history WHERE published_at IS NULL \
              ORDER BY occurred_at ASC LIMIT ?",
         )
-        .bind(limit)
-        .fetch_all(self.pool)
         .await?;
+        let rows = sqlx::query(&sql).bind(limit).fetch_all(self.pool).await?;
         rows.iter().map(row_to_history).collect()
     }
 
     /// Mark an outbox row as published.
     pub async fn mark_published(&self, id: &HistoryId) -> Result<()> {
-        sqlx::query("UPDATE invoice_state_history SET published_at = ? WHERE id = ?")
+        let sql = portable_sql(
+            self.pool,
+            "UPDATE invoice_state_history SET published_at = ? WHERE id = ?",
+        )
+        .await?;
+        sqlx::query(&sql)
             .bind(ts_to_string(&Utc::now()))
             .bind(id.to_string())
             .execute(self.pool)

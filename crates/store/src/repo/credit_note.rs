@@ -13,6 +13,7 @@ use super::{
 };
 use crate::error::{Result, StoreError};
 use crate::pool::Pool;
+use crate::sql::{portable_sql, portable_sql_for_tx};
 
 /// Filter for listing credit notes.
 #[derive(Debug, Default, Clone)]
@@ -55,7 +56,8 @@ impl<'p> CreditNoteRepo<'p> {
         n: &CreditNote,
     ) -> Result<()> {
         let metadata = metadata_to_json(&n.metadata)?;
-        sqlx::query(
+        let sql = portable_sql_for_tx(
+            tx,
             "INSERT INTO credit_notes \
              (id, number, invoice_id, state, amount, currency, reason, refund_ref, issued_at, created_at, metadata) \
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) \
@@ -69,40 +71,45 @@ impl<'p> CreditNoteRepo<'p> {
               refund_ref = excluded.refund_ref, \
               issued_at = excluded.issued_at, \
               metadata = excluded.metadata",
-        )
-        .bind(n.id.to_string())
-        .bind(n.number.clone())
-        .bind(n.invoice_id.to_string())
-        .bind(cn_state_to_str(n.state))
-        .bind(decimal_to_string(&n.amount))
-        .bind(n.currency.to_string())
-        .bind(n.reason.clone())
-        .bind(n.refund_ref.clone())
-        .bind(n.issued_at.as_ref().map(ts_to_string))
-        .bind(ts_to_string(&n.created_at))
-        .bind(metadata)
-        .execute(&mut **tx)
-        .await?;
+        );
+        sqlx::query(&sql)
+            .bind(n.id.to_string())
+            .bind(n.number.clone())
+            .bind(n.invoice_id.to_string())
+            .bind(cn_state_to_str(n.state))
+            .bind(decimal_to_string(&n.amount))
+            .bind(n.currency.to_string())
+            .bind(n.reason.clone())
+            .bind(n.refund_ref.clone())
+            .bind(n.issued_at.as_ref().map(ts_to_string))
+            .bind(ts_to_string(&n.created_at))
+            .bind(metadata)
+            .execute(&mut **tx)
+            .await?;
         Ok(())
     }
 
     /// Fetch by id.
     pub async fn get(&self, id: &CreditNoteId) -> Result<Option<CreditNote>> {
-        let row = sqlx::query(
+        let sql = portable_sql(
+            self.pool,
             "SELECT id, number, invoice_id, state, amount, currency, reason, refund_ref, issued_at, created_at, metadata \
              FROM credit_notes WHERE id = ?",
         )
-        .bind(id.to_string())
-        .fetch_optional(self.pool)
         .await?;
+        let row = sqlx::query(&sql)
+            .bind(id.to_string())
+            .fetch_optional(self.pool)
+            .await?;
         row.as_ref().map(row_to_credit_note).transpose()
     }
 
     /// List with filters. With no filter set, returns every credit
     /// note across all invoices ordered by `created_at ASC`.
     pub async fn list(&self, filter: &CreditNoteFilter) -> Result<Vec<CreditNote>> {
-        // Build the WHERE dynamically. Each placeholder is `?` (sqlite's
-        // form; sqlx::Any rewrites to the native form per backend).
+        // Build the WHERE dynamically. The SQL is assembled in sqlite's
+        // `?` form, then [`portable_sql`] rewrites to `$N` for postgres
+        // immediately before query() consumes it.
         let mut sql = String::from(
             "SELECT id, number, invoice_id, state, amount, currency, reason, refund_ref, issued_at, created_at, metadata \
              FROM credit_notes WHERE 1=1",
@@ -120,6 +127,7 @@ impl<'p> CreditNoteRepo<'p> {
         if filter.offset.is_some() {
             sql.push_str(" OFFSET ?");
         }
+        let sql = portable_sql(self.pool, &sql).await?;
 
         let mut q = sqlx::query(&sql);
         if let Some(i) = filter.invoice_id.as_ref() {
@@ -239,25 +247,27 @@ impl<'p> CreditNoteHistoryRepo<'p> {
         h: &CreditNoteStateHistory,
     ) -> Result<()> {
         let metadata = metadata_to_json(&h.metadata)?;
-        sqlx::query(
+        let sql = portable_sql_for_tx(
+            tx,
             "INSERT INTO credit_note_state_history \
              (id, credit_note_id, from_state, to_state, event, actor, channel, bus_event_id, \
               occurred_at, published_at, metadata) \
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        )
-        .bind(h.id.to_string())
-        .bind(h.credit_note_id.to_string())
-        .bind(h.from_state.map(cn_state_to_str))
-        .bind(cn_state_to_str(h.to_state))
-        .bind(&h.event)
-        .bind(h.actor.clone())
-        .bind(super::history::channel_to_str(h.channel))
-        .bind(h.bus_event_id.clone())
-        .bind(ts_to_string(&h.occurred_at))
-        .bind(h.published_at.as_ref().map(ts_to_string))
-        .bind(metadata)
-        .execute(&mut **tx)
-        .await?;
+        );
+        sqlx::query(&sql)
+            .bind(h.id.to_string())
+            .bind(h.credit_note_id.to_string())
+            .bind(h.from_state.map(cn_state_to_str))
+            .bind(cn_state_to_str(h.to_state))
+            .bind(&h.event)
+            .bind(h.actor.clone())
+            .bind(super::history::channel_to_str(h.channel))
+            .bind(h.bus_event_id.clone())
+            .bind(ts_to_string(&h.occurred_at))
+            .bind(h.published_at.as_ref().map(ts_to_string))
+            .bind(metadata)
+            .execute(&mut **tx)
+            .await?;
         Ok(())
     }
 
@@ -266,34 +276,42 @@ impl<'p> CreditNoteHistoryRepo<'p> {
         &self,
         credit_note_id: &CreditNoteId,
     ) -> Result<Vec<CreditNoteStateHistory>> {
-        let rows = sqlx::query(
+        let sql = portable_sql(
+            self.pool,
             "SELECT id, credit_note_id, from_state, to_state, event, actor, channel, bus_event_id, \
                     occurred_at, published_at, metadata \
              FROM credit_note_state_history WHERE credit_note_id = ? ORDER BY occurred_at ASC",
         )
-        .bind(credit_note_id.to_string())
-        .fetch_all(self.pool)
         .await?;
+        let rows = sqlx::query(&sql)
+            .bind(credit_note_id.to_string())
+            .fetch_all(self.pool)
+            .await?;
         rows.iter().map(row_to_cn_history).collect()
     }
 
     /// Outbox query: pending rows that need bus publication.
     pub async fn pending_outbox(&self, limit: i64) -> Result<Vec<CreditNoteStateHistory>> {
-        let rows = sqlx::query(
+        let sql = portable_sql(
+            self.pool,
             "SELECT id, credit_note_id, from_state, to_state, event, actor, channel, bus_event_id, \
                     occurred_at, published_at, metadata \
              FROM credit_note_state_history WHERE published_at IS NULL \
              ORDER BY occurred_at ASC LIMIT ?",
         )
-        .bind(limit)
-        .fetch_all(self.pool)
         .await?;
+        let rows = sqlx::query(&sql).bind(limit).fetch_all(self.pool).await?;
         rows.iter().map(row_to_cn_history).collect()
     }
 
     /// Mark an outbox row as published.
     pub async fn mark_published(&self, id: &HistoryId) -> Result<()> {
-        sqlx::query("UPDATE credit_note_state_history SET published_at = ? WHERE id = ?")
+        let sql = portable_sql(
+            self.pool,
+            "UPDATE credit_note_state_history SET published_at = ? WHERE id = ?",
+        )
+        .await?;
+        sqlx::query(&sql)
             .bind(ts_to_string(&Utc::now()))
             .bind(id.to_string())
             .execute(self.pool)

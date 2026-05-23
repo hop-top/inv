@@ -11,6 +11,7 @@ use hop_top_inv_core::domain::ids::InvoiceId;
 use super::{parse_ts, ts_to_string};
 use crate::error::{Result, StoreError};
 use crate::pool::Pool;
+use crate::sql::portable_sql;
 
 /// One row in `bus_inbox`.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -47,33 +48,46 @@ impl<'p> BusInboxRepo<'p> {
     pub async fn try_insert(&self, rec: &BusInboxRecord) -> Result<bool> {
         // Check first; INSERT OR IGNORE would be portable on sqlite but not
         // on postgres/mysql. Two-step is portable.
-        let existing = sqlx::query("SELECT event_id FROM bus_inbox WHERE event_id = ?")
+        let select_sql = portable_sql(
+            self.pool,
+            "SELECT event_id FROM bus_inbox WHERE event_id = ?",
+        )
+        .await?;
+        let existing = sqlx::query(&select_sql)
             .bind(&rec.event_id)
             .fetch_optional(self.pool)
             .await?;
         if existing.is_some() {
             return Ok(false);
         }
-        sqlx::query(
+        let insert_sql = portable_sql(
+            self.pool,
             "INSERT INTO bus_inbox \
              (event_id, topic, source, received_at, payload_json, processed_at, invoice_id) \
              VALUES (?, ?, ?, ?, ?, ?, ?)",
         )
-        .bind(&rec.event_id)
-        .bind(&rec.topic)
-        .bind(&rec.source)
-        .bind(ts_to_string(&rec.received_at))
-        .bind(&rec.payload_json)
-        .bind(rec.processed_at.as_ref().map(ts_to_string))
-        .bind(rec.invoice_id.as_ref().map(|i| i.to_string()))
-        .execute(self.pool)
         .await?;
+        sqlx::query(&insert_sql)
+            .bind(&rec.event_id)
+            .bind(&rec.topic)
+            .bind(&rec.source)
+            .bind(ts_to_string(&rec.received_at))
+            .bind(&rec.payload_json)
+            .bind(rec.processed_at.as_ref().map(ts_to_string))
+            .bind(rec.invoice_id.as_ref().map(|i| i.to_string()))
+            .execute(self.pool)
+            .await?;
         Ok(true)
     }
 
     /// Mark a row as processed (sets `processed_at` to now).
     pub async fn mark_processed(&self, event_id: &str) -> Result<()> {
-        sqlx::query("UPDATE bus_inbox SET processed_at = ? WHERE event_id = ?")
+        let sql = portable_sql(
+            self.pool,
+            "UPDATE bus_inbox SET processed_at = ? WHERE event_id = ?",
+        )
+        .await?;
+        sqlx::query(&sql)
             .bind(ts_to_string(&Utc::now()))
             .bind(event_id)
             .execute(self.pool)
@@ -83,13 +97,16 @@ impl<'p> BusInboxRepo<'p> {
 
     /// Get by id.
     pub async fn get(&self, event_id: &str) -> Result<Option<BusInboxRecord>> {
-        let row = sqlx::query(
+        let sql = portable_sql(
+            self.pool,
             "SELECT event_id, topic, source, received_at, payload_json, processed_at, invoice_id \
              FROM bus_inbox WHERE event_id = ?",
         )
-        .bind(event_id)
-        .fetch_optional(self.pool)
         .await?;
+        let row = sqlx::query(&sql)
+            .bind(event_id)
+            .fetch_optional(self.pool)
+            .await?;
         row.as_ref().map(row_to_inbox).transpose()
     }
 }

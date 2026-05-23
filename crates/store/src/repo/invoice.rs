@@ -12,6 +12,7 @@ use super::{
 };
 use crate::error::{Result, StoreError};
 use crate::pool::Pool;
+use crate::sql::{portable_sql, portable_sql_for_tx};
 
 // ---------------------------------------------------------------------
 // Invoice
@@ -66,7 +67,8 @@ impl<'p> InvoiceRepo<'p> {
         inv: &Invoice,
     ) -> Result<()> {
         let metadata = metadata_to_json(&inv.metadata)?;
-        sqlx::query(
+        let sql = portable_sql_for_tx(
+            tx,
             "INSERT INTO invoices \
              (id, number, customer_id, seller_jur, currency, state, \
               issued_at, due_at, sent_at, viewed_at, paid_at, voided_at, \
@@ -97,39 +99,41 @@ impl<'p> InvoiceRepo<'p> {
               nexus_review = excluded.nexus_review, \
               metadata = excluded.metadata, \
               updated_at = excluded.updated_at",
-        )
-        .bind(inv.id.to_string())
-        .bind(inv.number.clone())
-        .bind(inv.customer_id.to_string())
-        .bind(inv.seller_jurisdiction.as_str())
-        .bind(inv.currency.to_string())
-        .bind(state_to_str(inv.state))
-        .bind(inv.issued_at.as_ref().map(ts_to_string))
-        .bind(inv.due_at.as_ref().map(ts_to_string))
-        .bind(inv.sent_at.as_ref().map(ts_to_string))
-        .bind(inv.viewed_at.as_ref().map(ts_to_string))
-        .bind(inv.paid_at.as_ref().map(ts_to_string))
-        .bind(inv.voided_at.as_ref().map(ts_to_string))
-        .bind(decimal_to_string(&inv.subtotal))
-        .bind(decimal_to_string(&inv.tax_total))
-        .bind(decimal_to_string(&inv.total))
-        .bind(decimal_to_string(&inv.amount_paid))
-        .bind(inv.schedule_id.as_ref().map(|s| s.to_string()))
-        .bind(inv.template_path.clone())
-        .bind(inv.pdf_blob_ref.clone())
-        .bind(inv.idempotency_key.clone())
-        .bind(i64::from(inv.nexus_review))
-        .bind(metadata)
-        .bind(ts_to_string(&inv.created_at))
-        .bind(ts_to_string(&inv.updated_at))
-        .execute(&mut **tx)
-        .await?;
+        );
+        sqlx::query(&sql)
+            .bind(inv.id.to_string())
+            .bind(inv.number.clone())
+            .bind(inv.customer_id.to_string())
+            .bind(inv.seller_jurisdiction.as_str())
+            .bind(inv.currency.to_string())
+            .bind(state_to_str(inv.state))
+            .bind(inv.issued_at.as_ref().map(ts_to_string))
+            .bind(inv.due_at.as_ref().map(ts_to_string))
+            .bind(inv.sent_at.as_ref().map(ts_to_string))
+            .bind(inv.viewed_at.as_ref().map(ts_to_string))
+            .bind(inv.paid_at.as_ref().map(ts_to_string))
+            .bind(inv.voided_at.as_ref().map(ts_to_string))
+            .bind(decimal_to_string(&inv.subtotal))
+            .bind(decimal_to_string(&inv.tax_total))
+            .bind(decimal_to_string(&inv.total))
+            .bind(decimal_to_string(&inv.amount_paid))
+            .bind(inv.schedule_id.as_ref().map(|s| s.to_string()))
+            .bind(inv.template_path.clone())
+            .bind(inv.pdf_blob_ref.clone())
+            .bind(inv.idempotency_key.clone())
+            .bind(i64::from(inv.nexus_review))
+            .bind(metadata)
+            .bind(ts_to_string(&inv.created_at))
+            .bind(ts_to_string(&inv.updated_at))
+            .execute(&mut **tx)
+            .await?;
         Ok(())
     }
 
     /// Fetch by id.
     pub async fn get(&self, id: &InvoiceId) -> Result<Option<Invoice>> {
-        let row = sqlx::query(invoice_select_columns().as_str())
+        let sql = portable_sql(self.pool, &invoice_select_columns()).await?;
+        let row = sqlx::query(&sql)
             .bind(id.to_string())
             .fetch_optional(self.pool)
             .await?;
@@ -142,7 +146,8 @@ impl<'p> InvoiceRepo<'p> {
     /// idempotency-replay path). The column has a UNIQUE constraint at
     /// schema level so the query is O(1) — `LIMIT 1` is belt-and-braces.
     pub async fn find_by_idempotency_key(&self, key: &str) -> Result<Option<Invoice>> {
-        let row = sqlx::query(
+        let sql = portable_sql(
+            self.pool,
             "SELECT id, number, customer_id, seller_jur, currency, state, \
                     issued_at, due_at, sent_at, viewed_at, paid_at, voided_at, \
                     subtotal, tax_total, total, amount_paid, \
@@ -150,16 +155,19 @@ impl<'p> InvoiceRepo<'p> {
                     nexus_review, metadata, created_at, updated_at \
              FROM invoices WHERE idempotency_key = ? LIMIT 1",
         )
-        .bind(key)
-        .fetch_optional(self.pool)
         .await?;
+        let row = sqlx::query(&sql)
+            .bind(key)
+            .fetch_optional(self.pool)
+            .await?;
         row.as_ref().map(row_to_invoice).transpose()
     }
 
     /// List with filters.
     pub async fn list(&self, filter: &InvoiceFilter) -> Result<Vec<Invoice>> {
-        // Build the WHERE dynamically. Each placeholder is `?` (sqlite's
-        // form; sqlx::Any rewrites to the native form per backend).
+        // Build the WHERE dynamically. The SQL is assembled in sqlite's
+        // `?` form, then [`portable_sql`] rewrites to `$N` for postgres
+        // immediately before query() consumes it.
         let mut sql = String::from(
             "SELECT id, number, customer_id, seller_jur, currency, state, \
                     issued_at, due_at, sent_at, viewed_at, paid_at, voided_at, \
@@ -181,6 +189,7 @@ impl<'p> InvoiceRepo<'p> {
         if filter.offset.is_some() {
             sql.push_str(" OFFSET ?");
         }
+        let sql = portable_sql(self.pool, &sql).await?;
 
         let mut q = sqlx::query(&sql);
         if let Some(c) = filter.customer_id.as_ref() {
@@ -201,7 +210,8 @@ impl<'p> InvoiceRepo<'p> {
 
     /// Delete (cascades through invoice_lines, history, etc).
     pub async fn delete(&self, id: &InvoiceId) -> Result<()> {
-        sqlx::query("DELETE FROM invoices WHERE id = ?")
+        let sql = portable_sql(self.pool, "DELETE FROM invoices WHERE id = ?").await?;
+        sqlx::query(&sql)
             .bind(id.to_string())
             .execute(self.pool)
             .await?;
@@ -368,7 +378,8 @@ impl<'p> InvoiceLineRepo<'p> {
     ) -> Result<()> {
         let tax_rate_ids = serde_json::to_string(&line.tax_rate_ids)?;
         let metadata = metadata_to_json(&line.metadata)?;
-        sqlx::query(
+        let sql = portable_sql_for_tx(
+            tx,
             "INSERT INTO invoice_lines \
              (id, invoice_id, position, description, quantity, unit_price, \
               tax_rate_ids, tax_category, tax_amount, line_total, metadata) \
@@ -384,20 +395,21 @@ impl<'p> InvoiceLineRepo<'p> {
               tax_amount = excluded.tax_amount, \
               line_total = excluded.line_total, \
               metadata = excluded.metadata",
-        )
-        .bind(line.id.to_string())
-        .bind(line.invoice_id.to_string())
-        .bind(line.position as i64)
-        .bind(&line.description)
-        .bind(decimal_to_string(&line.quantity))
-        .bind(decimal_to_string(&line.unit_price))
-        .bind(tax_rate_ids)
-        .bind(tax_category_to_str(line.tax_category))
-        .bind(decimal_to_string(&line.tax_amount))
-        .bind(decimal_to_string(&line.line_total))
-        .bind(metadata)
-        .execute(&mut **tx)
-        .await?;
+        );
+        sqlx::query(&sql)
+            .bind(line.id.to_string())
+            .bind(line.invoice_id.to_string())
+            .bind(line.position as i64)
+            .bind(&line.description)
+            .bind(decimal_to_string(&line.quantity))
+            .bind(decimal_to_string(&line.unit_price))
+            .bind(tax_rate_ids)
+            .bind(tax_category_to_str(line.tax_category))
+            .bind(decimal_to_string(&line.tax_amount))
+            .bind(decimal_to_string(&line.line_total))
+            .bind(metadata)
+            .execute(&mut **tx)
+            .await?;
         Ok(())
     }
 
@@ -424,46 +436,52 @@ impl<'p> InvoiceLineRepo<'p> {
         invoice_id: &InvoiceId,
         lines: &[InvoiceLine],
     ) -> Result<()> {
-        sqlx::query("DELETE FROM invoice_lines WHERE invoice_id = ?")
+        let delete_sql = portable_sql_for_tx(tx, "DELETE FROM invoice_lines WHERE invoice_id = ?");
+        sqlx::query(&delete_sql)
             .bind(invoice_id.to_string())
             .execute(&mut **tx)
             .await?;
         for line in lines {
             let tax_rate_ids = serde_json::to_string(&line.tax_rate_ids)?;
             let metadata = metadata_to_json(&line.metadata)?;
-            sqlx::query(
+            let insert_sql = portable_sql_for_tx(
+                tx,
                 "INSERT INTO invoice_lines \
                  (id, invoice_id, position, description, quantity, unit_price, \
                   tax_rate_ids, tax_category, tax_amount, line_total, metadata) \
                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            )
-            .bind(line.id.to_string())
-            .bind(line.invoice_id.to_string())
-            .bind(line.position as i64)
-            .bind(&line.description)
-            .bind(decimal_to_string(&line.quantity))
-            .bind(decimal_to_string(&line.unit_price))
-            .bind(tax_rate_ids)
-            .bind(tax_category_to_str(line.tax_category))
-            .bind(decimal_to_string(&line.tax_amount))
-            .bind(decimal_to_string(&line.line_total))
-            .bind(metadata)
-            .execute(&mut **tx)
-            .await?;
+            );
+            sqlx::query(&insert_sql)
+                .bind(line.id.to_string())
+                .bind(line.invoice_id.to_string())
+                .bind(line.position as i64)
+                .bind(&line.description)
+                .bind(decimal_to_string(&line.quantity))
+                .bind(decimal_to_string(&line.unit_price))
+                .bind(tax_rate_ids)
+                .bind(tax_category_to_str(line.tax_category))
+                .bind(decimal_to_string(&line.tax_amount))
+                .bind(decimal_to_string(&line.line_total))
+                .bind(metadata)
+                .execute(&mut **tx)
+                .await?;
         }
         Ok(())
     }
 
     /// Fetch all lines for an invoice, sorted by `position`.
     pub async fn list_for_invoice(&self, invoice_id: &InvoiceId) -> Result<Vec<InvoiceLine>> {
-        let rows = sqlx::query(
+        let sql = portable_sql(
+            self.pool,
             "SELECT id, invoice_id, position, description, quantity, unit_price, \
                     tax_rate_ids, tax_category, tax_amount, line_total, metadata \
              FROM invoice_lines WHERE invoice_id = ? ORDER BY position ASC",
         )
-        .bind(invoice_id.to_string())
-        .fetch_all(self.pool)
         .await?;
+        let rows = sqlx::query(&sql)
+            .bind(invoice_id.to_string())
+            .fetch_all(self.pool)
+            .await?;
 
         rows.iter().map(row_to_invoice_line).collect()
     }
