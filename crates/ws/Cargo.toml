@@ -34,7 +34,7 @@ hop-top-inv-bus      = { workspace = true }
 [dev-dependencies]
 tokio = { workspace = true }
 # Dev-only WebSocket client; separate from axum's runtime ws use.
-tokio-tungstenite = "0.24"
+tokio-tungstenite = "0.29"
 # Tax fixtures + the shared `connect_for_tests` pool. Postgres is opted
 # in by CI via `--features hop-top-inv-store/postgres`.
 hop-top-inv-store = { workspace = true, features = ["sqlite", "test-fixtures"] }
