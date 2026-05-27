@@ -29,7 +29,7 @@ tokio = { version = "1", features = ["full"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 serde_yaml = "0.9"
-toml = "0.8"
+toml = "1.1"
 
 # JSON Schema derive. Gated behind crate features (see hop-top-inv-core's `schema`
 # feature, hop-top-inv-mcp's hard dep). `chrono04` brings JsonSchema impls for
