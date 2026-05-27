@@ -53,7 +53,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 # Used by hop-top-inv-store::blob to compute HMAC-SHA256 over signed file:// URLs
 # for the local backend. Lightweight; no key-management story shipped at
 # v1 — the signing key is passed in by the caller.
-sha2 = "0.10"
+sha2 = "0.11"
 # Constant-time byte comparison for bearer-token auth (hop-top-inv-api). Already
 # pulled in transitively by sha2/rustls/etc.; pinned here so the api crate
 # can take a direct dep.
