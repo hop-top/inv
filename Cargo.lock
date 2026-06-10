@@ -1301,9 +1301,9 @@ dependencies = [
 
 [[package]]
 name = "hop-top-kit"
-version = "0.4.0-experimental.3"
+version = "0.5.0-alpha.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "effaa25acf73203e7f3455b2837b480ce5e771ec3d8a6b6381fa4bf3aa4668c3"
+checksum = "729ad2c87dd55eca3ea99eea0f7035d4a234652bd7bbd7ecab9ca73df1d8b500"
 dependencies = [
  "clap",
  "comfy-table",
