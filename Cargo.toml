@@ -77,7 +77,7 @@ sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio",
 # --- HTTP + WS + MCP -----------------------------------------------------
 axum = { version = "0.8", features = ["macros", "tokio", "ws", "tracing"] }
 tower = "0.5"
-tower-http = { version = "0.6", features = ["trace", "cors", "limit"] }
+tower-http = { version = "0.7", features = ["trace", "cors", "limit"] }
 rmcp = "1.7"
 # Outbound webhook delivery (hop-top-inv-api) + base64url encoding for signed-link
 # tokens served by the public-view route. Both sit on the request path so
