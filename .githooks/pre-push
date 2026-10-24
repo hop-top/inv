@@ -14,6 +14,13 @@
 # would punish every push. If we want it, add it as a separate opt-in hook.
 set -euo pipefail
 
+# Chain to the global pre-push (attribution guard): a local core.hooksPath
+# replaces the global hooks directory instead of adding to it.
+global_hooks=$(git config --global --type=path core.hooksPath 2>/dev/null || true)
+if [[ -n "$global_hooks" && -x "$global_hooks/pre-push" ]]; then
+  "$global_hooks/pre-push" "$@" || exit $?
+fi
+
 if [[ "${INV_SKIP_FMT_HOOK:-}" == "1" ]]; then
   exit 0
 fi
